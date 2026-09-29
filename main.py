@@ -87,6 +87,21 @@ async def get_today_dinner():
         return {"has_plan": False, "plan": None}
 
 
+@app.post("/api/cleanup-today")
+async def cleanup_today_dinner():
+    """Clean up duplicate dinner entries for today in Mealie, keeping only the single latest meal."""
+    try:
+        plan = await mealie_client.get_today_plan()
+        return {
+            "status": "success",
+            "message": "Cleaned up duplicate dinner entries for today in Mealie",
+            "active_plan": plan,
+        }
+    except Exception as e:
+        logger.error(f"Error during dinner cleanup: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/options")
 async def get_dinner_options():
     """Fetch 3 random dinner recipe options from Mealie (or mock recipes if unconfigured/offline)."""

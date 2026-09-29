@@ -56,6 +56,62 @@ class MealieClient:
             "Accept": "application/json",
         }
 
+    async def delete_mealplan_entry(self, entry_id: Any) -> bool:
+        """Delete a meal plan entry by ID from Mealie."""
+        if self.mock_mode or not entry_id:
+            return True
+
+        del_endpoints = [
+            f"{self.base_url}/api/households/mealplans/{entry_id}",
+            f"{self.base_url}/api/groups/mealplans/{entry_id}",
+        ]
+        async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+            for url in del_endpoints:
+                try:
+                    resp = await client.delete(url, headers=self.headers)
+                    if resp.status_code in (200, 204):
+                        logger.info(f"Deleted meal plan entry {entry_id} via {url}")
+                        return True
+                except Exception as e:
+                    logger.debug(f"Error deleting entry {entry_id} at {url}: {e}")
+        return False
+
+    async def clear_today_dinner_entries(self, today_str: Optional[str] = None) -> int:
+        """Find and remove all existing dinner entries for today from Mealie."""
+        if not today_str:
+            today_str = date.today().isoformat()
+
+        if self.mock_mode:
+            return 0
+
+        endpoints = [
+            f"{self.base_url}/api/households/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
+            f"{self.base_url}/api/groups/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
+        ]
+        deleted_count = 0
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+            entries_to_delete = []
+            for url in endpoints:
+                try:
+                    resp = await client.get(url, headers=self.headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        items = data.get("items", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                        for it in items:
+                            if str(it.get("date")) == today_str and str(it.get("entryType", "")).lower() == "dinner":
+                                if it.get("id"):
+                                    entries_to_delete.append(it["id"])
+                        if entries_to_delete:
+                            break
+                except Exception as e:
+                    logger.debug(f"Error querying meal plans for clear: {e}")
+
+            for eid in set(entries_to_delete):
+                if await self.delete_mealplan_entry(eid):
+                    deleted_count += 1
+
+        return deleted_count
+
     async def get_today_plan(self) -> Optional[Dict[str, Any]]:
         """Fetch today's already scheduled dinner from Mealie or cache."""
         today_str = date.today().isoformat()
@@ -66,9 +122,9 @@ class MealieClient:
 
         if not self.mock_mode:
             endpoints = [
-                f"{self.base_url}/api/households/mealplans?start_date={today_str}&end_date={today_str}",
+                f"{self.base_url}/api/households/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
                 f"{self.base_url}/api/households/mealplans/today",
-                f"{self.base_url}/api/groups/mealplans?start_date={today_str}&end_date={today_str}",
+                f"{self.base_url}/api/groups/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
                 f"{self.base_url}/api/groups/mealplans/today",
             ]
             async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
@@ -86,19 +142,28 @@ class MealieClient:
                             elif isinstance(data, list):
                                 items = data
 
-                            # Look for dinner entry for today
-                            dinner_entry = None
-                            for it in items:
-                                if str(it.get("date")) == today_str and str(it.get("entryType", "")).lower() == "dinner":
-                                    dinner_entry = it
-                                    break
-                            if not dinner_entry and items:
-                                for it in items:
-                                    if str(it.get("date")) == today_str:
-                                        dinner_entry = it
-                                        break
+                            # Find all dinner entries for today
+                            dinner_entries = [
+                                it for it in items
+                                if str(it.get("date")) == today_str and str(it.get("entryType", "")).lower() == "dinner"
+                            ]
+                            if not dinner_entries and items:
+                                dinner_entries = [it for it in items if str(it.get("date")) == today_str]
 
-                            if dinner_entry:
+                            if dinner_entries:
+                                # Keep the latest entry (highest ID or last in list)
+                                dinner_entry = dinner_entries[-1]
+
+                                # Automatically clean up older duplicate testing entries from Mealie!
+                                if len(dinner_entries) > 1:
+                                    logger.info(
+                                        f"Cleaning up {len(dinner_entries) - 1} duplicate dinner entries for {today_str} in Mealie."
+                                    )
+                                    for dup in dinner_entries[:-1]:
+                                        dup_id = dup.get("id")
+                                        if dup_id:
+                                            await self.delete_mealplan_entry(dup_id)
+
                                 recipe_obj = dinner_entry.get("recipe")
                                 title = dinner_entry.get("title") or dinner_entry.get("text")
                                 recipe_id = dinner_entry.get("recipeId")
@@ -323,6 +388,12 @@ class MealieClient:
                 "is_custom": is_custom,
                 "entry": payload,
             }
+
+        # Clear any existing dinner entries for today in Mealie so exactly ONE meal exists
+        try:
+            await self.clear_today_dinner_entries(today_str)
+        except Exception as e:
+            logger.warning(f"Could not clear prior dinner entries for {today_str}: {e}")
 
         # Try modern Mealie endpoint (/api/households/mealplans) first,
         # then fallback to legacy (/api/groups/mealplans) if needed

@@ -96,6 +96,16 @@ async def test_today_endpoint_returns_locked_in_choice():
 
 
 @pytest.mark.anyio
+async def test_cleanup_today_endpoint():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/cleanup-today")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert "Cleaned up" in data["message"]
+
+
+@pytest.mark.anyio
 async def test_choose_validation_failure():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Neither recipe_id nor custom_note provided
