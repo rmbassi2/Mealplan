@@ -9,10 +9,15 @@ services:
     container_name: dinner-decider
     ports:
       - "${BIND_IP:-127.0.0.1}:${PORT:-8000}:8000"
-    env_file:
-      - .env
     environment:
       - PORT=8000
+      - MEALIE_BASE_URL=${MEALIE_BASE_URL:-}
+      - MEALIE_API_TOKEN=${MEALIE_API_TOKEN:-}
+      - MEALIE_GROUP_SLUG=${MEALIE_GROUP_SLUG:-home}
+      - NTFY_TOPIC=${NTFY_TOPIC:-}
+      - NTFY_BASE_URL=${NTFY_BASE_URL:-https://ntfy.sh}
+      - NTFY_TOKEN=${NTFY_TOKEN:-}
+      - MOCK_MODE=${MOCK_MODE:-false}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
