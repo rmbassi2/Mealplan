@@ -1,0 +1,24 @@
+[Unit]
+Description=Dinner Decider - Mealie Dinner Voting Web App
+After=network.target
+
+[Service]
+Type=simple
+User=dinnerdecider
+Group=dinnerdecider
+WorkingDirectory=/opt/dinner-decider
+EnvironmentFile=/opt/dinner-decider/.env
+ExecStart=/opt/dinner-decider/.venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security sandbox directives
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

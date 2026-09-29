@@ -79,6 +79,58 @@ A lightweight, mobile-first web app designed for effortless dinner decision-maki
 
 ---
 
+### Option 3: LXC Container (Proxmox VE / LXD / Incus)
+
+Dinner Decider includes turnkey provisioning scripts to deploy as a lightweight LXC container without Docker overhead:
+
+#### A. Automated Proxmox VE Provisioning (from Proxmox Host Shell)
+Run directly from your Proxmox node shell or SSH session:
+```bash
+bash lxc/create-proxmox-lxc.sh
+```
+This script will:
+- Download the official Debian 12 LXC template (if not already cached).
+- Create a lightweight unprivileged container (1 vCPU, 512MB RAM, 4GB disk, auto-DHCP).
+- Push project files and run `lxc/install.sh` inside the container.
+- Output your web interface URL (`http://<lxc-ip>:8000`).
+
+#### B. Inside an Existing Debian / Ubuntu LXC Container
+1. Copy or clone the project inside your container:
+   ```bash
+   cd /opt
+   git clone <repo-url> dinner-decider
+   cd dinner-decider
+   ```
+2. Run the automated installer:
+   ```bash
+   bash lxc/install.sh
+   ```
+3. Update your Mealie credentials:
+   ```bash
+   nano /opt/dinner-decider/.env
+   systemctl restart dinner-decider
+   ```
+
+#### C. Incus or Canonical LXD
+Run from your host machine:
+```bash
+bash lxc/create-incus-lxd.sh
+```
+
+#### LXC Service Management:
+```bash
+# Check status
+systemctl status dinner-decider
+
+# View live stream of logs
+journalctl -u dinner-decider -f
+
+# Restart after configuration changes
+systemctl restart dinner-decider
+```
+
+---
+
 ## 🔑 How to Generate a Mealie API Token
 
 1. Log into your self-hosted **Mealie** web interface.
