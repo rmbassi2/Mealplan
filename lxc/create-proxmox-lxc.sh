@@ -17,36 +17,59 @@ if ! command -v pveversion &>/dev/null; then
 fi
 
 # 2. Defaults and Configuration
-HOSTNAME="${HOSTNAME:-dinner-decider}"
-MEMORY="${MEMORY:-512}"
-SWAP="${SWAP:-256}"
-CORES="${CORES:-1}"
-DISK_SIZE="${DISK_SIZE:-4G}"
-STORAGE="${STORAGE:-local-lvm}"
-BRIDGE="${BRIDGE:-vmbr0}"
-VZTMPL_STORAGE="${VZTMPL_STORAGE:-local}"
+DEFAULT_HOSTNAME="dinner-decider"
+read -r -p "Enter Container Hostname [${DEFAULT_HOSTNAME}]: " HOSTNAME_INPUT
+CT_HOSTNAME="${HOSTNAME_INPUT:-$DEFAULT_HOSTNAME}"
 
 # Get next available CTID
 NEXT_CTID=$(pvesh get /cluster/nextid)
 read -r -p "Enter Container ID [${NEXT_CTID}]: " CTID_INPUT
 CTID="${CTID_INPUT:-$NEXT_CTID}"
 
-# Check Storage availability
-if ! pvesm status -storage "$STORAGE" &>/dev/null; then
-  echo "[!] Storage '${STORAGE}' not found. Falling back to default available storage..."
-  STORAGE=$(pvesm status -content rootdir | awk 'NR>1 {print $1; exit}')
-  echo "[+] Selected rootdir storage: ${STORAGE}"
+# Check if container ID already exists
+if pct status "$CTID" &>/dev/null; then
+  echo "[!] Container ${CTID} already exists on this node."
+  read -r -p "Do you want to destroy container ${CTID} and recreate it? (y/N): " CONFIRM_DESTROY
+  if [[ "$CONFIRM_DESTROY" =~ ^[Yy]$ ]]; then
+    echo "[+] Stopping and destroying CT ${CTID}..."
+    pct stop "$CTID" 2>/dev/null || true
+    pct destroy "$CTID" --purge 1 2>/dev/null || pct destroy "$CTID"
+  else
+    echo "[-] Aborted by user."
+    exit 1
+  fi
 fi
+
+# Detect rootdir storages
+AVAILABLE_STORAGES=$(pvesm status -content rootdir | awk 'NR>1 {print $1}')
+DEFAULT_STORAGE=$(echo "$AVAILABLE_STORAGES" | grep -E "^(local-lvm|local-zfs)$" | head -n 1 || true)
+if [ -z "$DEFAULT_STORAGE" ]; then
+  DEFAULT_STORAGE=$(echo "$AVAILABLE_STORAGES" | head -n 1)
+fi
+
+read -r -p "Enter Target Storage [${DEFAULT_STORAGE}]: " STORAGE_INPUT
+STORAGE="${STORAGE_INPUT:-$DEFAULT_STORAGE}"
+
+# Disk size: Must be an integer in GB without trailing 'G' for pct create
+DEFAULT_DISK="4"
+read -r -p "Enter Disk Size in GB [${DEFAULT_DISK}]: " DISK_INPUT
+DISK_SIZE="${DISK_INPUT:-$DEFAULT_DISK}"
+DISK_SIZE="${DISK_SIZE//[gG]/}"  # Strip any accidental 'G' or 'g'
+
+MEMORY="${MEMORY:-512}"
+SWAP="${SWAP:-256}"
+CORES="${CORES:-1}"
+BRIDGE="${BRIDGE:-vmbr0}"
+VZTMPL_STORAGE="${VZTMPL_STORAGE:-local}"
 
 # 3. Locate or Download Debian 12 Template
 echo "[+] Checking for Debian 12 LXC template..."
-TEMPLATE_NAME=$(pveam available -section system | awk '{print $2}' | grep -E "debian-12-standard.*\.tar\.(zst|xz|gz)" | tail -n 1)
+TEMPLATE_NAME=$(pveam available -section system | awk '{print $2}' | grep -E "debian-12-standard.*\.tar\.(zst|xz|gz)" | tail -n 1 || true)
 
 if [ -z "$TEMPLATE_NAME" ]; then
-  echo "[-] Could not find Debian 12 standard template in pveam catalog. Using available local templates..."
+  echo "[-] Could not find Debian 12 in pveam catalog. Searching local templates..."
   TEMPLATE=$(pveam list "$VZTMPL_STORAGE" | awk '$1 ~ /debian/ {print $1; exit}')
 else
-  # Check if template is already downloaded
   TEMPLATE="${VZTMPL_STORAGE}:vztmpl/${TEMPLATE_NAME}"
   if ! pveam list "$VZTMPL_STORAGE" | grep -q "$TEMPLATE_NAME"; then
     echo "[+] Downloading template ${TEMPLATE_NAME} to ${VZTMPL_STORAGE}..."
@@ -57,10 +80,10 @@ else
 fi
 
 # 4. Create Container
-echo "[+] Creating LXC container ${CTID} (${HOSTNAME})..."
+echo "[+] Creating LXC container ${CTID} (${CT_HOSTNAME}) on storage ${STORAGE} (${DISK_SIZE}GB)..."
 pct create "$CTID" "$TEMPLATE" \
   --ostype debian \
-  --hostname "$HOSTNAME" \
+  --hostname "$CT_HOSTNAME" \
   --cores "$CORES" \
   --memory "$MEMORY" \
   --swap "$SWAP" \
@@ -88,7 +111,7 @@ if [ -z "$IP" ]; then
   echo "[!] Warning: Container did not obtain DHCP address yet. Checking later..."
 fi
 
-# 6. Copy or Clone project files into container
+# 6. Copy project files into container
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARENT_DIR="$(dirname "$SCRIPT_DIR")"
 
@@ -123,6 +146,7 @@ echo "  🎉 LXC Container ${CTID} is Ready!"
 echo "=========================================================="
 echo "  • Web Interface: http://${IP}:8000"
 echo "  • Container ID:  ${CTID}"
+echo "  • Container Host: ${CT_HOSTNAME}"
 echo "  • To edit .env:  pct exec ${CTID} -- nano /opt/dinner-decider/.env"
 echo "  • Restart app:   pct exec ${CTID} -- systemctl restart dinner-decider"
 echo "  • View logs:     pct exec ${CTID} -- journalctl -u dinner-decider -f"
