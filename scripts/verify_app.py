@@ -34,10 +34,29 @@ async def run_verification():
         print(f"Rendered {len(cards)} recipe cards.")
         assert len(cards) == 3, f"Expected 3 cards, got {len(cards)}"
 
-        # Initial view screenshot
+        # Verify filter pills rendered
+        pills = await page.query_selector_all("#filterPills button")
+        print(f"Rendered {len(pills)} mood filter pills.")
+        assert len(pills) >= 10, f"Expected at least 10 filter pills, got {len(pills)}"
+
+        # Initial view screenshot with filter pills & badges
         initial_shot = os.path.join(SCREENSHOTS_DIR, "1_initial_options.png")
         await page.screenshot(path=initial_shot)
         print(f"Saved initial view screenshot to: {initial_shot}")
+
+        # Test clicking a mood filter pill (e.g. Quick)
+        print("Clicking '⚡ Quick (<30m)' filter pill...")
+        quick_pill = page.locator("#filterPills button").filter(has_text="Quick")
+        await quick_pill.click()
+        await page.wait_for_timeout(600)
+        await page.wait_for_selector("#recipeList .recipe-card", state="visible")
+        quick_cards = await page.query_selector_all("#recipeList .recipe-card")
+        print(f"Rendered {len(quick_cards)} recipes for Quick filter.")
+        assert len(quick_cards) > 0, "Expected at least 1 recipe card for Quick filter"
+
+        filtered_shot = os.path.join(SCREENSHOTS_DIR, "1b_filtered_quick_options.png")
+        await page.screenshot(path=filtered_shot)
+        print(f"Saved filtered quick view screenshot to: {filtered_shot}")
 
         # Verify Lock It In button is initially disabled
         lock_btn = page.locator("#lockItInBtn")

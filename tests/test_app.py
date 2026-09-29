@@ -29,14 +29,59 @@ async def test_get_options_endpoint():
         assert "options" in data
         assert len(data["options"]) == 3
 
-        # Verify option card fields
+        # Verify option card fields and taxonomy badges
         for option in data["options"]:
             assert "id" in option
             assert "name" in option
             assert "description" in option
             assert "totalTime" in option
             assert "imageUrl" in option
+            assert "badges" in option
+            assert isinstance(option["badges"], list)
             assert option["imageUrl"].startswith("/api/recipe-image/")
+
+
+@pytest.mark.anyio
+async def test_taxonomy_endpoint():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/taxonomy")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "moods" in data
+        mood_ids = [m["id"] for m in data["moods"]]
+        assert "surprise" in mood_ids
+        assert "quick" in mood_ids
+        assert "chicken" in mood_ids
+
+
+@pytest.mark.anyio
+async def test_get_options_with_filters():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Quick mood
+        resp = await client.get("/api/options?mood=quick")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["options"]) > 0
+
+        # 2. Chicken protein filter
+        resp_chicken = await client.get("/api/options?protein=chicken")
+        assert resp_chicken.status_code == 200
+        data_chicken = resp_chicken.json()
+        assert len(data_chicken["options"]) > 0
+        for opt in data_chicken["options"]:
+            assert "chicken" in [t.lower() for t in opt.get("tags", [])]
+
+        # 3. Sheet pan tool filter
+        resp_tool = await client.get("/api/options?tool=sheet-pan")
+        assert resp_tool.status_code == 200
+        data_tool = resp_tool.json()
+        assert len(data_tool["options"]) > 0
+
+        # 4. Italian cuisine filter
+        resp_cuisine = await client.get("/api/options?cuisine=italian")
+        assert resp_cuisine.status_code == 200
+        data_cuisine = resp_cuisine.json()
+        assert len(data_cuisine["options"]) > 0
 
 
 @pytest.mark.anyio
@@ -120,3 +165,38 @@ def test_time_formatting_helper():
     assert format_recipe_time({"totalTime": "35"}) == "35 mins"
     assert format_recipe_time({"performTime": "25 mins"}) == "25 mins"
     assert format_recipe_time({}) == "30 mins"
+
+
+def test_taxonomy_unit_logic():
+    from app.taxonomy import extract_recipe_taxonomy, is_dinner_recipe, select_balanced_recipes
+
+    sample_recipe = {
+        "name": "Chicken Fajitas",
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "tools": [{"name": "Cast Iron Skillet", "slug": "cast-iron-skillet"}],
+        "tags": [
+            {"slug": "chicken"},
+            {"slug": "skillet"},
+            {"slug": "mexican-texmex"},
+            {"slug": "quick-weeknight"},
+        ],
+    }
+
+    tax = extract_recipe_taxonomy(sample_recipe)
+    assert "dinner" in tax["categories"]
+    assert "cast-iron-skillet" in tax["tools"]
+    assert "chicken" in tax["tags"]
+    assert tax["primary_protein"] == "chicken"
+    assert is_dinner_recipe(tax) is True
+
+    # Badges generated
+    assert len(tax["badges"]) > 0
+    badge_labels = [b["label"] for b in tax["badges"]]
+    assert any("Cast Iron" in lbl or "Mexican" in lbl or "Quick" in lbl for lbl in badge_labels)
+
+    # Balanced selection
+    from app.mock_data import MOCK_RECIPES
+    balanced = select_balanced_recipes(MOCK_RECIPES, count=3)
+    assert len(balanced) == 3
+    # Ensure distinct recipes
+    assert len({r["id"] for r in balanced}) == 3

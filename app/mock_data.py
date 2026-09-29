@@ -15,6 +15,15 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
         "category": "Seafood",
         "emoji": "🐟",
         "gradient": ("#f97316", "#e11d48"),
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "tools": [{"name": "Cast Iron Skillet", "slug": "cast-iron-skillet"}],
+        "tags": [
+            {"name": "seafood", "slug": "seafood"},
+            {"name": "skillet", "slug": "skillet"},
+            {"name": "quick-weeknight", "slug": "quick-weeknight"},
+            {"name": "light-fresh", "slug": "light-fresh"},
+            {"name": "gluten-free", "slug": "gluten-free"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e02",
@@ -25,6 +34,15 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
         "category": "Poultry",
         "emoji": "🍗",
         "gradient": ("#eab308", "#d97706"),
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "tools": [{"name": "Cast Iron Skillet", "slug": "cast-iron-skillet"}],
+        "tags": [
+            {"name": "chicken", "slug": "chicken"},
+            {"name": "skillet", "slug": "skillet"},
+            {"name": "comfort-food", "slug": "comfort-food"},
+            {"name": "italian", "slug": "italian"},
+            {"name": "low-carb", "slug": "low-carb"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e03",
@@ -35,6 +53,15 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
         "category": "Italian",
         "emoji": "🍕",
         "gradient": ("#ef4444", "#b91c1c"),
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "tools": [{"name": "Baking Dish", "slug": "baking-dish"}],
+        "tags": [
+            {"name": "vegetarian", "slug": "vegetarian"},
+            {"name": "baked-casserole", "slug": "baked-casserole"},
+            {"name": "italian", "slug": "italian"},
+            {"name": "kid-friendly", "slug": "kid-friendly"},
+            {"name": "comfort-food", "slug": "comfort-food"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e04",
@@ -45,6 +72,14 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
         "category": "Mexican",
         "emoji": "🌮",
         "gradient": ("#f59e0b", "#b45309"),
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "tools": [{"name": "Slow Cooker", "slug": "slow-cooker"}],
+        "tags": [
+            {"name": "beef", "slug": "beef"},
+            {"name": "mexican-texmex", "slug": "mexican-texmex"},
+            {"name": "crowd-pleaser", "slug": "crowd-pleaser"},
+            {"name": "comfort-food", "slug": "comfort-food"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e05",
@@ -55,6 +90,15 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
         "category": "Asian",
         "emoji": "🍜",
         "gradient": ("#d97706", "#92400e"),
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "tools": [{"name": "Wok", "slug": "wok"}],
+        "tags": [
+            {"name": "pasta-noodles", "slug": "pasta-noodles"},
+            {"name": "vegetarian", "slug": "vegetarian"},
+            {"name": "stir-fry", "slug": "stir-fry"},
+            {"name": "quick-weeknight", "slug": "quick-weeknight"},
+            {"name": "east-asian", "slug": "east-asian"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e06",
@@ -65,6 +109,15 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
         "category": "Sheet Pan",
         "emoji": "🥘",
         "gradient": ("#84cc16", "#4d7c0f"),
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "tools": [{"name": "Sheet Pan", "slug": "sheet-pan"}],
+        "tags": [
+            {"name": "chicken", "slug": "chicken"},
+            {"name": "sheet-pan", "slug": "sheet-pan"},
+            {"name": "low-effort", "slug": "low-effort"},
+            {"name": "light-fresh", "slug": "light-fresh"},
+            {"name": "gluten-free", "slug": "gluten-free"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e07",
@@ -75,6 +128,16 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
         "category": "Comfort Food",
         "emoji": "🍔",
         "gradient": ("#f97316", "#c2410c"),
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "tools": [{"name": "Cast Iron Skillet", "slug": "cast-iron-skillet"}],
+        "tags": [
+            {"name": "beef", "slug": "beef"},
+            {"name": "skillet", "slug": "skillet"},
+            {"name": "american-classic", "slug": "american-classic"},
+            {"name": "quick-weeknight", "slug": "quick-weeknight"},
+            {"name": "comfort-food", "slug": "comfort-food"},
+            {"name": "kid-friendly", "slug": "kid-friendly"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e08",
@@ -85,6 +148,15 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
         "category": "Vegetarian",
         "emoji": "🍲",
         "gradient": ("#fbbf24", "#d97706"),
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "tools": [{"name": "Dutch Oven", "slug": "dutch-oven"}],
+        "tags": [
+            {"name": "vegetarian", "slug": "vegetarian"},
+            {"name": "one-pot", "slug": "one-pot"},
+            {"name": "italian", "slug": "italian"},
+            {"name": "comfort-food", "slug": "comfort-food"},
+            {"name": "gluten-free", "slug": "gluten-free"},
+        ],
     },
 ]
 

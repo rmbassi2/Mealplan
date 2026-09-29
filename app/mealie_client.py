@@ -8,6 +8,7 @@ import httpx
 
 from app.config import settings
 from app.mock_data import MOCK_RECIPES, generate_recipe_svg
+from app.taxonomy import extract_recipe_taxonomy, select_balanced_recipes
 
 logger = logging.getLogger("mealie_client")
 
@@ -217,13 +218,20 @@ class MealieClient:
 
         return self._cached_today_plan
 
-    async def get_dinner_options(self, count: int = 3) -> List[Dict[str, Any]]:
-        """Fetch recipe options from Mealie, or fall back to mock recipes if offline/unconfigured."""
+    async def get_dinner_options(
+        self,
+        count: int = 3,
+        mood: Optional[str] = None,
+        protein: Optional[str] = None,
+        tool: Optional[str] = None,
+        cuisine: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch recipe options with taxonomy-aware balanced selection and badges."""
         if not self.mock_mode:
             try:
                 async with httpx.AsyncClient(timeout=6.0) as client:
                     resp = await client.get(
-                        f"{self.base_url}/api/recipes?perPage=50",
+                        f"{self.base_url}/api/recipes?perPage=100",
                         headers=self.headers,
                     )
                     if resp.status_code == 200:
@@ -237,10 +245,25 @@ class MealieClient:
                         )
 
                         if items:
-                            selected = random.sample(items, min(count, len(items)))
+                            selected = select_balanced_recipes(
+                                items,
+                                count=count,
+                                mood=mood,
+                                protein=protein,
+                                tool=tool,
+                                cuisine=cuisine,
+                            )
                             results = []
                             for r in selected:
+                                tax = r.get("_taxonomy") or extract_recipe_taxonomy(r)
                                 recipe_id = r.get("id") or r.get("slug")
+                                # Derive category label
+                                cat_label = "Dinner"
+                                raw_cats = r.get("recipeCategory") or r.get("categories") or []
+                                if raw_cats and isinstance(raw_cats, list):
+                                    first_c = raw_cats[0]
+                                    cat_label = first_c.get("name") if isinstance(first_c, dict) else str(first_c)
+
                                 results.append(
                                     {
                                         "id": recipe_id,
@@ -249,6 +272,10 @@ class MealieClient:
                                         "description": r.get("description") or "",
                                         "totalTime": format_recipe_time(r),
                                         "imageUrl": f"/api/recipe-image/{recipe_id}",
+                                        "category": cat_label,
+                                        "badges": tax.get("badges", []),
+                                        "tags": list(tax.get("tags", set())),
+                                        "tools": list(tax.get("tools", set())),
                                         "is_mock": False,
                                     }
                                 )
@@ -262,21 +289,35 @@ class MealieClient:
             except Exception as e:
                 logger.warning(f"Failed to connect to Mealie ({e}), falling back to mock options.")
 
-        # Fallback / Mock Mode: Pick random recipes from MOCK_RECIPES
-        selected_mocks = random.sample(MOCK_RECIPES, min(count, len(MOCK_RECIPES)))
-        return [
-            {
-                "id": m["id"],
-                "name": m["name"],
-                "slug": m["slug"],
-                "description": m["description"],
-                "totalTime": m["totalTime"],
-                "imageUrl": f"/api/recipe-image/{m['id']}",
-                "category": m.get("category"),
-                "is_mock": True,
-            }
-            for m in selected_mocks
-        ]
+        # Fallback / Mock Mode: Select balanced recipes from MOCK_RECIPES
+        selected_mocks = select_balanced_recipes(
+            MOCK_RECIPES,
+            count=count,
+            mood=mood,
+            protein=protein,
+            tool=tool,
+            cuisine=cuisine,
+        )
+        results = []
+        for m in selected_mocks:
+            tax = m.get("_taxonomy") or extract_recipe_taxonomy(m)
+            results.append(
+                {
+                    "id": m["id"],
+                    "name": m["name"],
+                    "slug": m["slug"],
+                    "description": m["description"],
+                    "totalTime": m["totalTime"],
+                    "imageUrl": f"/api/recipe-image/{m['id']}",
+                    "category": m.get("category", "Dinner"),
+                    "badges": tax.get("badges", []),
+                    "tags": list(tax.get("tags", set())),
+                    "tools": list(tax.get("tools", set())),
+                    "emoji": m.get("emoji", "🥘"),
+                    "is_mock": True,
+                }
+            )
+        return results
 
     async def get_recipe_image(self, recipe_id: str) -> Tuple[bytes, str]:
         """Proxy recipe image from Mealie, or serve generated SVG if unavailable or mock."""

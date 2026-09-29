@@ -102,14 +102,51 @@ async def cleanup_today_dinner():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/taxonomy")
+async def get_taxonomy_filters():
+    """Return available taxonomy filter options and curated mood presets for the frontend."""
+    return {
+        "moods": [
+            {"id": "surprise", "label": "Surprise Me", "icon": "✨"},
+            {"id": "quick", "label": "Quick (<30m)", "icon": "⚡"},
+            {"id": "comfort", "label": "Comfort Food", "icon": "🍲"},
+            {"id": "fresh", "label": "Light & Fresh", "icon": "🥗"},
+            {"id": "chicken", "label": "Chicken", "icon": "🍗"},
+            {"id": "beef", "label": "Beef", "icon": "🥩"},
+            {"id": "seafood", "label": "Seafood", "icon": "🐟"},
+            {"id": "vegetarian", "label": "Vegetarian", "icon": "🥑"},
+            {"id": "sheet-pan", "label": "Sheet Pan", "icon": "🥘"},
+            {"id": "air-fryer", "label": "Air Fryer", "icon": "💨"},
+            {"id": "slow-cooker", "label": "Slow Cooker", "icon": "⏳"},
+        ],
+    }
+
+
 @app.get("/api/options")
-async def get_dinner_options():
-    """Fetch 3 random dinner recipe options from Mealie (or mock recipes if unconfigured/offline)."""
+async def get_dinner_options(
+    mood: Optional[str] = None,
+    protein: Optional[str] = None,
+    tool: Optional[str] = None,
+    cuisine: Optional[str] = None,
+):
+    """Fetch 3 balanced dinner recipe options from Mealie, with optional mood, protein, tool, or cuisine filtering."""
     try:
-        options = await mealie_client.get_dinner_options(count=3)
+        options = await mealie_client.get_dinner_options(
+            count=3,
+            mood=mood,
+            protein=protein,
+            tool=tool,
+            cuisine=cuisine,
+        )
         return {
             "options": options,
             "count": len(options),
+            "active_filters": {
+                "mood": mood,
+                "protein": protein,
+                "tool": tool,
+                "cuisine": cuisine,
+            },
             "is_mock": mealie_client.mock_mode or any(o.get("is_mock") for o in options),
         }
     except Exception as e:
