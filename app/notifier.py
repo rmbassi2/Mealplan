@@ -42,10 +42,11 @@ class NtfyNotifier:
         # Determine click destination
         click_url = None
         if settings.mealie_base_url:
+            group = settings.mealie_group_slug or "home"
             if recipe_slug:
-                click_url = f"{settings.mealie_base_url}/recipe/{recipe_slug}"
+                click_url = f"{settings.mealie_base_url}/g/{group}/r/{recipe_slug}"
             else:
-                click_url = f"{settings.mealie_base_url}/household/mealplan/planner/view"
+                click_url = f"{settings.mealie_base_url}/g/{group}/planner"
 
         # Build clean, friendly notification content
         if is_custom:
@@ -77,10 +78,11 @@ class NtfyNotifier:
 
         if click_url:
             payload["click"] = click_url
+            label = "Open Recipe" if recipe_slug else "Open Meal Plan"
             payload["actions"] = [
                 {
                     "action": "view",
-                    "label": "Open in Mealie",
+                    "label": label,
                     "url": click_url,
                     "clear": False,
                 }

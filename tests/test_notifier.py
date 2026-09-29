@@ -43,6 +43,8 @@ async def test_notifier_send_recipe_success():
         assert "Crispy Honey Garlic Salmon" in payload["title"]
         assert payload["priority"] == 4
         assert "pot_of_food" in payload["tags"]
+        if "click" in payload:
+            assert "/g/home/r/crispy-honey-garlic-salmon" in payload["click"]
 
 
 @pytest.mark.anyio

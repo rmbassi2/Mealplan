@@ -8,6 +8,7 @@ load_dotenv()
 class Settings(BaseModel):
     mealie_base_url: str = os.getenv("MEALIE_BASE_URL", "").rstrip("/")
     mealie_api_token: str = os.getenv("MEALIE_API_TOKEN", "").strip()
+    mealie_group_slug: str = os.getenv("MEALIE_GROUP_SLUG", "home").strip() or "home"
     port: int = int(os.getenv("PORT", "8000"))
     mock_mode: bool = os.getenv("MOCK_MODE", "").lower() in ("true", "1", "yes")
 
