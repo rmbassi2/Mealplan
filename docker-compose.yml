@@ -2,10 +2,7 @@ version: "3.8"
 
 services:
   dinner-decider:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: dinner-decider:latest
+    image: ghcr.io/rmbassi2/mealplan:latest
     container_name: dinner-decider
     ports:
       - "${BIND_IP:-127.0.0.1}:${PORT:-8000}:8000"
