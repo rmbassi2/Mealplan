@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  dinner-picker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dinner-picker
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

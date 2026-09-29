@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Tonight's Dinner — Dinner Decider</title>
+  
+  <!-- Google Fonts for warm, cozy bistro feel -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['Fraunces', 'Georgia', 'serif'],
+            sans: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          },
+          colors: {
+            warm: {
+              50: '#fdfbf7',
+              100: '#f7f3eb',
+              200: '#ede4d4',
+              300: '#dfd0b5',
+              400: '#cdb48f',
+              500: '#b8966c',
+              800: '#4a3b2c',
+              900: '#2b2218',
+            },
+            terracotta: {
+              500: '#d9532f',
+              600: '#c04322',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Mobile-first tweaks and smooth transitions */
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #faf7f2;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    .font-serif-title {
+      font-family: 'Fraunces', Georgia, serif;
+    }
+
+    /* Custom scrollbar hiding */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Card active transition */
+    .recipe-card {
+      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .recipe-card:active {
+      transform: scale(0.985);
+    }
+
+    /* Skeleton shimmer */
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #ede7de 25%, #f5efe6 50%, #ede7de 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+
+    /* Spinning animation for refresh button */
+    .spin-icon {
+      animation: spin 0.75s ease-in-out;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Confetti animation */
+    @keyframes pop {
+      0% { transform: scale(0.8); opacity: 0; }
+      70% { transform: scale(1.05); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .pop-in {
+      animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+  </style>
+</head>
+<body class="text-stone-800 antialiased min-h-screen flex flex-col justify-between selection:bg-amber-200">
+
+  <!-- Main Container (optimized for mobile 390px-480px, centered on desktop) -->
+  <main class="w-full max-w-md mx-auto px-4 pt-6 pb-28 flex-1">
+
+    <!-- View: Voting Form -->
+    <div id="votingView" class="space-y-5">
+      
+      <!-- Top Header -->
+      <header class="flex items-start justify-between pb-2 border-b border-stone-200/80">
+        <div>
+          <div class="flex items-center space-x-1.5 text-xs font-semibold uppercase tracking-wider text-amber-700/90 mb-0.5">
+            <span>🍲</span>
+            <span id="dateSubtitle">Dinner Decider</span>
+          </div>
+          <h1 class="text-2xl font-bold font-serif-title text-stone-900 tracking-tight">
+            Tonight's Dinner
+          </h1>
+          <p class="text-xs text-stone-500 mt-0.5">What are you in the mood for?</p>
+        </div>
+
+        <!-- Refresh Button -->
+        <button id="refreshBtn" 
+                onclick="refreshOptions()" 
+                title="Roll for 3 new dinner ideas"
+                class="flex items-center space-x-1.5 px-3 py-2 text-xs font-medium text-stone-600 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all focus:outline-none">
+          <svg id="refreshIcon" class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span class="text-stone-700">Shuffle</span>
+        </button>
+      </header>
+
+      <!-- Alert / Status Banner if any -->
+      <div id="errorBanner" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start space-x-2">
+        <span class="text-base">⚠️</span>
+        <div class="flex-1" id="errorMessage">Unable to reach Mealie.</div>
+        <button onclick="hideError()" class="text-rose-500 hover:text-rose-700 font-bold ml-1">✕</button>
+      </div>
+
+      <!-- Options Container (Skeletons or Recipe Cards) -->
+      <div id="cardsContainer" class="space-y-3.5" role="radiogroup" aria-label="Tonight's dinner options">
+        
+        <!-- Skeletons while loading -->
+        <div id="skeletons" class="space-y-3.5">
+          <div class="h-44 rounded-2xl skeleton border border-stone-200/60"></div>
+          <div class="h-44 rounded-2xl skeleton border border-stone-200/60"></div>
+          <div class="h-44 rounded-2xl skeleton border border-stone-200/60"></div>
+        </div>
+
+        <!-- Rendered Recipe Cards will be inserted here -->
+        <div id="recipeList" class="space-y-3.5 hidden"></div>
+      </div>
+
+      <!-- Option 4: "Something Else" Custom Craving Card -->
+      <div id="customCravingCard" 
+           class="recipe-card relative bg-white border-2 border-dashed border-stone-300 hover:border-stone-400 rounded-2xl p-4 shadow-sm transition-all duration-200">
+        <div class="flex items-start space-x-3 mb-2">
+          <div id="customCravingIconWrapper" class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-lg flex-shrink-0 text-amber-700 transition-colors">
+            🍜
+          </div>
+          <div class="flex-1">
+            <h3 class="text-sm font-semibold text-stone-900 flex items-center justify-between">
+              <span>Craving something else?</span>
+              <span id="customActiveBadge" class="hidden text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full">
+                Active
+              </span>
+            </h3>
+            <p class="text-xs text-stone-500 mt-0.5">Takeout, breakfast for dinner, pantry raid, or a specific craving</p>
+          </div>
+        </div>
+
+        <div class="relative mt-2">
+          <input 
+            type="text" 
+            id="customNoteInput" 
+            maxlength="120"
+            placeholder="e.g. Thai curry, breakfast burritos, pizza night..."
+            class="w-full px-3.5 py-2.5 text-sm bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/60 transition-all outline-none text-stone-800 placeholder-stone-400"
+            oninput="handleCustomInput(this.value)"
+            onfocus="handleCustomFocus()"
+          />
+          <button 
+            id="clearCustomBtn"
+            onclick="clearCustomInput()" 
+            class="hidden absolute right-3 top-2.5 text-stone-400 hover:text-stone-600 p-0.5 text-xs font-semibold"
+            type="button"
+            title="Clear text">
+            ✕
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- View: Confirmation Success Screen -->
+    <div id="confirmationView" class="hidden pop-in space-y-6 pt-10 pb-8 text-center">
+      <!-- Decorative Celebration Icon -->
+      <div class="relative mx-auto w-24 h-24">
+        <div class="absolute inset-0 bg-amber-300 rounded-full animate-ping opacity-30"></div>
+        <div class="relative w-24 h-24 rounded-full bg-gradient-to-tr from-amber-600 via-orange-500 to-amber-500 flex items-center justify-center text-4xl shadow-xl shadow-amber-500/30 text-white border-2 border-white">
+          🍽️
+        </div>
+      </div>
+
+      <!-- Heading -->
+      <div class="space-y-2">
+        <span class="inline-flex items-center space-x-1 px-3.5 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm">
+          <span>✓</span>
+          <span>MEAL PLAN UPDATED</span>
+        </span>
+        <h2 class="text-3xl font-extrabold font-serif-title text-stone-900 tracking-tight">
+          Dinner is locked in!
+        </h2>
+        <p class="text-stone-600 text-sm font-medium">
+          Tonight's chef has been notified. 👩‍🍳
+        </p>
+      </div>
+
+      <!-- Selected Dinner Showcase Card -->
+      <div class="bg-white rounded-2xl p-5 border border-stone-200/90 shadow-lg text-left space-y-3 mx-1">
+        <div class="flex items-center justify-between">
+          <div class="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">Tonight's Menu Selection</div>
+          <span class="text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full">Tonight</span>
+        </div>
+        <div class="flex items-center space-x-4 pt-1">
+          <div id="confirmDishEmoji" class="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-3xl flex-shrink-0 shadow-inner">
+            🥘
+          </div>
+          <div class="flex-1 min-w-0">
+            <h3 id="confirmDishTitle" class="text-lg font-bold text-stone-900 leading-snug break-words">
+              Crispy Honey Garlic Salmon
+            </h3>
+            <p id="confirmDishMeta" class="text-xs text-stone-500 mt-0.5 flex items-center space-x-1">
+              <span>📅</span>
+              <span id="confirmDateStr">Scheduled for tonight</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action: Reset / Change Mind -->
+      <div class="pt-6">
+        <button 
+          onclick="resetVoting()" 
+          class="w-full py-3.5 px-4 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200/80 active:bg-stone-200 rounded-xl transition-all shadow-sm border border-stone-200">
+          🔄 Change your mind? Pick again
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Sticky Bottom Bar: "Lock It In" Action -->
+  <footer id="bottomBar" class="fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur-md border-t border-stone-200/80 p-4 z-40 transition-transform">
+    <div class="max-w-md mx-auto">
+      <button 
+        id="lockItInBtn"
+        disabled
+        onclick="submitDinnerChoice()"
+        class="w-full relative flex items-center justify-center space-x-2 py-3.5 px-6 rounded-xl font-bold text-sm tracking-wide text-white transition-all duration-200 shadow-sm
+               disabled:bg-stone-300 disabled:text-stone-400 disabled:cursor-not-allowed disabled:shadow-none
+               enabled:bg-gradient-to-r enabled:from-amber-600 enabled:to-orange-500 enabled:hover:from-amber-700 enabled:hover:to-orange-600 enabled:active:scale-[0.99] enabled:shadow-md enabled:shadow-amber-600/25">
+        
+        <!-- Spinner (hidden by default) -->
+        <svg id="btnSpinner" class="hidden animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+
+        <span id="btnIcon" class="text-base">🛎️</span>
+        <span id="btnText">Lock It In</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Application Logic (Clean Modern Vanilla JS) -->
+  <script>
+    // State
+    let currentOptions = [];
+    let selectedRecipeId = null;
+    let customNote = '';
+    let isSubmitting = false;
+
+    // Elements
+    const votingView = document.getElementById('votingView');
+    const confirmationView = document.getElementById('confirmationView');
+    const skeletons = document.getElementById('skeletons');
+    const recipeList = document.getElementById('recipeList');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const refreshIcon = document.getElementById('refreshIcon');
+    const lockItInBtn = document.getElementById('lockItInBtn');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const btnIcon = document.getElementById('btnIcon');
+    const btnText = document.getElementById('btnText');
+    const bottomBar = document.getElementById('bottomBar');
+    const customNoteInput = document.getElementById('customNoteInput');
+    const customCravingCard = document.getElementById('customCravingCard');
+    const customCravingIconWrapper = document.getElementById('customCravingIconWrapper');
+    const customActiveBadge = document.getElementById('customActiveBadge');
+    const clearCustomBtn = document.getElementById('clearCustomBtn');
+    const errorBanner = document.getElementById('errorBanner');
+    const errorMessage = document.getElementById('errorMessage');
+    const dateSubtitle = document.getElementById('dateSubtitle');
+
+    // Initialize Date Header
+    function initDate() {
+      const now = new Date();
+      const options = { weekday: 'long', month: 'short', day: 'numeric' };
+      dateSubtitle.textContent = now.toLocaleDateString(undefined, options);
+    }
+
+    // Fetch Dinner Options from /api/options
+    async function loadOptions() {
+      showSkeletons(true);
+      hideError();
+      refreshIcon.classList.add('spin-icon');
+
+      try {
+        const res = await fetch('/api/options');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        currentOptions = data.options || [];
+        renderCards(currentOptions);
+      } catch (err) {
+        console.error('Failed to load options:', err);
+        showError('Could not load recipe options. Please try shuffling again.');
+      } finally {
+        showSkeletons(false);
+        setTimeout(() => refreshIcon.classList.remove('spin-icon'), 750);
+      }
+    }
+
+    function refreshOptions() {
+      // Clear selection on shuffle
+      selectedRecipeId = null;
+      renderCards(currentOptions);
+      updateLockInState();
+      loadOptions();
+    }
+
+    function showSkeletons(show) {
+      if (show) {
+        skeletons.classList.remove('hidden');
+        recipeList.classList.add('hidden');
+      } else {
+        skeletons.classList.add('hidden');
+        recipeList.classList.remove('hidden');
+      }
+    }
+
+    // Render Recipe Cards
+    function renderCards(recipes) {
+      recipeList.innerHTML = '';
+      if (!recipes || recipes.length === 0) {
+        recipeList.innerHTML = `
+          <div class="text-center py-8 text-stone-500 bg-white rounded-2xl border border-stone-200 p-6">
+            <p class="text-sm font-medium">No dinner options available.</p>
+            <p class="text-xs text-stone-400 mt-1">Tap shuffle above to generate ideas.</p>
+          </div>
+        `;
+        return;
+      }
+
+      recipes.forEach((recipe) => {
+        const isSelected = (selectedRecipeId === recipe.id);
+        const card = document.createElement('div');
+        card.className = `recipe-card cursor-pointer relative bg-white rounded-2xl overflow-hidden shadow-sm transition-all duration-200 border-2 ${
+          isSelected 
+            ? 'border-amber-500 ring-2 ring-amber-400/40 bg-amber-50/20 shadow-md -translate-y-0.5' 
+            : 'border-stone-200/90 hover:border-stone-300'
+        }`;
+        card.setAttribute('role', 'radio');
+        card.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+        card.onclick = () => selectRecipe(recipe.id);
+
+        card.innerHTML = `
+          <!-- Image Banner -->
+          <div class="relative w-full h-36 bg-stone-100 overflow-hidden">
+            <img 
+              src="${recipe.imageUrl}" 
+              alt="${escapeHtml(recipe.name)}" 
+              loading="lazy"
+              class="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+              onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 400 200\\'><rect width=\\'400\\' height=\\'200\\' fill=\\'%23f3f4f6\\'/><text x=\\'50%\\' y=\\'50%\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' font-size=\\'36\\'>🍽️</text></svg>';"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+            
+            <!-- Time Badge -->
+            <div class="absolute bottom-2.5 left-3 bg-black/60 backdrop-blur-md text-white text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center space-x-1">
+              <span>⏱️</span>
+              <span>${escapeHtml(recipe.totalTime || '30 mins')}</span>
+            </div>
+
+            <!-- Selection Indicator Radio / Check -->
+            <div class="absolute top-2.5 right-3 w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+              isSelected 
+                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/40 scale-105' 
+                : 'bg-white/80 backdrop-blur-sm text-stone-300 border border-stone-200/80'
+            }">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Card Content -->
+          <div class="p-3.5">
+            <h2 class="text-base font-bold text-stone-900 leading-snug line-clamp-1">
+              ${escapeHtml(recipe.name)}
+            </h2>
+            <p class="text-xs text-stone-500 mt-1 line-clamp-2 leading-relaxed">
+              ${escapeHtml(recipe.description || 'A delicious, hearty home-cooked meal ready for tonight.')}
+            </p>
+          </div>
+        `;
+
+        recipeList.appendChild(card);
+      });
+    }
+
+    // Select a Recipe Card
+    function selectRecipe(id) {
+      if (isSubmitting) return;
+
+      selectedRecipeId = id;
+
+      // Deselect and clear custom input
+      customNote = '';
+      customNoteInput.value = '';
+      clearCustomBtn.classList.add('hidden');
+      customCravingCard.className = 'recipe-card relative bg-white border-2 border-dashed border-stone-300 hover:border-stone-400 rounded-2xl p-4 shadow-sm transition-all duration-200';
+      customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-lg flex-shrink-0 text-amber-700 transition-colors';
+      customActiveBadge.classList.add('hidden');
+
+      renderCards(currentOptions);
+      updateLockInState();
+    }
+
+    // Handle typing in "Something Else" input
+    function handleCustomInput(val) {
+      customNote = val;
+
+      if (val.trim().length > 0) {
+        // Automatically deselect any selected recipe card
+        if (selectedRecipeId !== null) {
+          selectedRecipeId = null;
+          renderCards(currentOptions);
+        }
+
+        // Highlight the custom card
+        customCravingCard.className = 'recipe-card relative bg-amber-50/40 border-2 border-amber-500 ring-2 ring-amber-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
+        customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
+        customActiveBadge.classList.remove('hidden');
+        clearCustomBtn.classList.remove('hidden');
+      } else {
+        // Reset custom card highlight if empty
+        customCravingCard.className = 'recipe-card relative bg-white border-2 border-dashed border-stone-300 hover:border-stone-400 rounded-2xl p-4 shadow-sm transition-all duration-200';
+        customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-lg flex-shrink-0 text-amber-700 transition-colors';
+        customActiveBadge.classList.add('hidden');
+        clearCustomBtn.classList.add('hidden');
+      }
+
+      updateLockInState();
+    }
+
+    function handleCustomFocus() {
+      if (customNote.trim().length > 0 && selectedRecipeId !== null) {
+        selectedRecipeId = null;
+        renderCards(currentOptions);
+        updateLockInState();
+      }
+    }
+
+    function clearCustomInput() {
+      customNote = '';
+      customNoteInput.value = '';
+      handleCustomInput('');
+    }
+
+    // Enable / Disable "Lock It In" button
+    function updateLockInState() {
+      const hasSelection = (selectedRecipeId !== null) || (customNote.trim().length > 0);
+      lockItInBtn.disabled = !hasSelection || isSubmitting;
+    }
+
+    // Submit Choice to Backend API
+    async function submitDinnerChoice() {
+      if (isSubmitting) return;
+
+      const payload = {};
+      let chosenName = '';
+      let emoji = '🍽️';
+
+      if (selectedRecipeId) {
+        payload.recipe_id = selectedRecipeId;
+        const recipe = currentOptions.find(r => r.id === selectedRecipeId);
+        chosenName = recipe ? recipe.name : 'Selected Recipe';
+        emoji = recipe && recipe.emoji ? recipe.emoji : '🥘';
+      } else if (customNote.trim()) {
+        payload.custom_note = customNote.trim();
+        chosenName = customNote.trim();
+        emoji = '🍜';
+      } else {
+        return;
+      }
+
+      // Enter Submitting State
+      isSubmitting = true;
+      updateLockInState();
+      btnSpinner.classList.remove('hidden');
+      btnIcon.classList.add('hidden');
+      btnText.textContent = 'Locking it in...';
+      hideError();
+
+      try {
+        const res = await fetch('/api/choose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || `Server responded with ${res.status}`);
+        }
+
+        const data = await res.json();
+        console.log('Choice submitted successfully:', data);
+
+        // Show Confirmation View
+        showConfirmation(chosenName, emoji);
+
+      } catch (err) {
+        console.error('Submission error:', err);
+        showError(`Failed to save dinner choice: ${err.message}`);
+      } finally {
+        isSubmitting = false;
+        btnSpinner.classList.add('hidden');
+        btnIcon.classList.remove('hidden');
+        btnText.textContent = 'Lock It In';
+        updateLockInState();
+      }
+    }
+
+    // Transition to Confirmation Screen
+    function showConfirmation(dishTitle, emoji) {
+      document.getElementById('confirmDishTitle').textContent = dishTitle;
+      document.getElementById('confirmDishEmoji').textContent = emoji;
+
+      votingView.classList.add('hidden');
+      bottomBar.classList.add('hidden');
+      confirmationView.classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Reset back to Voting Form
+    function resetVoting() {
+      confirmationView.classList.add('hidden');
+      votingView.classList.remove('hidden');
+      bottomBar.classList.remove('hidden');
+      
+      selectedRecipeId = null;
+      customNote = '';
+      customNoteInput.value = '';
+      clearCustomInput();
+      renderCards(currentOptions);
+      updateLockInState();
+    }
+
+    function showError(msg) {
+      errorMessage.textContent = msg;
+      errorBanner.classList.remove('hidden');
+    }
+
+    function hideError() {
+      errorBanner.classList.add('hidden');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Startup
+    initDate();
+    loadOptions();
+  </script>
+</body>
+</html>

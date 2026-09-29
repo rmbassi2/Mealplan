@@ -1,0 +1,136 @@
+"""Mock data and fallback recipes for Dinner Decider.
+
+Used when Mealie is unreachable, not yet configured, or when MOCK_MODE is enabled.
+"""
+
+from typing import List, Dict, Any
+
+MOCK_RECIPES: List[Dict[str, Any]] = [
+    {
+        "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e01",
+        "name": "Crispy Honey Garlic Salmon",
+        "slug": "crispy-honey-garlic-salmon",
+        "description": "Pan-seared salmon fillets glazed in a sticky, sweet honey garlic sauce with a squeeze of fresh lemon and toasted sesame seeds.",
+        "totalTime": "25 mins",
+        "category": "Seafood",
+        "emoji": "🐟",
+        "gradient": ("#f97316", "#e11d48"),
+    },
+    {
+        "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e02",
+        "name": "Creamy Tuscan Garlic Chicken",
+        "slug": "creamy-tuscan-garlic-chicken",
+        "description": "Tender chicken breasts in a rich garlic cream sauce simmered with sun-dried tomatoes, wilted baby spinach, and parmesan.",
+        "totalTime": "35 mins",
+        "category": "Poultry",
+        "emoji": "🍗",
+        "gradient": ("#eab308", "#d97706"),
+    },
+    {
+        "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e03",
+        "name": "Artisan Margherita Pizza",
+        "slug": "artisan-margherita-pizza",
+        "description": "Crispy charred crust topped with San Marzano tomato sauce, bubbly fresh mozzarella, aromatic basil leaves, and extra virgin olive oil.",
+        "totalTime": "30 mins",
+        "category": "Italian",
+        "emoji": "🍕",
+        "gradient": ("#ef4444", "#b91c1c"),
+    },
+    {
+        "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e04",
+        "name": "Slow-Cooker Beef Birria Tacos",
+        "slug": "slow-cooker-beef-birria-tacos",
+        "description": "Fork-tender chuck roast braised in rich guajillo consomme, folded into crispy corn tortillas with melted oaxaca cheese and cilantro.",
+        "totalTime": "45 mins",
+        "category": "Mexican",
+        "emoji": "🌮",
+        "gradient": ("#f59e0b", "#b45309"),
+    },
+    {
+        "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e05",
+        "name": "Spicy Sesame Peanut Noodles",
+        "slug": "spicy-sesame-peanut-noodles",
+        "description": "Chewy noodles tossed in a luscious peanut chili sauce, garnished with crisp cucumber matchsticks, scallions, and crushed peanuts.",
+        "totalTime": "20 mins",
+        "category": "Asian",
+        "emoji": "🍜",
+        "gradient": ("#d97706", "#92400e"),
+    },
+    {
+        "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e06",
+        "name": "Lemon Herb Roasted Chicken & Veggies",
+        "slug": "lemon-herb-roasted-chicken-veggies",
+        "description": "Juicy bone-in chicken thighs roasted on a sheet pan with baby potatoes, rosemary, asparagus, and caramelized garlic cloves.",
+        "totalTime": "40 mins",
+        "category": "Sheet Pan",
+        "emoji": "🥘",
+        "gradient": ("#84cc16", "#4d7c0f"),
+    },
+    {
+        "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e07",
+        "name": "Classic Double Smash Burgers",
+        "slug": "classic-double-smash-burgers",
+        "description": "Two lacy-edged smashed beef patties with melted American cheese, griddled onions, pickles, and secret burger sauce on toasted brioche.",
+        "totalTime": "25 mins",
+        "category": "Comfort Food",
+        "emoji": "🍔",
+        "gradient": ("#f97316", "#c2410c"),
+    },
+    {
+        "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e08",
+        "name": "Creamy Butternut Squash Risotto",
+        "slug": "creamy-butternut-squash-risotto",
+        "description": "Slow-stirred arborio rice with roasted butternut squash puree, crispy fried sage leaves, browned butter, and aged parmesan.",
+        "totalTime": "40 mins",
+        "category": "Vegetarian",
+        "emoji": "🍲",
+        "gradient": ("#fbbf24", "#d97706"),
+    },
+]
+
+
+def generate_recipe_svg(title: str, emoji: str = "🍽️", c1: str = "#f59e0b", c2: str = "#b45309") -> str:
+    """Generate an elegant, high-quality SVG image placeholder for a recipe."""
+    escaped_title = (
+        title.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="{c1}" />
+      <stop offset="100%" stop-color="{c2}" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.25)" />
+      <stop offset="100%" stop-color="rgba(0,0,0,0.3)" />
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="rgba(0,0,0,0.3)"/>
+    </filter>
+  </defs>
+  <!-- Background with warm gradient -->
+  <rect width="800" height="500" fill="url(#grad)" />
+  <rect width="800" height="500" fill="url(#glow)" />
+  
+  <!-- Subtle decorative geometric circles -->
+  <circle cx="700" cy="80" r="180" fill="rgba(255,255,255,0.06)" />
+  <circle cx="100" cy="420" r="220" fill="rgba(0,0,0,0.08)" />
+
+  <!-- Center Cloche / Food Illustration Plate -->
+  <g transform="translate(400, 200)">
+    <circle cx="0" cy="0" r="95" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.4)" stroke-width="3" filter="url(#shadow)" />
+    <circle cx="0" cy="0" r="80" fill="rgba(255,255,255,0.92)" />
+    <text x="0" y="24" font-size="72" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">{emoji}</text>
+  </g>
+
+  <!-- Title Pill at bottom -->
+  <g transform="translate(400, 390)">
+    <rect x="-260" y="-24" width="520" height="48" rx="24" fill="rgba(15, 23, 42, 0.65)" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" />
+    <text x="0" y="6" font-size="20" font-weight="600" fill="#ffffff" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" letter-spacing="0.5">
+      {escaped_title}
+    </text>
+  </g>
+</svg>"""
