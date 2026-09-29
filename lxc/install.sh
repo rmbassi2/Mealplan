@@ -36,7 +36,7 @@ apt-get install -y --no-install-recommends \
 # 3. Create unprivileged service user if not exists
 if ! id -u "$APP_USER" &>/dev/null; then
   echo "[+] Creating dedicated service user '${APP_USER}'..."
-  useradd -r -m -d "$APP_DIR" -s /bin/false "$APP_USER"
+  useradd -r -s /bin/false -d "$APP_DIR" -M "$APP_USER"
 else
   echo "[+] User '${APP_USER}' already exists."
 fi
@@ -48,8 +48,10 @@ mkdir -p "$APP_DIR"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARENT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# If run from within the source repo clone
-if [ -f "${PARENT_DIR}/main.py" ]; then
+# If files are already in APP_DIR, no copy is needed
+if [ "$PARENT_DIR" = "$APP_DIR" ]; then
+  echo "[+] Project files are already in place at ${APP_DIR}."
+elif [ -f "${PARENT_DIR}/main.py" ]; then
   echo "[+] Copying files from local repository (${PARENT_DIR})..."
   cp -r "${PARENT_DIR}/app" "$APP_DIR/"
   cp -r "${PARENT_DIR}/static" "$APP_DIR/"
