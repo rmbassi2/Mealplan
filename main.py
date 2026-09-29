@@ -1,12 +1,13 @@
 import logging
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, model_validator
 
 from app.config import settings
 from app.mealie_client import mealie_client
+from app.notifier import notifier
 
 # Configure logging
 logging.basicConfig(
@@ -52,6 +53,8 @@ async def health_check():
         "mock_mode": mealie_client.mock_mode,
         "mealie_configured": settings.is_configured,
         "base_url": settings.mealie_base_url or "(none)",
+        "ntfy_configured": settings.is_ntfy_configured,
+        "ntfy_topic": settings.ntfy_topic or "(none)",
     }
 
 
@@ -88,13 +91,23 @@ async def get_recipe_image(recipe_id: str):
 
 
 @app.post("/api/choose")
-async def choose_dinner(choice: DinnerChoice):
-    """Submit the chosen recipe or custom note to Mealie's Mealplanner API."""
+async def choose_dinner(choice: DinnerChoice, background_tasks: BackgroundTasks):
+    """Submit the chosen recipe or custom note to Mealie's Mealplanner API and notify the chef."""
     try:
         result = await mealie_client.submit_choice(
             recipe_id=choice.recipe_id.strip() if choice.recipe_id else None,
             custom_note=choice.custom_note.strip() if choice.custom_note else None,
         )
+
+        # Trigger push notification in background so UI confirmation never waits
+        background_tasks.add_task(
+            notifier.send_dinner_notification,
+            dish_name=result.get("dish_name", "Dinner"),
+            total_time=result.get("total_time"),
+            recipe_slug=result.get("recipe_slug"),
+            is_custom=result.get("is_custom", False),
+        )
+
         return result
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))

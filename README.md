@@ -141,6 +141,21 @@ systemctl restart dinner-decider
 
 ---
 
+## 🔔 Mobile Push Notifications (ntfy.sh)
+
+Dinner Decider uses **[ntfy.sh](https://ntfy.sh/)** to immediately alert the chef on their phone when dinner is locked in, complete with recipe cook times and a tap-to-open button for Mealie:
+
+1. **Install the free app:** Download **ntfy** on [iOS App Store](https://apps.apple.com/app/ntfy/id1625396347) or [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) (also on F-Droid).
+2. **Subscribe to a topic:** Choose a unique, unguessable topic name (e.g. `dinner-rob-family-9872`), open the ntfy app, tap `+`, and subscribe to it.
+3. **Configure `.env`:**
+   ```dotenv
+   NTFY_TOPIC=dinner-rob-family-9872
+   NTFY_BASE_URL=https://ntfy.sh
+   ```
+4. **Done!** Whenever your partner selects a meal or enters a craving, your phone will chime with a high-priority push notification and a direct link to the recipe.
+
+---
+
 ## 📡 API Endpoints
 
 | Method | Endpoint | Description |

@@ -11,9 +11,18 @@ class Settings(BaseModel):
     port: int = int(os.getenv("PORT", "8000"))
     mock_mode: bool = os.getenv("MOCK_MODE", "").lower() in ("true", "1", "yes")
 
+    # Notification Settings (ntfy.sh or self-hosted ntfy)
+    ntfy_topic: str = os.getenv("NTFY_TOPIC", "").strip()
+    ntfy_base_url: str = os.getenv("NTFY_BASE_URL", "https://ntfy.sh").rstrip("/")
+    ntfy_token: str = os.getenv("NTFY_TOKEN", "").strip()
+
     @property
     def is_configured(self) -> bool:
         return bool(self.mealie_base_url and self.mealie_api_token)
+
+    @property
+    def is_ntfy_configured(self) -> bool:
+        return bool(self.ntfy_topic)
 
 
 settings = Settings()

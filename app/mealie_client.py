@@ -157,8 +157,33 @@ class MealieClient:
     ) -> Dict[str, Any]:
         """Submit the selected recipe or custom craving to Mealie Mealplanner API."""
         today_str = date.today().isoformat()
+        dish_name = "Dinner"
+        total_time = None
+        recipe_slug = None
+        is_custom = False
 
         if recipe_id:
+            # Check mock recipes first
+            mock_recipe = next((m for m in MOCK_RECIPES if m["id"] == recipe_id), None)
+            if mock_recipe:
+                dish_name = mock_recipe["name"]
+                total_time = mock_recipe.get("totalTime")
+                recipe_slug = mock_recipe.get("slug")
+            elif not self.mock_mode:
+                try:
+                    async with httpx.AsyncClient(timeout=4.0) as client:
+                        r_resp = await client.get(
+                            f"{self.base_url}/api/recipes/{recipe_id}",
+                            headers=self.headers,
+                        )
+                        if r_resp.status_code == 200:
+                            r_data = r_resp.json()
+                            dish_name = r_data.get("name", "Selected Recipe")
+                            total_time = format_recipe_time(r_data)
+                            recipe_slug = r_data.get("slug")
+                except Exception as e:
+                    logger.debug(f"Could not retrieve recipe metadata for {recipe_id}: {e}")
+
             payload: Dict[str, Any] = {
                 "date": today_str,
                 "entryType": "dinner",
@@ -167,6 +192,8 @@ class MealieClient:
                 "text": "",
             }
         elif custom_note:
+            dish_name = custom_note
+            is_custom = True
             payload = {
                 "date": today_str,
                 "entryType": "dinner",
@@ -183,6 +210,10 @@ class MealieClient:
                 "status": "success",
                 "message": "Meal plan updated (Mock mode)",
                 "date": today_str,
+                "dish_name": dish_name,
+                "total_time": total_time,
+                "recipe_slug": recipe_slug,
+                "is_custom": is_custom,
                 "entry": payload,
             }
 
@@ -214,6 +245,10 @@ class MealieClient:
                             "status": "success",
                             "message": "Meal plan updated",
                             "date": today_str,
+                            "dish_name": dish_name,
+                            "total_time": total_time,
+                            "recipe_slug": recipe_slug,
+                            "is_custom": is_custom,
                         }
                     elif resp.status_code in (404, 405):
                         # Method not allowed or not found on this path, try next endpoint
