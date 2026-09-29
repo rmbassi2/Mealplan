@@ -163,6 +163,8 @@ class MealieClient:
                 "date": today_str,
                 "entryType": "dinner",
                 "recipeId": recipe_id,
+                "title": "",
+                "text": "",
             }
         elif custom_note:
             payload = {
@@ -170,6 +172,7 @@ class MealieClient:
                 "entryType": "dinner",
                 "title": custom_note,
                 "text": custom_note,
+                "recipeId": None,
             }
         else:
             raise ValueError("Either recipe_id or custom_note must be provided")
@@ -183,34 +186,50 @@ class MealieClient:
                 "entry": payload,
             }
 
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(
-                    f"{self.base_url}/api/groups/mealplans",
-                    headers={
-                        "Authorization": f"Bearer {self.token}",
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
-                )
-                if resp.status_code in (200, 201):
-                    logger.info(f"Successfully posted dinner choice to Mealie: {resp.text}")
-                    return {
-                        "status": "success",
-                        "message": "Meal plan updated",
-                        "date": today_str,
-                    }
-                else:
-                    logger.error(
-                        f"Mealie mealplan creation failed with status {resp.status_code}: {resp.text}"
+        # Try modern Mealie endpoint (/api/households/mealplans) first,
+        # then fallback to legacy (/api/groups/mealplans) if needed
+        endpoints = [
+            f"{self.base_url}/api/households/mealplans",
+            f"{self.base_url}/api/households/mealplans/",
+            f"{self.base_url}/api/groups/mealplans",
+            f"{self.base_url}/api/groups/mealplans/",
+        ]
+
+        last_error = ""
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            for url in endpoints:
+                try:
+                    resp = await client.post(
+                        url,
+                        headers={
+                            "Authorization": f"Bearer {self.token}",
+                            "Content-Type": "application/json",
+                            "Accept": "application/json",
+                        },
+                        json=payload,
                     )
-                    # If Mealie rejected or token expired, return detailed message or fallback
-                    raise RuntimeError(
-                        f"Mealie API error ({resp.status_code}): {resp.text}"
-                    )
-        except Exception as e:
-            logger.error(f"Failed to submit meal plan to Mealie: {e}")
-            raise
+                    if resp.status_code in (200, 201):
+                        logger.info(f"Successfully posted dinner choice to Mealie ({url}): {resp.text}")
+                        return {
+                            "status": "success",
+                            "message": "Meal plan updated",
+                            "date": today_str,
+                        }
+                    elif resp.status_code in (404, 405):
+                        # Method not allowed or not found on this path, try next endpoint
+                        last_error = f"Mealie API error ({resp.status_code}) on {url}: {resp.text}"
+                        continue
+                    else:
+                        logger.error(f"Mealie error ({resp.status_code}) on {url}: {resp.text}")
+                        raise RuntimeError(f"Mealie API error ({resp.status_code}): {resp.text}")
+                except RuntimeError:
+                    raise
+                except Exception as e:
+                    last_error = str(e)
+                    continue
+
+        # If all candidate endpoints failed:
+        raise RuntimeError(last_error or "Failed to submit meal plan: no valid endpoint responded.")
 
 
 mealie_client = MealieClient()
