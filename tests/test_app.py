@@ -187,6 +187,27 @@ async def test_cleanup_today_endpoint():
 
 
 @pytest.mark.anyio
+async def test_reset_today_endpoint():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Submit a choice first
+        await client.post("/api/choose", json={"recipe_id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e01"})
+        
+        # Verify /api/today reports plan
+        r1 = await client.get("/api/today")
+        assert r1.json()["has_plan"] is True
+
+        # Call reset
+        reset_resp = await client.post("/api/reset-today")
+        assert reset_resp.status_code == 200
+        assert reset_resp.json()["status"] == "success"
+
+        # Verify /api/today is now reset
+        r2 = await client.get("/api/today")
+        assert r2.json()["has_plan"] is False
+
+
+
+@pytest.mark.anyio
 async def test_choose_validation_failure():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Neither recipe_id nor custom_note provided

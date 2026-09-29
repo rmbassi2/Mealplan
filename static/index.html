@@ -842,6 +842,9 @@
             confirmationView.classList.add('hidden');
             votingView.classList.remove('hidden');
             bottomBar.classList.remove('hidden');
+            if (!currentOptions || currentOptions.length === 0) {
+              loadOptions();
+            }
           }
         }
       } catch (err) {
@@ -851,7 +854,11 @@
     }
 
     // Reset back to Voting Form
-    function resetVoting() {
+    async function resetVoting() {
+      try {
+        localStorage.removeItem('dinnerDeciderToday');
+      } catch (e) {}
+
       confirmationView.classList.add('hidden');
       votingView.classList.remove('hidden');
       bottomBar.classList.remove('hidden');
@@ -862,6 +869,11 @@
       clearCustomInput();
       renderFilterPills();
       
+      // Clean up in Mealie and backend cache as well
+      try {
+        fetch('/api/reset-today', { method: 'POST' }).catch(() => {});
+      } catch (e) {}
+
       if (!currentOptions || currentOptions.length === 0) {
         loadOptions();
       } else {

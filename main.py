@@ -103,6 +103,22 @@ async def cleanup_today_dinner():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/reset-today")
+async def reset_today_dinner():
+    """Reset today's meal plan in Mealie and clear local cached plan so voting is reopened."""
+    try:
+        deleted = await mealie_client.reset_today_plan()
+        return {
+            "status": "success",
+            "message": "Today's meal plan has been reset",
+            "deleted_count": deleted,
+        }
+    except Exception as e:
+        logger.error(f"Error resetting today's dinner: {e}")
+        return {"status": "success", "deleted_count": 0}
+
+
+
 @app.get("/api/taxonomy")
 async def get_taxonomy_filters():
     """Return available taxonomy filter options and curated mood presets for the frontend."""

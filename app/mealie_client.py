@@ -80,6 +80,7 @@ class MealieClient:
 
     async def clear_today_dinner_entries(self, today_str: Optional[str] = None) -> int:
         """Find and remove all existing dinner entries for today from Mealie."""
+        self._cached_today_plan = None
         if not today_str:
             today_str = date.today().isoformat()
 
@@ -114,120 +115,137 @@ class MealieClient:
 
         return deleted_count
 
+    async def reset_today_plan(self) -> int:
+        """Reset and remove today's dinner from Mealie and clear cache."""
+        self._cached_today_plan = None
+        if self.mock_mode:
+            return 0
+        return await self.clear_today_dinner_entries()
+
     async def get_today_plan(self) -> Optional[Dict[str, Any]]:
         """Fetch today's already scheduled dinner from Mealie or cache."""
         today_str = date.today().isoformat()
 
-        # Check in-memory cached plan if set today
+        if self.mock_mode:
+            if self._cached_today_plan and self._cached_today_plan.get("date") == today_str:
+                return self._cached_today_plan
+            return None
+
+        queried_successfully = False
+        endpoints = [
+            f"{self.base_url}/api/households/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
+            f"{self.base_url}/api/households/mealplans/today",
+            f"{self.base_url}/api/groups/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
+            f"{self.base_url}/api/groups/mealplans/today",
+        ]
+        async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+            for url in endpoints:
+                try:
+                    resp = await client.get(url, headers=self.headers)
+                    if resp.status_code == 200:
+                        queried_successfully = True
+                        data = resp.json()
+                        items = []
+                        if isinstance(data, dict):
+                            if "items" in data:
+                                items = data["items"]
+                            elif "date" in data:
+                                items = [data]
+                        elif isinstance(data, list):
+                            items = data
+
+                        # Find all dinner entries for today
+                        dinner_entries = [
+                            it for it in items
+                            if str(it.get("date")) == today_str and str(it.get("entryType", "")).lower() == "dinner"
+                        ]
+                        if not dinner_entries and items:
+                            dinner_entries = [it for it in items if str(it.get("date")) == today_str]
+
+                        if dinner_entries:
+                            # Keep the latest entry (highest ID or last in list)
+                            dinner_entry = dinner_entries[-1]
+
+                            # Automatically clean up older duplicate testing entries from Mealie!
+                            if len(dinner_entries) > 1:
+                                logger.info(
+                                    f"Cleaning up {len(dinner_entries) - 1} duplicate dinner entries for {today_str} in Mealie."
+                                )
+                                for dup in dinner_entries[:-1]:
+                                    dup_id = dup.get("id")
+                                    if dup_id:
+                                        await self.delete_mealplan_entry(dup_id)
+
+                            recipe_obj = dinner_entry.get("recipe")
+                            title = dinner_entry.get("title") or dinner_entry.get("text")
+                            recipe_id = dinner_entry.get("recipeId")
+
+                            if recipe_obj and isinstance(recipe_obj, dict):
+                                dish_name = recipe_obj.get("name", "Tonight's Recipe")
+                                total_time = format_recipe_time(recipe_obj)
+                                recipe_slug = recipe_obj.get("slug")
+                                is_custom = False
+                                emoji = "🥘"
+                                external_url = None
+                                source_domain = None
+                            elif title:
+                                dish_name = title
+                                total_time = None
+                                recipe_slug = None
+                                is_custom = True
+                                note_text = dinner_entry.get("text") or ""
+                                found_url = extract_url_from_text(note_text) or extract_url_from_text(title)
+                                external_url = found_url
+                                source_domain = clean_domain(found_url) if found_url else None
+                                emoji = "🌐" if external_url else "🍜"
+                            elif recipe_id:
+                                dish_name = "Tonight's Dinner"
+                                total_time = None
+                                recipe_slug = None
+                                is_custom = False
+                                external_url = None
+                                source_domain = None
+                                emoji = "🍽️"
+                                try:
+                                    r_res = await client.get(
+                                        f"{self.base_url}/api/recipes/{recipe_id}",
+                                        headers=self.headers,
+                                    )
+                                    if r_res.status_code == 200:
+                                        rd = r_res.json()
+                                        dish_name = rd.get("name", dish_name)
+                                        total_time = format_recipe_time(rd)
+                                        recipe_slug = rd.get("slug")
+                                except Exception:
+                                    pass
+                            else:
+                                continue
+
+                            plan = {
+                                "date": today_str,
+                                "dish_name": dish_name,
+                                "total_time": total_time,
+                                "recipe_slug": recipe_slug,
+                                "is_custom": is_custom,
+                                "external_url": external_url,
+                                "source_domain": source_domain,
+                                "emoji": emoji,
+                            }
+                            self._cached_today_plan = plan
+                            return plan
+                except Exception as e:
+                    logger.debug(f"Error checking existing meal plan at {url}: {e}")
+                    continue
+
+        if queried_successfully:
+            # Mealie explicitly confirmed no dinner planned for today
+            self._cached_today_plan = None
+            return None
+
+        # Fallback to cache only if Mealie was completely unreachable
         if self._cached_today_plan and self._cached_today_plan.get("date") == today_str:
             return self._cached_today_plan
-
-        if not self.mock_mode:
-            endpoints = [
-                f"{self.base_url}/api/households/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
-                f"{self.base_url}/api/households/mealplans/today",
-                f"{self.base_url}/api/groups/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
-                f"{self.base_url}/api/groups/mealplans/today",
-            ]
-            async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
-                for url in endpoints:
-                    try:
-                        resp = await client.get(url, headers=self.headers)
-                        if resp.status_code == 200:
-                            data = resp.json()
-                            items = []
-                            if isinstance(data, dict):
-                                if "items" in data:
-                                    items = data["items"]
-                                elif "date" in data:
-                                    items = [data]
-                            elif isinstance(data, list):
-                                items = data
-
-                            # Find all dinner entries for today
-                            dinner_entries = [
-                                it for it in items
-                                if str(it.get("date")) == today_str and str(it.get("entryType", "")).lower() == "dinner"
-                            ]
-                            if not dinner_entries and items:
-                                dinner_entries = [it for it in items if str(it.get("date")) == today_str]
-
-                            if dinner_entries:
-                                # Keep the latest entry (highest ID or last in list)
-                                dinner_entry = dinner_entries[-1]
-
-                                # Automatically clean up older duplicate testing entries from Mealie!
-                                if len(dinner_entries) > 1:
-                                    logger.info(
-                                        f"Cleaning up {len(dinner_entries) - 1} duplicate dinner entries for {today_str} in Mealie."
-                                    )
-                                    for dup in dinner_entries[:-1]:
-                                        dup_id = dup.get("id")
-                                        if dup_id:
-                                            await self.delete_mealplan_entry(dup_id)
-
-                                recipe_obj = dinner_entry.get("recipe")
-                                title = dinner_entry.get("title") or dinner_entry.get("text")
-                                recipe_id = dinner_entry.get("recipeId")
-
-                                if recipe_obj and isinstance(recipe_obj, dict):
-                                    dish_name = recipe_obj.get("name", "Tonight's Recipe")
-                                    total_time = format_recipe_time(recipe_obj)
-                                    recipe_slug = recipe_obj.get("slug")
-                                    is_custom = False
-                                    emoji = "🥘"
-                                    external_url = None
-                                    source_domain = None
-                                elif title:
-                                    dish_name = title
-                                    total_time = None
-                                    recipe_slug = None
-                                    is_custom = True
-                                    note_text = dinner_entry.get("text") or ""
-                                    found_url = extract_url_from_text(note_text) or extract_url_from_text(title)
-                                    external_url = found_url
-                                    source_domain = clean_domain(found_url) if found_url else None
-                                    emoji = "🌐" if external_url else "🍜"
-                                elif recipe_id:
-                                    dish_name = "Tonight's Dinner"
-                                    total_time = None
-                                    recipe_slug = None
-                                    is_custom = False
-                                    external_url = None
-                                    source_domain = None
-                                    emoji = "🍽️"
-                                    try:
-                                        r_res = await client.get(
-                                            f"{self.base_url}/api/recipes/{recipe_id}",
-                                            headers=self.headers,
-                                        )
-                                        if r_res.status_code == 200:
-                                            rd = r_res.json()
-                                            dish_name = rd.get("name", dish_name)
-                                            total_time = format_recipe_time(rd)
-                                            recipe_slug = rd.get("slug")
-                                    except Exception:
-                                        pass
-                                else:
-                                    continue
-
-                                plan = {
-                                    "date": today_str,
-                                    "dish_name": dish_name,
-                                    "total_time": total_time,
-                                    "recipe_slug": recipe_slug,
-                                    "is_custom": is_custom,
-                                    "external_url": external_url,
-                                    "source_domain": source_domain,
-                                    "emoji": emoji,
-                                }
-                                self._cached_today_plan = plan
-                                return plan
-                    except Exception as e:
-                        logger.debug(f"Error checking existing meal plan at {url}: {e}")
-                        continue
-
-        return self._cached_today_plan
+        return None
 
     async def get_dinner_options(
         self,
