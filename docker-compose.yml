@@ -8,7 +8,7 @@ services:
     image: dinner-decider:latest
     container_name: dinner-decider
     ports:
-      - "${PORT:-8000}:8000"
+      - "${BIND_IP:-127.0.0.1}:${PORT:-8000}:8000"
     env_file:
       - .env
     environment:
