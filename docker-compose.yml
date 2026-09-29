@@ -1,11 +1,12 @@
 version: "3.8"
 
 services:
-  dinner-picker:
+  dinner-decider:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: dinner-picker
+    image: dinner-decider:latest
+    container_name: dinner-decider
     ports:
       - "${PORT:-8000}:8000"
     env_file:

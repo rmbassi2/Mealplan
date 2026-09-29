@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for Dinner Decider
 # Stage 1: Build virtual environment and install dependencies
-FROM python:3.11-slim AS builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 
 # Stage 2: Final lightweight runtime container
-FROM python:3.11-slim AS final
+FROM python:3.12-slim AS final
 
 WORKDIR /app
 
@@ -53,4 +53,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:' + str(__import__('os').getenv('PORT', 8000)) + '/health')" || exit 1
 
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
