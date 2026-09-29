@@ -47,6 +47,7 @@ class MealieClient:
         self.base_url = settings.mealie_base_url
         self.token = settings.mealie_api_token
         self.mock_mode = settings.mock_mode or not settings.is_configured
+        self._cached_today_plan: Optional[Dict[str, Any]] = None
 
     @property
     def headers(self) -> Dict[str, str]:
@@ -54,6 +55,102 @@ class MealieClient:
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/json",
         }
+
+    async def get_today_plan(self) -> Optional[Dict[str, Any]]:
+        """Fetch today's already scheduled dinner from Mealie or cache."""
+        today_str = date.today().isoformat()
+
+        # Check in-memory cached plan if set today
+        if self._cached_today_plan and self._cached_today_plan.get("date") == today_str:
+            return self._cached_today_plan
+
+        if not self.mock_mode:
+            endpoints = [
+                f"{self.base_url}/api/households/mealplans?start_date={today_str}&end_date={today_str}",
+                f"{self.base_url}/api/households/mealplans/today",
+                f"{self.base_url}/api/groups/mealplans?start_date={today_str}&end_date={today_str}",
+                f"{self.base_url}/api/groups/mealplans/today",
+            ]
+            async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+                for url in endpoints:
+                    try:
+                        resp = await client.get(url, headers=self.headers)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            items = []
+                            if isinstance(data, dict):
+                                if "items" in data:
+                                    items = data["items"]
+                                elif "date" in data:
+                                    items = [data]
+                            elif isinstance(data, list):
+                                items = data
+
+                            # Look for dinner entry for today
+                            dinner_entry = None
+                            for it in items:
+                                if str(it.get("date")) == today_str and str(it.get("entryType", "")).lower() == "dinner":
+                                    dinner_entry = it
+                                    break
+                            if not dinner_entry and items:
+                                for it in items:
+                                    if str(it.get("date")) == today_str:
+                                        dinner_entry = it
+                                        break
+
+                            if dinner_entry:
+                                recipe_obj = dinner_entry.get("recipe")
+                                title = dinner_entry.get("title") or dinner_entry.get("text")
+                                recipe_id = dinner_entry.get("recipeId")
+
+                                if recipe_obj and isinstance(recipe_obj, dict):
+                                    dish_name = recipe_obj.get("name", "Tonight's Recipe")
+                                    total_time = format_recipe_time(recipe_obj)
+                                    recipe_slug = recipe_obj.get("slug")
+                                    is_custom = False
+                                    emoji = "🥘"
+                                elif title:
+                                    dish_name = title
+                                    total_time = None
+                                    recipe_slug = None
+                                    is_custom = True
+                                    emoji = "🍜"
+                                elif recipe_id:
+                                    dish_name = "Tonight's Dinner"
+                                    total_time = None
+                                    recipe_slug = None
+                                    is_custom = False
+                                    emoji = "🍽️"
+                                    try:
+                                        r_res = await client.get(
+                                            f"{self.base_url}/api/recipes/{recipe_id}",
+                                            headers=self.headers,
+                                        )
+                                        if r_res.status_code == 200:
+                                            rd = r_res.json()
+                                            dish_name = rd.get("name", dish_name)
+                                            total_time = format_recipe_time(rd)
+                                            recipe_slug = rd.get("slug")
+                                    except Exception:
+                                        pass
+                                else:
+                                    continue
+
+                                plan = {
+                                    "date": today_str,
+                                    "dish_name": dish_name,
+                                    "total_time": total_time,
+                                    "recipe_slug": recipe_slug,
+                                    "is_custom": is_custom,
+                                    "emoji": emoji,
+                                }
+                                self._cached_today_plan = plan
+                                return plan
+                    except Exception as e:
+                        logger.debug(f"Error checking existing meal plan at {url}: {e}")
+                        continue
+
+        return self._cached_today_plan
 
     async def get_dinner_options(self, count: int = 3) -> List[Dict[str, Any]]:
         """Fetch recipe options from Mealie, or fall back to mock recipes if offline/unconfigured."""
@@ -204,8 +301,18 @@ class MealieClient:
         else:
             raise ValueError("Either recipe_id or custom_note must be provided")
 
+        plan = {
+            "date": today_str,
+            "dish_name": dish_name,
+            "total_time": total_time,
+            "recipe_slug": recipe_slug,
+            "is_custom": is_custom,
+            "emoji": "🍜" if is_custom else "🥘",
+        }
+
         if self.mock_mode:
             logger.info(f"[Mock Mode] Submitted dinner choice for {today_str}: {payload}")
+            self._cached_today_plan = plan
             return {
                 "status": "success",
                 "message": "Meal plan updated (Mock mode)",
@@ -241,6 +348,7 @@ class MealieClient:
                     )
                     if resp.status_code in (200, 201):
                         logger.info(f"Successfully posted dinner choice to Mealie ({url}): {resp.text}")
+                        self._cached_today_plan = plan
                         return {
                             "status": "success",
                             "message": "Meal plan updated",

@@ -76,6 +76,26 @@ async def test_choose_custom_note_success():
 
 
 @pytest.mark.anyio
+async def test_today_endpoint_returns_locked_in_choice():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # First submit a choice
+        choose_resp = await client.post(
+            "/api/choose",
+            json={"recipe_id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e01"},
+        )
+        assert choose_resp.status_code == 200
+
+        # Then query /api/today
+        resp = await client.get("/api/today")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["has_plan"] is True
+        assert data["plan"] is not None
+        assert "Crispy Honey Garlic Salmon" in data["plan"]["dish_name"]
+        assert data["plan"]["is_custom"] is False
+
+
+@pytest.mark.anyio
 async def test_choose_validation_failure():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Neither recipe_id nor custom_note provided

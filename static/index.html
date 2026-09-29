@@ -237,6 +237,13 @@
               <span>📅</span>
               <span id="confirmDateStr">Scheduled for tonight</span>
             </p>
+            <div id="confirmMealieLinkWrapper" class="pt-2 hidden">
+              <a id="confirmMealieLink" href="#" target="_blank" rel="noopener noreferrer" 
+                 class="inline-flex items-center space-x-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-200 transition-colors">
+                <span>View Recipe in Mealie</span>
+                <span class="text-xs">↗</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -530,8 +537,27 @@
         const data = await res.json();
         console.log('Choice submitted successfully:', data);
 
+        // Save to localStorage for quick restore
+        const planObj = {
+          date: new Date().toISOString().split('T')[0],
+          dish_name: chosenName,
+          emoji: emoji,
+          total_time: data.total_time || null,
+          is_custom: Boolean(customNote.trim()),
+          mealie_url: data.mealie_url || null,
+        };
+        try {
+          localStorage.setItem('dinnerDeciderToday', JSON.stringify(planObj));
+        } catch (e) {}
+
         // Show Confirmation View
-        showConfirmation(chosenName, emoji);
+        showConfirmation(
+          chosenName, 
+          emoji, 
+          data.total_time, 
+          Boolean(customNote.trim()), 
+          data.mealie_url
+        );
 
       } catch (err) {
         console.error('Submission error:', err);
@@ -546,14 +572,86 @@
     }
 
     // Transition to Confirmation Screen
-    function showConfirmation(dishTitle, emoji) {
+    function showConfirmation(dishTitle, emoji, totalTime, isCustom, mealieUrl) {
       document.getElementById('confirmDishTitle').textContent = dishTitle;
-      document.getElementById('confirmDishEmoji').textContent = emoji;
+      document.getElementById('confirmDishEmoji').textContent = emoji || (isCustom ? '🍜' : '🥘');
+
+      const confirmDateStr = document.getElementById('confirmDateStr');
+      if (totalTime) {
+        confirmDateStr.textContent = `⏱️ ${totalTime} • Scheduled for tonight`;
+      } else if (isCustom) {
+        confirmDateStr.textContent = 'Special Request • Scheduled for tonight';
+      } else {
+        confirmDateStr.textContent = 'Scheduled for tonight';
+      }
+
+      const linkWrapper = document.getElementById('confirmMealieLinkWrapper');
+      const mealieLink = document.getElementById('confirmMealieLink');
+      if (mealieUrl) {
+        mealieLink.href = mealieUrl;
+        mealieLink.querySelector('span').textContent = isCustom ? 'Open Mealie Planner' : 'View Recipe in Mealie';
+        linkWrapper.classList.remove('hidden');
+      } else {
+        linkWrapper.classList.add('hidden');
+      }
 
       votingView.classList.add('hidden');
       bottomBar.classList.add('hidden');
       confirmationView.classList.remove('hidden');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Check if a dinner plan is already locked in for today
+    async function checkExistingPlan() {
+      // 1. Instant check from localStorage
+      try {
+        const cached = localStorage.getItem('dinnerDeciderToday');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          const todayIso = new Date().toISOString().split('T')[0];
+          if (parsed && parsed.date === todayIso && parsed.dish_name) {
+            showConfirmation(
+              parsed.dish_name,
+              parsed.emoji,
+              parsed.total_time,
+              parsed.is_custom,
+              parsed.mealie_url
+            );
+          }
+        }
+      } catch (e) {}
+
+      // 2. Fetch authoritative state from Mealie / backend
+      try {
+        const res = await fetch('/api/today');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.has_plan && data.plan) {
+            try {
+              localStorage.setItem('dinnerDeciderToday', JSON.stringify(data.plan));
+            } catch (e) {}
+            showConfirmation(
+              data.plan.dish_name,
+              data.plan.emoji,
+              data.plan.total_time,
+              data.plan.is_custom,
+              data.plan.mealie_url
+            );
+            return true;
+          } else {
+            // No plan locked in for today yet
+            try {
+              localStorage.removeItem('dinnerDeciderToday');
+            } catch (e) {}
+            confirmationView.classList.add('hidden');
+            votingView.classList.remove('hidden');
+            bottomBar.classList.remove('hidden');
+          }
+        }
+      } catch (err) {
+        console.debug('Could not check today plan:', err);
+      }
+      return false;
     }
 
     // Reset back to Voting Form
@@ -566,8 +664,13 @@
       customNote = '';
       customNoteInput.value = '';
       clearCustomInput();
-      renderCards(currentOptions);
-      updateLockInState();
+      
+      if (!currentOptions || currentOptions.length === 0) {
+        loadOptions();
+      } else {
+        renderCards(currentOptions);
+        updateLockInState();
+      }
     }
 
     function showError(msg) {
@@ -590,8 +693,15 @@
     }
 
     // Startup
-    initDate();
-    loadOptions();
+    async function init() {
+      initDate();
+      const hasPlan = await checkExistingPlan();
+      if (!hasPlan) {
+        loadOptions();
+      }
+    }
+
+    init();
   </script>
 </body>
 </html>

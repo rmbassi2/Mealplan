@@ -123,8 +123,44 @@ async def run_verification():
         await page.screenshot(path=confirm_shot)
         print(f"Saved confirmation screenshot to: {confirm_shot}")
 
+        # 6. Verify subsequent visit persistence on reload
+        print("\nReloading page to test subsequent visit behavior...")
+        await page.reload(wait_until="networkidle")
+        await page.wait_for_timeout(500)
+
+        # Check that confirmation screen is immediately displayed
+        is_confirm_visible = await page.locator("#confirmationView").is_visible()
+        is_voting_hidden = await page.locator("#votingView").is_hidden()
+        reloaded_dish = await page.locator("#confirmDishTitle").inner_text()
+
+        print(f"Confirmation visible on reload: {is_confirm_visible}")
+        print(f"Voting view hidden on reload: {is_voting_hidden}")
+        print(f"Retained dish name: '{reloaded_dish}'")
+
+        assert is_confirm_visible, "Confirmation view must be displayed on subsequent visit"
+        assert is_voting_hidden, "Voting view must be hidden on subsequent visit"
+        assert reloaded_dish == chosen_dish, f"Expected '{chosen_dish}', got '{reloaded_dish}'"
+
+        subsequent_shot = os.path.join(SCREENSHOTS_DIR, "6_subsequent_visit_locked_in.png")
+        await page.screenshot(path=subsequent_shot)
+        print(f"Saved subsequent visit screenshot to: {subsequent_shot}")
+
+        # 7. Test "Change your mind? Pick again" button
+        print("Testing 'Change your mind? Pick again' button...")
+        pick_again_btn = page.locator("#confirmationView button").filter(has_text="Change your mind")
+        await pick_again_btn.click()
+        await page.wait_for_timeout(400)
+
+        is_voting_visible_again = await page.locator("#votingView").is_visible()
+        is_confirm_hidden_again = await page.locator("#confirmationView").is_hidden()
+        print(f"Voting view visible again: {is_voting_visible_again}")
+        print(f"Confirmation view hidden again: {is_confirm_hidden_again}")
+
+        assert is_voting_visible_again, "Voting view should be restored after clicking Pick Again"
+        assert is_confirm_hidden_again, "Confirmation view should be hidden after clicking Pick Again"
+
         await browser.close()
-        print("\nAll browser verifications passed successfully!")
+        print("\nAll browser verifications (including subsequent visits) passed successfully!")
 
 if __name__ == "__main__":
     asyncio.run(run_verification())

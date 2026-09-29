@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Response, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -56,6 +57,34 @@ async def health_check():
         "ntfy_configured": settings.is_ntfy_configured,
         "ntfy_topic": settings.ntfy_topic or "(none)",
     }
+
+
+@app.get("/api/today")
+async def get_today_dinner():
+    """Check if dinner has already been selected for today."""
+    try:
+        plan = await mealie_client.get_today_plan()
+        today_str = date.today().isoformat()
+        if plan and plan.get("date") == today_str:
+            recipe_slug = plan.get("recipe_slug")
+            group = settings.mealie_group_slug or "home"
+            link = None
+            if settings.mealie_base_url:
+                if recipe_slug:
+                    link = f"{settings.mealie_base_url}/g/{group}/r/{recipe_slug}"
+                else:
+                    link = f"{settings.mealie_base_url}/g/{group}/planner"
+            return {
+                "has_plan": True,
+                "plan": {
+                    **plan,
+                    "mealie_url": link,
+                },
+            }
+        return {"has_plan": False, "plan": None}
+    except Exception as e:
+        logger.error(f"Error checking today's dinner plan: {e}")
+        return {"has_plan": False, "plan": None}
 
 
 @app.get("/api/options")
