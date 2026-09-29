@@ -9,6 +9,7 @@ import httpx
 from app.config import settings
 from app.mock_data import MOCK_RECIPES, generate_recipe_svg
 from app.taxonomy import extract_recipe_taxonomy, select_balanced_recipes
+from app.url_helper import extract_url_from_text, fetch_recipe_url_info, clean_domain
 
 logger = logging.getLogger("mealie_client")
 
@@ -175,17 +176,25 @@ class MealieClient:
                                     recipe_slug = recipe_obj.get("slug")
                                     is_custom = False
                                     emoji = "🥘"
+                                    external_url = None
+                                    source_domain = None
                                 elif title:
                                     dish_name = title
                                     total_time = None
                                     recipe_slug = None
                                     is_custom = True
-                                    emoji = "🍜"
+                                    note_text = dinner_entry.get("text") or ""
+                                    found_url = extract_url_from_text(note_text) or extract_url_from_text(title)
+                                    external_url = found_url
+                                    source_domain = clean_domain(found_url) if found_url else None
+                                    emoji = "🌐" if external_url else "🍜"
                                 elif recipe_id:
                                     dish_name = "Tonight's Dinner"
                                     total_time = None
                                     recipe_slug = None
                                     is_custom = False
+                                    external_url = None
+                                    source_domain = None
                                     emoji = "🍽️"
                                     try:
                                         r_res = await client.get(
@@ -208,6 +217,8 @@ class MealieClient:
                                     "total_time": total_time,
                                     "recipe_slug": recipe_slug,
                                     "is_custom": is_custom,
+                                    "external_url": external_url,
+                                    "source_domain": source_domain,
                                     "emoji": emoji,
                                 }
                                 self._cached_today_plan = plan
@@ -365,6 +376,9 @@ class MealieClient:
         recipe_slug = None
         is_custom = False
 
+        external_url = None
+        source_domain = None
+
         if recipe_id:
             # Check mock recipes first
             mock_recipe = next((m for m in MOCK_RECIPES if m["id"] == recipe_id), None)
@@ -395,25 +409,53 @@ class MealieClient:
                 "text": "",
             }
         elif custom_note:
-            dish_name = custom_note
-            is_custom = True
-            payload = {
-                "date": today_str,
-                "entryType": "dinner",
-                "title": custom_note,
-                "text": custom_note,
-                "recipeId": None,
-            }
+            found_url = extract_url_from_text(custom_note)
+            if found_url:
+                external_url = found_url
+                source_domain = clean_domain(found_url)
+                # Fetch clean title from webpage (fast 3-4s timeout)
+                page_title, _ = await fetch_recipe_url_info(found_url)
+
+                text_without_url = custom_note.replace(found_url, "").strip(" -:–—\t\r\n")
+                dish_name = page_title or text_without_url or f"Recipe from {source_domain}"
+                is_custom = True
+
+                note_lines = []
+                if text_without_url:
+                    note_lines.append(f"Note: {text_without_url}")
+                note_lines.append(f"Recipe Link: {found_url}")
+                note_lines.append(f"Source: {source_domain}")
+
+                payload = {
+                    "date": today_str,
+                    "entryType": "dinner",
+                    "title": dish_name,
+                    "text": "\n\n".join(note_lines),
+                    "recipeId": None,
+                }
+            else:
+                dish_name = custom_note
+                is_custom = True
+                payload = {
+                    "date": today_str,
+                    "entryType": "dinner",
+                    "title": custom_note,
+                    "text": custom_note,
+                    "recipeId": None,
+                }
         else:
             raise ValueError("Either recipe_id or custom_note must be provided")
 
+        emoji = "🌐" if external_url else ("🍜" if is_custom else "🥘")
         plan = {
             "date": today_str,
             "dish_name": dish_name,
             "total_time": total_time,
             "recipe_slug": recipe_slug,
             "is_custom": is_custom,
-            "emoji": "🍜" if is_custom else "🥘",
+            "external_url": external_url,
+            "source_domain": source_domain,
+            "emoji": emoji,
         }
 
         if self.mock_mode:
@@ -427,6 +469,9 @@ class MealieClient:
                 "total_time": total_time,
                 "recipe_slug": recipe_slug,
                 "is_custom": is_custom,
+                "external_url": external_url,
+                "source_domain": source_domain,
+                "emoji": emoji,
                 "entry": payload,
             }
 
@@ -469,6 +514,9 @@ class MealieClient:
                             "total_time": total_time,
                             "recipe_slug": recipe_slug,
                             "is_custom": is_custom,
+                            "external_url": external_url,
+                            "source_domain": source_domain,
+                            "emoji": emoji,
                         }
                     elif resp.status_code in (404, 405):
                         # Method not allowed or not found on this path, try next endpoint

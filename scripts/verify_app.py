@@ -28,6 +28,14 @@ async def run_verification():
         print("Navigating to http://127.0.0.1:8000...")
         await page.goto("http://127.0.0.1:8000", wait_until="networkidle")
 
+        # If a prior run left dinner locked in, reset to voting view
+        await page.wait_for_timeout(500)
+        if await page.locator("#confirmationView").is_visible():
+            print("Resetting prior locked-in meal plan for fresh test run...")
+            pick_again = page.locator("#confirmationView button").filter(has_text="Change your mind")
+            await pick_again.click()
+            await page.wait_for_timeout(400)
+
         # 1. Wait for recipe cards to render
         await page.wait_for_selector("#recipeList .recipe-card", state="visible", timeout=10000)
         cards = await page.query_selector_all("#recipeList .recipe-card")
@@ -107,6 +115,21 @@ async def run_verification():
         custom_shot = os.path.join(SCREENSHOTS_DIR, "3_custom_craving_active.png")
         await page.screenshot(path=custom_shot)
         print(f"Saved custom craving screenshot to: {custom_shot}")
+
+        # 3b. Test pasting an external recipe URL
+        print("Testing pasting external recipe URL into custom field...")
+        test_url = "https://www.seriouseats.com/the-best-crispy-roast-potatoes-recipe"
+        await custom_input.fill(test_url)
+        await page.wait_for_timeout(800)
+
+        is_preview_visible = await page.locator("#urlPreviewContainer").is_visible()
+        preview_title = await page.locator("#urlPreviewTitle").inner_text()
+        print(f"URL preview visible: {is_preview_visible}, title: {preview_title}")
+        assert is_preview_visible, "URL preview pill must be visible when URL is entered"
+
+        url_shot = os.path.join(SCREENSHOTS_DIR, "3b_url_preview_active.png")
+        await page.screenshot(path=url_shot)
+        print(f"Saved URL preview screenshot to: {url_shot}")
 
         # 4. Select a card again to verify clicking card deselects/clears custom note
         print("Re-selecting second card...")

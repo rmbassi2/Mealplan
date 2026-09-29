@@ -9,6 +9,7 @@ from pydantic import BaseModel, model_validator
 from app.config import settings
 from app.mealie_client import mealie_client
 from app.notifier import notifier
+from app.url_helper import fetch_recipe_url_info, clean_domain
 
 # Configure logging
 logging.basicConfig(
@@ -171,6 +172,25 @@ async def get_recipe_image(recipe_id: str):
         raise HTTPException(status_code=404, detail="Image not found")
 
 
+@app.get("/api/url-info")
+async def get_url_info(url: str):
+    """Inspect an external recipe URL and return its title and domain for instant UI preview."""
+    try:
+        title, domain = await fetch_recipe_url_info(url)
+        return {
+            "title": title,
+            "domain": domain,
+            "url": url,
+        }
+    except Exception as e:
+        logger.warning(f"Error fetching URL info for {url}: {e}")
+        return {
+            "title": clean_domain(url),
+            "domain": clean_domain(url),
+            "url": url,
+        }
+
+
 @app.post("/api/choose")
 async def choose_dinner(choice: DinnerChoice, background_tasks: BackgroundTasks):
     """Submit the chosen recipe or custom note to Mealie's Mealplanner API and notify the chef."""
@@ -187,6 +207,7 @@ async def choose_dinner(choice: DinnerChoice, background_tasks: BackgroundTasks)
             total_time=result.get("total_time"),
             recipe_slug=result.get("recipe_slug"),
             is_custom=result.get("is_custom", False),
+            external_url=result.get("external_url"),
         )
 
         return result

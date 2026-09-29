@@ -25,6 +25,7 @@ class NtfyNotifier:
         total_time: Optional[str] = None,
         recipe_slug: Optional[str] = None,
         is_custom: bool = False,
+        external_url: Optional[str] = None,
     ) -> bool:
         """Send a rich push notification to the configured ntfy topic.
 
@@ -35,21 +36,46 @@ class NtfyNotifier:
             return False
 
         # In ntfy, JSON payloads must be POSTed to the root server URL (e.g. https://ntfy.sh/)
-        # with the 'topic' field inside the JSON body. Posting JSON to /<topic> treats the body
-        # as raw unparsed text!
+        # with the 'topic' field inside the JSON body.
         publish_url = f"{self.base_url}/"
 
-        # Determine click destination
-        click_url = None
-        if settings.mealie_base_url:
-            group = settings.mealie_group_slug or "home"
-            if recipe_slug:
-                click_url = f"{settings.mealie_base_url}/g/{group}/r/{recipe_slug}"
-            else:
+        actions = []
+        # Determine click destination and content
+        if external_url:
+            from urllib.parse import urlparse
+            domain = urlparse(external_url).netloc.replace("www.", "")
+            title = "Tonight's Dinner: Web Recipe Request!"
+            message = (
+                f"Special web recipe request locked in:\n\n"
+                f"🌐 {dish_name}\n"
+                f"Source: {domain}\n\n"
+                f"Scheduled on tonight's meal plan (cookbook untouched)."
+            )
+            tags = ["globe_with_meridians", "bell"]
+            click_url = external_url
+            actions.append(
+                {
+                    "action": "view",
+                    "label": f"Open on {domain}",
+                    "url": external_url,
+                    "clear": False,
+                }
+            )
+            if settings.mealie_base_url:
+                group = settings.mealie_group_slug or "home"
+                actions.append(
+                    {
+                        "action": "view",
+                        "label": "Open Meal Plan",
+                        "url": f"{settings.mealie_base_url}/g/{group}/planner",
+                        "clear": False,
+                    }
+                )
+        elif is_custom:
+            click_url = None
+            if settings.mealie_base_url:
+                group = settings.mealie_group_slug or "home"
                 click_url = f"{settings.mealie_base_url}/g/{group}/planner"
-
-        # Build clean, friendly notification content
-        if is_custom:
             title = "Tonight's Dinner: Custom Craving!"
             message = (
                 f"Special dinner request locked in:\n"
@@ -57,7 +83,20 @@ class NtfyNotifier:
                 f"Scheduled on Mealie for tonight."
             )
             tags = ["fork_and_knife", "bell"]
+            if click_url:
+                actions.append(
+                    {
+                        "action": "view",
+                        "label": "Open Meal Plan",
+                        "url": click_url,
+                        "clear": False,
+                    }
+                )
         else:
+            click_url = None
+            if settings.mealie_base_url and recipe_slug:
+                group = settings.mealie_group_slug or "home"
+                click_url = f"{settings.mealie_base_url}/g/{group}/r/{recipe_slug}"
             time_str = f" • ⏱️ {total_time}" if total_time else ""
             title = f"Tonight's Dinner: {dish_name}"
             message = (
@@ -66,6 +105,15 @@ class NtfyNotifier:
                 f"Scheduled on Mealie. Time to get cooking! 👩‍🍳"
             )
             tags = ["pot_of_food", "tada"]
+            if click_url:
+                actions.append(
+                    {
+                        "action": "view",
+                        "label": "Open Recipe",
+                        "url": click_url,
+                        "clear": False,
+                    }
+                )
 
         payload: Dict[str, Any] = {
             "topic": self.topic,
@@ -78,15 +126,8 @@ class NtfyNotifier:
 
         if click_url:
             payload["click"] = click_url
-            label = "Open Recipe" if recipe_slug else "Open Meal Plan"
-            payload["actions"] = [
-                {
-                    "action": "view",
-                    "label": label,
-                    "url": click_url,
-                    "clear": False,
-                }
-            ]
+        if actions:
+            payload["actions"] = actions
 
         headers = {
             "Content-Type": "application/json",

@@ -176,12 +176,12 @@
           </div>
           <div class="flex-1">
             <h3 class="text-sm font-semibold text-stone-900 flex items-center justify-between">
-              <span>Craving something else?</span>
+              <span id="customCardTitle">Craving something else?</span>
               <span id="customActiveBadge" class="hidden text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full">
                 Active
               </span>
             </h3>
-            <p class="text-xs text-stone-500 mt-0.5">Takeout, breakfast for dinner, pantry raid, or a specific craving</p>
+            <p id="customCardDesc" class="text-xs text-stone-500 mt-0.5">Takeout, external recipe link, pantry raid, or a specific craving</p>
           </div>
         </div>
 
@@ -189,8 +189,8 @@
           <input 
             type="text" 
             id="customNoteInput" 
-            maxlength="120"
-            placeholder="e.g. Thai curry, breakfast burritos, pizza night..."
+            maxlength="250"
+            placeholder="e.g. Thai curry, https://seriouseats.com/..., pizza night..."
             class="w-full px-3.5 py-2.5 text-sm bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/60 transition-all outline-none text-stone-800 placeholder-stone-400"
             oninput="handleCustomInput(this.value)"
             onfocus="handleCustomFocus()"
@@ -203,6 +203,18 @@
             title="Clear text">
             ✕
           </button>
+        </div>
+
+        <!-- Recipe URL Live Preview Pill -->
+        <div id="urlPreviewContainer" class="hidden mt-2.5 p-2.5 rounded-xl bg-sky-50 border border-sky-200/80 text-xs flex items-center justify-between space-x-2">
+          <div class="flex items-center space-x-2 min-w-0">
+            <span class="text-base flex-shrink-0">🌐</span>
+            <div class="min-w-0">
+              <div id="urlPreviewTitle" class="font-bold text-sky-900 truncate">Inspecting recipe link...</div>
+              <div id="urlPreviewDomain" class="text-[11px] text-sky-600 truncate">Test run for tonight • Mealie cookbook stays clean</div>
+            </div>
+          </div>
+          <span class="text-[10px] uppercase font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-md flex-shrink-0">Test Run</span>
         </div>
       </div>
 
@@ -220,14 +232,14 @@
 
       <!-- Heading -->
       <div class="space-y-2">
-        <span class="inline-flex items-center space-x-1 px-3.5 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm">
+        <span id="confirmBadge" class="inline-flex items-center space-x-1 px-3.5 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm">
           <span>✓</span>
-          <span>MEAL PLAN UPDATED</span>
+          <span id="confirmBadgeText">MEAL PLAN UPDATED</span>
         </span>
         <h2 class="text-3xl font-extrabold font-serif-title text-stone-900 tracking-tight">
           Dinner is locked in!
         </h2>
-        <p class="text-stone-600 text-sm font-medium">
+        <p id="confirmSubtitle" class="text-stone-600 text-sm font-medium">
           Tonight's chef has been notified. 👩‍🍳
         </p>
       </div>
@@ -236,7 +248,7 @@
       <div class="bg-white rounded-2xl p-5 border border-stone-200/90 shadow-lg text-left space-y-3 mx-1">
         <div class="flex items-center justify-between">
           <div class="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">Tonight's Menu Selection</div>
-          <span class="text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full">Tonight</span>
+          <span id="confirmPillTag" class="text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full">Tonight</span>
         </div>
         <div class="flex items-center space-x-4 pt-1">
           <div id="confirmDishEmoji" class="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-3xl flex-shrink-0 shadow-inner">
@@ -250,10 +262,15 @@
               <span>📅</span>
               <span id="confirmDateStr">Scheduled for tonight</span>
             </p>
-            <div id="confirmMealieLinkWrapper" class="pt-2 hidden">
+            <div id="confirmLinksWrapper" class="pt-2 flex flex-wrap gap-2">
+              <a id="confirmExternalLink" href="#" target="_blank" rel="noopener noreferrer" 
+                 class="hidden inline-flex items-center space-x-1 text-xs font-semibold text-sky-800 bg-sky-50 hover:bg-sky-100 active:bg-sky-200 px-3 py-1.5 rounded-lg border border-sky-200 transition-colors">
+                <span>🌐 Open Recipe Website</span>
+                <span class="text-xs">↗</span>
+              </a>
               <a id="confirmMealieLink" href="#" target="_blank" rel="noopener noreferrer" 
-                 class="inline-flex items-center space-x-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-200 transition-colors">
-                <span>View Recipe in Mealie</span>
+                 class="hidden inline-flex items-center space-x-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-200 transition-colors">
+                <span>View in Mealie</span>
                 <span class="text-xs">↗</span>
               </a>
             </div>
@@ -540,9 +557,15 @@
       updateLockInState();
     }
 
+    let urlDebounceTimeout = null;
+
     // Handle typing in "Something Else" input
     function handleCustomInput(val) {
       customNote = val;
+      const urlMatch = val.match(/https?:\/\/[^\s<>"]+/i);
+      const urlPreviewContainer = document.getElementById('urlPreviewContainer');
+      const urlPreviewTitle = document.getElementById('urlPreviewTitle');
+      const urlPreviewDomain = document.getElementById('urlPreviewDomain');
 
       if (val.trim().length > 0) {
         // Automatically deselect any selected recipe card
@@ -551,17 +574,54 @@
           renderCards(currentOptions);
         }
 
-        // Highlight the custom card
-        customCravingCard.className = 'recipe-card relative bg-amber-50/40 border-2 border-amber-500 ring-2 ring-amber-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
-        customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
-        customActiveBadge.classList.remove('hidden');
         clearCustomBtn.classList.remove('hidden');
+
+        if (urlMatch) {
+          // Highlight with sky blue styling for web recipe
+          customCravingCard.className = 'recipe-card relative bg-sky-50/50 border-2 border-sky-500 ring-2 ring-sky-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
+          customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
+          customCravingIconWrapper.textContent = '🌐';
+          customActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-sky-600 text-white px-2 py-0.5 rounded-full';
+          customActiveBadge.textContent = 'Web Recipe';
+          customActiveBadge.classList.remove('hidden');
+
+          const rawUrl = urlMatch[0];
+          urlPreviewContainer.classList.remove('hidden');
+          urlPreviewTitle.textContent = 'Inspecting recipe link...';
+          urlPreviewDomain.textContent = 'Test run for tonight • Mealie cookbook stays clean';
+
+          clearTimeout(urlDebounceTimeout);
+          urlDebounceTimeout = setTimeout(async () => {
+            try {
+              const res = await fetch(`/api/url-info?url=${encodeURIComponent(rawUrl)}`);
+              if (res.ok) {
+                const info = await res.json();
+                urlPreviewTitle.textContent = info.title;
+                urlPreviewDomain.textContent = `From ${info.domain} • Scheduled as a test run`;
+              }
+            } catch (e) {
+              urlPreviewTitle.textContent = 'External Recipe Link';
+            }
+          }, 350);
+
+        } else {
+          // Standard custom craving highlight
+          customCravingCard.className = 'recipe-card relative bg-amber-50/40 border-2 border-amber-500 ring-2 ring-amber-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
+          customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
+          customCravingIconWrapper.textContent = '🍜';
+          customActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full';
+          customActiveBadge.textContent = 'Active';
+          customActiveBadge.classList.remove('hidden');
+          urlPreviewContainer.classList.add('hidden');
+        }
       } else {
         // Reset custom card highlight if empty
         customCravingCard.className = 'recipe-card relative bg-white border-2 border-dashed border-stone-300 hover:border-stone-400 rounded-2xl p-4 shadow-sm transition-all duration-200';
         customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-lg flex-shrink-0 text-amber-700 transition-colors';
+        customCravingIconWrapper.textContent = '🍜';
         customActiveBadge.classList.add('hidden');
         clearCustomBtn.classList.add('hidden');
+        urlPreviewContainer.classList.add('hidden');
       }
 
       updateLockInState();
@@ -613,7 +673,8 @@
       updateLockInState();
       btnSpinner.classList.remove('hidden');
       btnIcon.classList.add('hidden');
-      btnText.textContent = 'Locking it in...';
+      const isUrlInput = Boolean(customNote.match(/https?:\/\/[^\s<>"]+/i));
+      btnText.textContent = isUrlInput ? 'Preparing test run...' : 'Locking it in...';
       hideError();
 
       try {
@@ -631,14 +692,19 @@
         const data = await res.json();
         console.log('Choice submitted successfully:', data);
 
+        const chosenDishName = data.dish_name || chosenName;
+        const chosenEmoji = data.emoji || (data.external_url ? '🌐' : emoji);
+
         // Save to localStorage for quick restore
         const planObj = {
           date: new Date().toISOString().split('T')[0],
-          dish_name: chosenName,
-          emoji: emoji,
+          dish_name: chosenDishName,
+          emoji: chosenEmoji,
           total_time: data.total_time || null,
           is_custom: Boolean(customNote.trim()),
           mealie_url: data.mealie_url || null,
+          external_url: data.external_url || null,
+          source_domain: data.source_domain || null,
         };
         try {
           localStorage.setItem('dinnerDeciderToday', JSON.stringify(planObj));
@@ -646,11 +712,13 @@
 
         // Show Confirmation View
         showConfirmation(
-          chosenName, 
-          emoji, 
+          chosenDishName, 
+          chosenEmoji, 
           data.total_time, 
           Boolean(customNote.trim()), 
-          data.mealie_url
+          data.mealie_url,
+          data.external_url,
+          data.source_domain
         );
 
       } catch (err) {
@@ -666,27 +734,57 @@
     }
 
     // Transition to Confirmation Screen
-    function showConfirmation(dishTitle, emoji, totalTime, isCustom, mealieUrl) {
+    function showConfirmation(dishTitle, emoji, totalTime, isCustom, mealieUrl, externalUrl, sourceDomain) {
       document.getElementById('confirmDishTitle').textContent = dishTitle;
-      document.getElementById('confirmDishEmoji').textContent = emoji || (isCustom ? '🍜' : '🥘');
+      document.getElementById('confirmDishEmoji').textContent = emoji || (externalUrl ? '🌐' : (isCustom ? '🍜' : '🥘'));
 
       const confirmDateStr = document.getElementById('confirmDateStr');
-      if (totalTime) {
-        confirmDateStr.textContent = `⏱️ ${totalTime} • Scheduled for tonight`;
-      } else if (isCustom) {
-        confirmDateStr.textContent = 'Special Request • Scheduled for tonight';
+      const confirmBadge = document.getElementById('confirmBadge');
+      const confirmBadgeText = document.getElementById('confirmBadgeText');
+      const confirmSubtitle = document.getElementById('confirmSubtitle');
+      const confirmPillTag = document.getElementById('confirmPillTag');
+
+      if (externalUrl) {
+        confirmDateStr.textContent = `Recipe from ${sourceDomain || 'web'} • Scheduled for tonight`;
+        confirmBadge.className = 'inline-flex items-center space-x-1 px-3.5 py-1 rounded-full text-xs font-bold bg-sky-600 text-white shadow-sm';
+        confirmBadgeText.textContent = 'TEST RUN LOCKED IN';
+        confirmSubtitle.textContent = "Tonight's chef has been notified with the recipe link. 👨‍🍳";
+        confirmPillTag.className = 'text-xs bg-sky-100 text-sky-800 font-semibold px-2 py-0.5 rounded-full';
+        confirmPillTag.textContent = 'Test Run';
       } else {
-        confirmDateStr.textContent = 'Scheduled for tonight';
+        confirmBadge.className = 'inline-flex items-center space-x-1 px-3.5 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm';
+        confirmBadgeText.textContent = 'MEAL PLAN UPDATED';
+        confirmSubtitle.textContent = "Tonight's chef has been notified. 👩‍🍳";
+        confirmPillTag.className = 'text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full';
+        confirmPillTag.textContent = 'Tonight';
+        if (totalTime) {
+          confirmDateStr.textContent = `⏱️ ${totalTime} • Scheduled for tonight`;
+        } else if (isCustom) {
+          confirmDateStr.textContent = 'Special Request • Scheduled for tonight';
+        } else {
+          confirmDateStr.textContent = 'Scheduled for tonight';
+        }
       }
 
-      const linkWrapper = document.getElementById('confirmMealieLinkWrapper');
+      // External link button
+      const externalLink = document.getElementById('confirmExternalLink');
+      if (externalUrl && externalLink) {
+        externalLink.href = externalUrl;
+        const domainText = sourceDomain || 'Website';
+        externalLink.querySelector('span').textContent = `🌐 Open Recipe (${domainText})`;
+        externalLink.classList.remove('hidden');
+      } else if (externalLink) {
+        externalLink.classList.add('hidden');
+      }
+
+      // Mealie link button
       const mealieLink = document.getElementById('confirmMealieLink');
-      if (mealieUrl) {
+      if (mealieUrl && mealieLink) {
         mealieLink.href = mealieUrl;
         mealieLink.querySelector('span').textContent = isCustom ? 'Open Mealie Planner' : 'View Recipe in Mealie';
-        linkWrapper.classList.remove('hidden');
-      } else {
-        linkWrapper.classList.add('hidden');
+        mealieLink.classList.remove('hidden');
+      } else if (mealieLink) {
+        mealieLink.classList.add('hidden');
       }
 
       votingView.classList.add('hidden');
@@ -709,7 +807,9 @@
               parsed.emoji,
               parsed.total_time,
               parsed.is_custom,
-              parsed.mealie_url
+              parsed.mealie_url,
+              parsed.external_url,
+              parsed.source_domain
             );
           }
         }
@@ -729,7 +829,9 @@
               data.plan.emoji,
               data.plan.total_time,
               data.plan.is_custom,
-              data.plan.mealie_url
+              data.plan.mealie_url,
+              data.plan.external_url,
+              data.plan.source_domain
             );
             return true;
           } else {

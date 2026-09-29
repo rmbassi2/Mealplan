@@ -121,6 +121,42 @@ async def test_choose_custom_note_success():
 
 
 @pytest.mark.anyio
+async def test_choose_external_recipe_url_success():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        sample_url = "https://www.seriouseats.com/the-best-crispy-roast-potatoes-recipe"
+        resp = await client.post(
+            "/api/choose",
+            json={"custom_note": f"Make this tonight: {sample_url}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["external_url"] == sample_url
+        assert data["source_domain"] == "seriouseats.com"
+        assert "Crispy Roast Potatoes" in data["dish_name"]
+        assert data["emoji"] == "🌐"
+
+        # Check /api/today reflects external URL
+        today_resp = await client.get("/api/today")
+        assert today_resp.status_code == 200
+        today_data = today_resp.json()
+        assert today_data["has_plan"] is True
+        assert today_data["plan"]["external_url"] == sample_url
+        assert today_data["plan"]["source_domain"] == "seriouseats.com"
+
+
+@pytest.mark.anyio
+async def test_url_info_endpoint():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        sample_url = "https://www.allrecipes.com/recipe/12345/homemade-chicken-pot-pie"
+        resp = await client.get(f"/api/url-info?url={sample_url}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["domain"] == "allrecipes.com"
+        assert "Chicken Pot Pie" in data["title"]
+
+
+@pytest.mark.anyio
 async def test_today_endpoint_returns_locked_in_choice():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # First submit a choice
@@ -200,3 +236,22 @@ def test_taxonomy_unit_logic():
     assert len(balanced) == 3
     # Ensure distinct recipes
     assert len({r["id"] for r in balanced}) == 3
+
+
+def test_url_helper_unit_logic():
+    from app.url_helper import extract_url_from_text, clean_domain, clean_page_title, slug_to_title
+
+    text = "Hey check this recipe out: https://www.seriouseats.com/the-best-crispy-roast-potatoes-recipe for tonight!"
+    extracted = extract_url_from_text(text)
+    assert extracted == "https://www.seriouseats.com/the-best-crispy-roast-potatoes-recipe"
+
+    assert clean_domain(extracted) == "seriouseats.com"
+    assert clean_domain("https://sub.domain.co.uk/path") == "sub.domain.co.uk"
+
+    title = slug_to_title(extracted)
+    assert "Crispy Roast Potatoes" in title
+
+    raw_title = "Crispy Honey Garlic Salmon Recipe | Serious Eats"
+    cleaned = clean_page_title(raw_title)
+    assert "Serious Eats" not in cleaned
+    assert "Crispy Honey Garlic Salmon" in cleaned
