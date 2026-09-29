@@ -34,7 +34,10 @@ class NtfyNotifier:
             logger.info("Ntfy notification skipped (NTFY_TOPIC is not set in .env).")
             return False
 
-        topic_url = f"{self.base_url}/{self.topic}"
+        # In ntfy, JSON payloads must be POSTed to the root server URL (e.g. https://ntfy.sh/)
+        # with the 'topic' field inside the JSON body. Posting JSON to /<topic> treats the body
+        # as raw unparsed text!
+        publish_url = f"{self.base_url}/"
 
         # Determine click destination
         click_url = None
@@ -44,22 +47,22 @@ class NtfyNotifier:
             else:
                 click_url = f"{settings.mealie_base_url}/household/mealplan/planner/view"
 
-        # Build notification content
+        # Build clean, friendly notification content
         if is_custom:
-            title = "🍲 Tonight's Dinner: Custom Craving!"
+            title = "Tonight's Dinner: Custom Craving!"
             message = (
-                f"Special dinner request locked in:\n\n"
-                f"👉 {dish_name}\n\n"
-                f"Scheduled for tonight in your Mealie meal plan."
+                f"Special dinner request locked in:\n"
+                f"🍜 {dish_name}\n\n"
+                f"Scheduled on Mealie for tonight."
             )
             tags = ["fork_and_knife", "bell"]
         else:
-            time_str = f" (⏱️ {total_time})" if total_time else ""
-            title = f"🍲 Tonight's Dinner: {dish_name}"
+            time_str = f" • ⏱️ {total_time}" if total_time else ""
+            title = f"Tonight's Dinner: {dish_name}"
             message = (
-                f"Tonight's menu selection is locked in:\n\n"
-                f"👉 {dish_name}{time_str}\n\n"
-                f"Scheduled for tonight in your Mealie meal plan. Time to get cooking! 👩‍🍳"
+                f"Tonight's menu is locked in!\n\n"
+                f"🍽️ {dish_name}{time_str}\n\n"
+                f"Scheduled on Mealie. Time to get cooking! 👩‍🍳"
             )
             tags = ["pot_of_food", "tada"]
 
@@ -69,6 +72,7 @@ class NtfyNotifier:
             "message": message,
             "priority": 4,  # High priority (ring & vibrate)
             "tags": tags,
+            "markdown": True,
         }
 
         if click_url:
@@ -90,19 +94,19 @@ class NtfyNotifier:
             headers["Authorization"] = f"Bearer {self.token}"
 
         try:
-            logger.info(f"Sending ntfy push notification to {topic_url}...")
+            logger.info(f"Sending ntfy push notification for topic '{self.topic}' to {publish_url}...")
             async with httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.post(topic_url, json=payload, headers=headers)
+                resp = await client.post(publish_url, json=payload, headers=headers)
                 if resp.status_code in (200, 201):
                     logger.info(f"Successfully delivered ntfy notification to topic '{self.topic}'.")
                     return True
                 else:
                     logger.warning(
-                        f"ntfy.sh returned HTTP {resp.status_code}: {resp.text}"
+                        f"ntfy server returned HTTP {resp.status_code}: {resp.text}"
                     )
                     return False
         except Exception as e:
-            logger.error(f"Failed to deliver ntfy notification ({e}).")
+            logger.error(f"Failed to deliver ntfy notification: {e}")
             return False
 
 
