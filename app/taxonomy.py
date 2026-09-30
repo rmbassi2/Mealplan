@@ -571,52 +571,47 @@ def select_balanced_recipes(
     weekday = date.today().weekday()  # 0=Monday, 6=Sunday
     is_weeknight = weekday in (0, 1, 2, 3)
 
-    # Group pool by protein families for anti-monotony
-    # Group A: Poultry (chicken, turkey)
-    # Group B: Red Meat & Seafood (beef, pork, seafood, lamb)
-    # Group C: Plant-based & Pasta (vegetarian, vegan, beans-legumes, tofu-tempeh, pasta-noodles, egg, other)
-    groups: Dict[str, List[Dict[str, Any]]] = {"poultry": [], "red_seafood": [], "plant_other": []}
-
+    # Base sampling weights: on weeknights, gently favor quick/low-effort recipes (1.8x boost)
+    # instead of a deterministic sort that starves variety or locks in a single recipe
+    base_weights = []
     for r in pool:
-        p = r["_taxonomy"]["primary_protein"]
-        if p in ("chicken", "turkey"):
-            groups["poultry"].append(r)
-        elif p in ("beef", "pork", "seafood", "lamb"):
-            groups["red_seafood"].append(r)
-        else:
-            groups["plant_other"].append(r)
-
-    # If weeknight, sort each group to prioritize quick/low-effort recipes first
-    if is_weeknight:
-        for g_name in groups:
-            groups[g_name].sort(
-                key=lambda x: (
-                    0 if "quick-weeknight" in x["_taxonomy"]["tags"] or "low-effort" in x["_taxonomy"]["tags"] else 1,
-                    random.random(),
-                )
-            )
-    else:
-        for g_name in groups:
-            random.shuffle(groups[g_name])
+        tags = r["_taxonomy"]["tags"]
+        is_quick = "quick-weeknight" in tags or "low-effort" in tags
+        w = 1.8 if (is_weeknight and is_quick) else 1.0
+        base_weights.append(w)
 
     selected: List[Dict[str, Any]] = []
-    available_group_keys = [k for k, v in groups.items() if len(v) > 0]
-    random.shuffle(available_group_keys)
+    selected_proteins: Set[str] = set()
+    selected_cuisines: Set[str] = set()
+    available_indices = list(range(len(pool)))
 
-    # Pick 1 from each distinct protein group first
-    for g_key in available_group_keys:
-        if len(selected) >= count:
-            break
-        if groups[g_key]:
-            chosen = groups[g_key].pop(0)
-            selected.append(chosen)
+    # Iteratively choose recipes, dynamically discounting already-represented proteins and cuisines
+    while len(selected) < count and available_indices:
+        current_weights = []
+        for idx in available_indices:
+            r = pool[idx]
+            prot = r["_taxonomy"]["primary_protein"]
+            cuisines = r["_taxonomy"]["dimensions"].get("cuisine", [])
+            w = base_weights[idx]
 
-    # If still need more, fill from remaining pool with distinct recipes
-    if len(selected) < count:
-        remaining = [r for r in pool if r not in selected]
-        random.shuffle(remaining)
-        needed = count - len(selected)
-        selected.extend(remaining[:needed])
+            # Anti-monotony penalty for duplicate protein family
+            if prot in selected_proteins:
+                w *= 0.15
+            # Soft penalty for duplicate cuisine
+            if any(c in selected_cuisines for c in cuisines):
+                w *= 0.5
+            current_weights.append(w)
+
+        # Weighted probabilistic choice
+        chosen_idx = random.choices(available_indices, weights=current_weights, k=1)[0]
+        chosen = pool[chosen_idx]
+        selected.append(chosen)
+
+        # Track selected dimensions
+        selected_proteins.add(chosen["_taxonomy"]["primary_protein"])
+        for c in chosen["_taxonomy"]["dimensions"].get("cuisine", []):
+            selected_cuisines.add(c)
+        available_indices.remove(chosen_idx)
 
     random.shuffle(selected)
     return selected
