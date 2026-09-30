@@ -93,7 +93,13 @@ TAXONOMY = {
 }
 
 # Categories eligible for Dinner Decider
-DINNER_ELIGIBLE_CATEGORIES = {"dinner", "soup & stew", "soup-stew"}
+DINNER_ELIGIBLE_CATEGORIES = {
+    "dinner",
+    "soup & stew",
+    "soup-&-stew",
+    "soup-stew",
+    "soup",
+}
 
 # Badges and UI Emoji mappings for tags and tools
 BADGE_ICONS = {
@@ -106,14 +112,29 @@ BADGE_ICONS = {
     "dutch oven": ("🍲", "Dutch Oven"),
     "grill": ("🔥", "Grill"),
     "wok": ("🥢", "Wok"),
-    # Effort
+    # Cooking Style
+    "skillet": ("🍳", "Skillet"),
+    "one-pot": ("🍲", "One-Pot"),
+    "sheet-pan": ("🥘", "Sheet Pan"),
+    "grill-bbq": ("🔥", "Grill"),
+    "baked-casserole": ("🥧", "Casserole"),
+    "stir-fry": ("🥢", "Stir-Fry"),
+    "pasta-noodles": ("🍝", "Pasta"),
+    "salad": ("🥗", "Salad"),
+    "sandwich-wrap": ("🥪", "Sandwich"),
+    "no-cook": ("🥗", "No-Cook"),
+    # Effort / Time
     "quick-weeknight": ("⚡", "Quick"),
     "low-effort": ("🛋️", "Easy"),
     "weekend-project": ("👨‍🍳", "Project"),
-    # Occasion
+    "make-ahead": ("⏱️", "Make-Ahead"),
+    # Occasion / Utility
     "comfort-food": ("🧀", "Comfort"),
     "light-fresh": ("🥗", "Fresh"),
     "kid-friendly": ("👶", "Kid-Friendly"),
+    "crowd-pleaser": ("🎉", "Crowd-Pleaser"),
+    "meal-prep": ("🍱", "Meal Prep"),
+    "freezer-friendly": ("❄️", "Freezer"),
     # Cuisines
     "italian": ("🍝", "Italian"),
     "mexican-texmex": ("🌮", "Mexican"),
@@ -128,6 +149,8 @@ BADGE_ICONS = {
     "gluten-free": ("🌾", "Gluten-Free"),
     "dairy-free": ("🥛", "Dairy-Free"),
     "low-carb": ("🥑", "Low-Carb"),
+    "vegetarian": ("🌱", "Vegetarian"),
+    "vegan": ("🌿", "Vegan"),
 }
 
 
@@ -208,6 +231,15 @@ def extract_recipe_taxonomy(recipe: Dict[str, Any]) -> Dict[str, Any]:
             seen_badges.add(c)
             break
 
+    # Cooking Style badge (if any)
+    for s in dimensions.get("cooking_style", []):
+        if s in BADGE_ICONS and s not in seen_badges:
+            ico, lbl = BADGE_ICONS[s]
+            badges.append({"icon": ico, "label": lbl, "type": "style"})
+            seen_badges.add(s)
+            if len(badges) >= 3:
+                break
+
     # Effort / Occasion badge
     for e in dimensions.get("effort_time", []) + dimensions.get("occasion_utility", []):
         if e in BADGE_ICONS and e not in seen_badges:
@@ -237,9 +269,14 @@ def extract_recipe_taxonomy(recipe: Dict[str, Any]) -> Dict[str, Any]:
 def is_dinner_recipe(tax: Dict[str, Any]) -> bool:
     """Check if recipe belongs to Dinner (or Soup & Stew).
 
+    Strictly excludes recipes categorized as Side Dish.
     If the user has not categorized recipes yet, allow uncategorized.
     """
     cats = tax.get("categories", set())
+    # Exclude any recipe explicitly designated as a side
+    if any(c in SIDE_ELIGIBLE_CATEGORIES or "side" in c for c in cats):
+        return False
+
     if not cats:
         # If no categories assigned at all, don't exclude
         return True
@@ -255,56 +292,91 @@ SIDE_ELIGIBLE_CATEGORIES = {
     "side dish",
     "side-dish",
     "side",
-    "appetizer & snack",
-    "appetizer-snack",
-    "salad",
-    "vegetable",
-    "vegetables",
 }
 
 
 def is_side_recipe(tax: Dict[str, Any], recipe: Optional[Dict[str, Any]] = None) -> bool:
-    """Check if recipe belongs to Side Dish, Salad, or Vegetable category/tags."""
+    """Check if recipe belongs to Side Dish category.
+
+    Strictly ensures main dinner recipes (even with salad/potato tags) are never classified as sides.
+    """
     cats = tax.get("categories", set())
+
+    # 1. If explicitly categorized as Dinner, it is a main course, NOT a side
+    if any(c in DINNER_ELIGIBLE_CATEGORIES or "dinner" in c for c in cats):
+        return False
+
+    # 2. Match explicit Side Dish category
     for c in cats:
-        if c in SIDE_ELIGIBLE_CATEGORIES or "side" in c or "salad" in c:
+        if c in SIDE_ELIGIBLE_CATEGORIES or "side" in c:
             return True
+
+    # 3. If explicit side tag is present (and not dinner)
     tags = tax.get("tags", set())
-    if any(t in ("side", "side-dish", "vegetables", "salad", "appetizer") for t in tags):
+    if any(t in ("side", "side-dish") for t in tags):
         return True
-    if recipe:
-        title = str(recipe.get("name", "")).lower()
-        side_keywords = [
-            "salad",
-            "potato",
-            "potatoes",
-            "fries",
-            "rice",
-            "asparagus",
-            "green bean",
-            "green beans",
-            "broccoli",
-            "garlic bread",
-            "slaw",
-            "coleslaw",
-            "roasted veg",
-            "corn on the cob",
-            "mac and cheese",
-            "baked beans",
-            "cauliflower",
-            "zucchini",
-            "brussels sprout",
-        ]
-        if any(k in title for k in side_keywords):
-            return True
+
+    # 4. Keyword fallback ONLY if recipe is completely uncategorized
+    if not cats:
+        protein_tags = {"chicken", "beef", "pork", "seafood", "lamb", "turkey"}
+        if tags.intersection(protein_tags):
+            return False
+
+        if recipe:
+            title = str(recipe.get("name", "")).lower()
+            side_keywords = [
+                "coleslaw",
+                "slaw",
+                "green bean",
+                "green beans",
+                "garlic bread",
+                "mashed potato",
+                "roasted potato",
+                "french fries",
+                "roasted veg",
+                "brussels sprout",
+            ]
+            if any(k in title for k in side_keywords):
+                return True
+
     return False
+
+
+def classify_side_bucket(recipe: Dict[str, Any], tax: Dict[str, Any]) -> str:
+    """Classify a side recipe into 'salad', 'starch', or 'veggie'."""
+    tags = tax.get("tags", set())
+    title = str(recipe.get("name", "")).lower()
+
+    # 1. Starches, Potatoes & Grains
+    starch_keywords = [
+        "potato",
+        "potatoes",
+        "rice",
+        "hash brown",
+        "fries",
+        "naan",
+        "bread",
+        "pasta",
+        "grain",
+        "quinoa",
+        "corn",
+    ]
+    if any(k in title for k in starch_keywords):
+        return "starch"
+
+    # 2. Fresh Salads & Slaws
+    if "salad" in tags or "no-cook" in tags or "slaw" in title or "salad" in title:
+        return "salad"
+
+    # 3. Warm Roasted & Sautéed Veggies
+    return "veggie"
 
 
 def select_side_recipes(
     recipes: List[Dict[str, Any]],
     count: int = 3,
 ) -> List[Dict[str, Any]]:
-    """Select 'count' diverse side dish recipes."""
+    """Select 'count' diverse side dish recipes, ideally 1 salad, 1 starch, 1 veggie."""
     if not recipes:
         return []
 
@@ -321,8 +393,38 @@ def select_side_recipes(
     if len(side_candidates) <= count:
         return side_candidates
 
-    random.shuffle(side_candidates)
-    return side_candidates[:count]
+    # Partition candidates into 3 distinct culinary buckets:
+    # 1. Fresh Salads & Slaws
+    # 2. Potatoes, Grains & Starches
+    # 3. Warm Roasted & Sautéed Veggies
+    buckets: Dict[str, List[Dict[str, Any]]] = {
+        "salad": [],
+        "starch": [],
+        "veggie": [],
+    }
+    for r in side_candidates:
+        b = classify_side_bucket(r, r["_taxonomy"])
+        buckets[b].append(r)
+
+    for b in buckets:
+        random.shuffle(buckets[b])
+
+    selected: List[Dict[str, Any]] = []
+
+    # Pick 1 from each bucket if available
+    for b in ("salad", "starch", "veggie"):
+        if buckets[b] and len(selected) < count:
+            selected.append(buckets[b].pop(0))
+
+    # If we still need more to satisfy count (e.g. one bucket was empty), fill from remaining pool
+    if len(selected) < count:
+        remaining = [r for r in side_candidates if r not in selected]
+        random.shuffle(remaining)
+        needed = count - len(selected)
+        selected.extend(remaining[:needed])
+
+    random.shuffle(selected)
+    return selected
 
 
 def matches_filter(
@@ -337,23 +439,31 @@ def matches_filter(
     tags = tax.get("tags", set())
     tools = tax.get("tools", set())
     dims = tax.get("dimensions", {})
+    title = str(recipe.get("name", "")).lower()
 
     # 1. Specific Protein filter
     if protein:
         p_norm = normalize_str(protein)
-        if p_norm not in dims.get("protein", []):
+        if p_norm in ("vegetarian", "veggie"):
+            if not any(v in dims.get("protein", []) or v in tags for v in ["vegetarian", "vegan", "beans-legumes", "tofu-tempeh"]):
+                return False
+        elif p_norm not in dims.get("protein", []) and p_norm not in tags:
             return False
 
     # 2. Specific Tool filter
     if tool:
         t_norm = normalize_str(tool)
-        if t_norm not in tools:
+        if t_norm not in tools and t_norm not in tags:
             return False
 
     # 3. Specific Cuisine filter
     if cuisine:
         c_norm = normalize_str(cuisine)
-        if c_norm not in dims.get("cuisine", []):
+        if c_norm in ("asian", "east-asian", "southeast-asian"):
+            asian_cuisines = {"east-asian", "southeast-asian"}
+            if not any(ac in dims.get("cuisine", []) or ac in tags for ac in asian_cuisines):
+                return False
+        elif c_norm not in dims.get("cuisine", []) and c_norm not in tags:
             return False
 
     # 4. Mood Preset filter
@@ -362,7 +472,7 @@ def matches_filter(
         if m in ("quick", "quick-weeknight"):
             # Matches quick-weeknight tag, low-effort tag, or <= 30 mins
             total_time = str(recipe.get("totalTime", "")).lower()
-            is_fast = "20" in total_time or "25" in total_time or "30" in total_time or "15" in total_time
+            is_fast = any(t in total_time for t in ["15", "20", "25", "30"])
             if not ("quick-weeknight" in tags or "low-effort" in tags or is_fast):
                 return False
         elif m in ("comfort", "comfort-food"):
@@ -371,29 +481,50 @@ def matches_filter(
         elif m in ("fresh", "light-fresh"):
             if "light-fresh" not in tags and "salad" not in tags:
                 return False
+        elif m in ("skillet", "cast-iron"):
+            if "skillet" not in tags and "cast-iron-skillet" not in tools:
+                return False
         elif m in ("one-pot", "one-pot-meals"):
-            if "one-pot" not in tags and "sheet-pan" not in tags and "skillet" not in tags:
+            if "one-pot" not in tags and "dutch-oven" not in tools:
+                return False
+        elif m in ("sheet-pan", "sheetpan"):
+            if "sheet-pan" not in tools and "sheet-pan" not in tags:
+                return False
+        elif m in ("grill", "grill-bbq", "bbq"):
+            if "grill-bbq" not in tags and "grill" not in tools:
+                return False
+        elif m in ("pasta", "pasta-noodles"):
+            if "pasta-noodles" not in tags and not any(k in title for k in ["pasta", "spaghetti", "noodle", "orzo", "risoni"]):
+                return False
+        elif m == "chicken":
+            if "chicken" not in dims.get("protein", []) and "chicken" not in tags:
+                return False
+        elif m == "beef":
+            if "beef" not in dims.get("protein", []) and "beef" not in tags:
+                return False
+        elif m == "pork":
+            if "pork" not in dims.get("protein", []) and "pork" not in tags:
+                return False
+        elif m == "seafood":
+            if "seafood" not in dims.get("protein", []) and "seafood" not in tags:
+                return False
+        elif m in ("vegetarian", "veggie"):
+            if not any(v in dims.get("protein", []) or v in tags for v in ["vegetarian", "vegan", "beans-legumes", "tofu-tempeh"]):
+                return False
+        elif m in ("asian", "east-asian", "southeast-asian"):
+            if not any(ac in dims.get("cuisine", []) or ac in tags for ac in ["east-asian", "southeast-asian"]):
+                return False
+        elif m == "italian":
+            if "italian" not in dims.get("cuisine", []) and "italian" not in tags:
+                return False
+        elif m in ("mexican", "mexican-texmex"):
+            if "mexican-texmex" not in dims.get("cuisine", []) and "mexican-texmex" not in tags:
                 return False
         elif m in ("air-fryer", "airfryer"):
             if "air-fryer" not in tools:
                 return False
         elif m in ("slow-cooker", "slowcooker"):
             if "slow-cooker" not in tools:
-                return False
-        elif m in ("sheet-pan", "sheetpan"):
-            if "sheet-pan" not in tools and "sheet-pan" not in tags:
-                return False
-        elif m == "chicken":
-            if "chicken" not in dims.get("protein", []):
-                return False
-        elif m == "beef":
-            if "beef" not in dims.get("protein", []):
-                return False
-        elif m == "seafood":
-            if "seafood" not in dims.get("protein", []):
-                return False
-        elif m in ("vegetarian", "veggie"):
-            if not any(v in dims.get("protein", []) for v in ["vegetarian", "vegan", "beans-legumes", "tofu-tempeh", "pasta-noodles"]):
                 return False
 
     return True

@@ -83,6 +83,36 @@ async def test_get_options_with_filters():
         data_cuisine = resp_cuisine.json()
         assert len(data_cuisine["options"]) > 0
 
+        # 5. Skillet mood filter
+        resp_skillet = await client.get("/api/options?mood=skillet")
+        assert resp_skillet.status_code == 200
+        data_skillet = resp_skillet.json()
+        assert len(data_skillet["options"]) > 0
+
+        # 6. One-pot mood filter
+        resp_onepot = await client.get("/api/options?mood=one-pot")
+        assert resp_onepot.status_code == 200
+        data_onepot = resp_onepot.json()
+        assert len(data_onepot["options"]) > 0
+
+        # 7. Pork protein filter
+        resp_pork = await client.get("/api/options?protein=pork")
+        assert resp_pork.status_code == 200
+        data_pork = resp_pork.json()
+        assert len(data_pork["options"]) > 0
+
+        # 8. Pasta mood filter
+        resp_pasta = await client.get("/api/options?mood=pasta")
+        assert resp_pasta.status_code == 200
+        data_pasta = resp_pasta.json()
+        assert len(data_pasta["options"]) > 0
+
+        # 9. Asian cuisine filter
+        resp_asian = await client.get("/api/options?cuisine=asian")
+        assert resp_asian.status_code == 200
+        data_asian = resp_asian.json()
+        assert len(data_asian["options"]) > 0
+
 
 @pytest.mark.anyio
 async def test_get_recipe_image_endpoint():
@@ -318,3 +348,78 @@ def test_url_helper_unit_logic():
     cleaned = clean_page_title(raw_title)
     assert "Serious Eats" not in cleaned
     assert "Crispy Honey Garlic Salmon" in cleaned
+
+
+def test_taxonomy_overhaul_separation_and_diversity():
+    """Verify overhauled taxonomy cleanly separates dinners vs sides and provides 3-bucket side diversity."""
+    from app.taxonomy import (
+        extract_recipe_taxonomy,
+        is_dinner_recipe,
+        is_side_recipe,
+        classify_side_bucket,
+        select_side_recipes,
+    )
+
+    # 1. Main dinner salads and potato dishes must NEVER be identified as sides
+    dinner_salad = {
+        "name": "Asian Noodle Salad with Chicken & Peanut Dressing",
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "tags": [{"slug": "chicken"}, {"slug": "salad"}, {"slug": "quick-weeknight"}],
+    }
+    tax_ds = extract_recipe_taxonomy(dinner_salad)
+    assert is_dinner_recipe(tax_ds) is True
+    assert is_side_recipe(tax_ds, dinner_salad) is False
+
+    dinner_burger = {
+        "name": "Sweet Potato Black Bean Burger",
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "tags": [{"slug": "vegan"}, {"slug": "beans-legumes"}, {"slug": "sandwich-wrap"}],
+    }
+    tax_db = extract_recipe_taxonomy(dinner_burger)
+    assert is_dinner_recipe(tax_db) is True
+    assert is_side_recipe(tax_db, dinner_burger) is False
+
+    dinner_soup = {
+        "name": "Potato-Leek Soup with Sage",
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}, {"name": "Soup & Stew", "slug": "soup-stew"}],
+        "tags": [{"slug": "vegetarian"}, {"slug": "one-pot"}, {"slug": "comfort-food"}],
+    }
+    tax_sp = extract_recipe_taxonomy(dinner_soup)
+    assert is_dinner_recipe(tax_sp) is True
+    assert is_side_recipe(tax_sp, dinner_soup) is False
+
+    # 2. Side dishes must NEVER be identified as dinners
+    side_dish = {
+        "name": "Greek Lemon Potatoes",
+        "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}],
+        "tags": [{"slug": "vegan"}, {"slug": "mediterranean-greek"}, {"slug": "comfort-food"}],
+    }
+    tax_sd = extract_recipe_taxonomy(side_dish)
+    assert is_side_recipe(tax_sd, side_dish) is True
+    assert is_dinner_recipe(tax_sd) is False
+
+    # 3. 3-bucket side classification: salad, starch, veggie
+    side_candidates = [
+        # Salads
+        {"name": "Chimichurri Green Bean Salad", "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}], "tags": [{"slug": "salad"}]},
+        {"name": "Asian Slaw", "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}], "tags": [{"slug": "salad"}]},
+        # Starches
+        {"name": "Greek Lemon Potatoes", "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}], "tags": [{"slug": "vegan"}]},
+        {"name": "Mexican Red Rice", "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}], "tags": [{"slug": "one-pot"}]},
+        # Veggies
+        {"name": "Miso-Glazed Roasted Brussels Sprouts", "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}], "tags": [{"slug": "skillet"}]},
+        {"name": "Grilled Zucchini Ribbons", "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}], "tags": [{"slug": "grill-bbq"}]},
+    ]
+    for sc in side_candidates:
+        sc["_taxonomy"] = extract_recipe_taxonomy(sc)
+
+    assert classify_side_bucket(side_candidates[0], side_candidates[0]["_taxonomy"]) == "salad"
+    assert classify_side_bucket(side_candidates[2], side_candidates[2]["_taxonomy"]) == "starch"
+    assert classify_side_bucket(side_candidates[4], side_candidates[4]["_taxonomy"]) == "veggie"
+
+    # Selecting 3 sides must pick 1 salad, 1 starch, 1 veggie
+    trio = select_side_recipes(side_candidates, count=3)
+    assert len(trio) == 3
+    trio_buckets = {classify_side_bucket(s, s["_taxonomy"]) for s in trio}
+    assert trio_buckets == {"salad", "starch", "veggie"}
+
