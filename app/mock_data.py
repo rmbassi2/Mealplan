@@ -161,6 +161,75 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
 ]
 
 
+MOCK_SIDES: List[Dict[str, Any]] = [
+    {
+        "id": "side-e4b1-001",
+        "name": "Garlic Butter Baby Potatoes",
+        "slug": "garlic-butter-baby-potatoes",
+        "description": "Crispy roasted mini gold potatoes tossed in melted butter, minced garlic, cracked pepper, and fresh parsley.",
+        "totalTime": "25 mins",
+        "category": "Side Dish",
+        "emoji": "🥔",
+        "gradient": ("#eab308", "#ca8a04"),
+        "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}],
+        "tools": [{"name": "Sheet Pan", "slug": "sheet-pan"}],
+        "tags": [{"name": "side", "slug": "side"}, {"name": "comfort-food", "slug": "comfort-food"}],
+    },
+    {
+        "id": "side-e4b1-002",
+        "name": "Parmesan Roasted Asparagus",
+        "slug": "parmesan-roasted-asparagus",
+        "description": "Tender-crisp asparagus spears drizzled with olive oil, sea salt, lemon zest, and grated aged parmesan.",
+        "totalTime": "15 mins",
+        "category": "Side Dish",
+        "emoji": "🥦",
+        "gradient": ("#10b981", "#059669"),
+        "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}],
+        "tools": [{"name": "Sheet Pan", "slug": "sheet-pan"}],
+        "tags": [{"name": "side", "slug": "side"}, {"name": "light-fresh", "slug": "light-fresh"}, {"name": "quick-weeknight", "slug": "quick-weeknight"}],
+    },
+    {
+        "id": "side-e4b1-003",
+        "name": "Classic Caesar Salad",
+        "slug": "classic-caesar-salad",
+        "description": "Crisp romaine hearts with creamy garlic dressing, shaved pecorino, toasted sourdough croutons, and lemon.",
+        "totalTime": "10 mins",
+        "category": "Side Dish",
+        "emoji": "🥗",
+        "gradient": ("#84cc16", "#4d7c0f"),
+        "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}],
+        "tools": [],
+        "tags": [{"name": "side", "slug": "side"}, {"name": "salad", "slug": "salad"}, {"name": "quick-weeknight", "slug": "quick-weeknight"}],
+    },
+    {
+        "id": "side-e4b1-004",
+        "name": "Steamed Jasmine Rice",
+        "slug": "steamed-jasmine-rice",
+        "description": "Fragrant, fluffy jasmine rice infused with a hint of sea salt and grass-fed butter.",
+        "totalTime": "15 mins",
+        "category": "Side Dish",
+        "emoji": "🍚",
+        "gradient": ("#f1f5f9", "#cbd5e1"),
+        "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}],
+        "tools": [{"name": "Instant Pot", "slug": "instant-pot"}],
+        "tags": [{"name": "side", "slug": "side"}, {"name": "comfort-food", "slug": "comfort-food"}],
+    },
+    {
+        "id": "side-e4b1-005",
+        "name": "Air Fryer Sweet Potato Fries",
+        "slug": "air-fryer-sweet-potato-fries",
+        "description": "Crunchy on the outside, tender on the inside with smoked paprika and rosemary sea salt.",
+        "totalTime": "20 mins",
+        "category": "Side Dish",
+        "emoji": "🍟",
+        "gradient": ("#f97316", "#c2410c"),
+        "recipeCategory": [{"name": "Side Dish", "slug": "side-dish"}],
+        "tools": [{"name": "Air Fryer", "slug": "air-fryer"}],
+        "tags": [{"name": "side", "slug": "side"}, {"name": "kid-friendly", "slug": "kid-friendly"}],
+    },
+]
+
+
 def generate_recipe_svg(title: str, emoji: str = "🍽️", c1: str = "#f59e0b", c2: str = "#b45309") -> str:
     """Generate an elegant, high-quality SVG image placeholder for a recipe."""
     escaped_title = (

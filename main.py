@@ -37,6 +37,8 @@ app.add_middleware(
 class DinnerChoice(BaseModel):
     recipe_id: Optional[str] = None
     custom_note: Optional[str] = None
+    side_recipe_id: Optional[str] = None
+    side_custom_note: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_choice(self):
@@ -75,11 +77,21 @@ async def get_today_dinner():
                     link = f"{settings.mealie_base_url}/g/{group}/r/{recipe_slug}"
                 else:
                     link = f"{settings.mealie_base_url}/g/{group}/planner"
+
+            side_slug = plan.get("side_slug")
+            side_link = None
+            if settings.mealie_base_url and plan.get("side_name"):
+                if side_slug:
+                    side_link = f"{settings.mealie_base_url}/g/{group}/r/{side_slug}"
+                else:
+                    side_link = f"{settings.mealie_base_url}/g/{group}/planner"
+
             return {
                 "has_plan": True,
                 "plan": {
                     **plan,
                     "mealie_url": link,
+                    "side_mealie_url": side_link,
                 },
             }
         return {"has_plan": False, "plan": None}
@@ -171,6 +183,21 @@ async def get_dinner_options(
         raise HTTPException(status_code=500, detail="Failed to fetch dinner options")
 
 
+@app.get("/api/side-options")
+async def get_side_options():
+    """Fetch 3 curated side dish options from Mealie or smart fallbacks."""
+    try:
+        options = await mealie_client.get_side_options(count=3)
+        return {
+            "options": options,
+            "count": len(options),
+            "is_mock": mealie_client.mock_mode or any(o.get("is_mock") for o in options),
+        }
+    except Exception as e:
+        logger.error(f"Error fetching side options: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch side options")
+
+
 @app.get("/api/recipe-image/{recipe_id}")
 async def get_recipe_image(recipe_id: str):
     """Proxy recipe image from Mealie, or return an elegant SVG fallback."""
@@ -209,11 +236,13 @@ async def get_url_info(url: str):
 
 @app.post("/api/choose")
 async def choose_dinner(choice: DinnerChoice, background_tasks: BackgroundTasks):
-    """Submit the chosen recipe or custom note to Mealie's Mealplanner API and notify the chef."""
+    """Submit the chosen recipe or custom note, plus optional side dish to Mealie."""
     try:
         result = await mealie_client.submit_choice(
             recipe_id=choice.recipe_id.strip() if choice.recipe_id else None,
             custom_note=choice.custom_note.strip() if choice.custom_note else None,
+            side_recipe_id=choice.side_recipe_id.strip() if choice.side_recipe_id else None,
+            side_custom_note=choice.side_custom_note.strip() if choice.side_custom_note else None,
         )
 
         # Trigger push notification in background so UI confirmation never waits
@@ -224,7 +253,33 @@ async def choose_dinner(choice: DinnerChoice, background_tasks: BackgroundTasks)
             recipe_slug=result.get("recipe_slug"),
             is_custom=result.get("is_custom", False),
             external_url=result.get("external_url"),
+            side_name=result.get("side_name"),
+            side_time=result.get("side_time"),
+            side_slug=result.get("side_slug"),
+            side_external_url=result.get("side_external_url"),
         )
+
+        # Attach direct Mealie URLs if configured
+        group = settings.mealie_group_slug or "home"
+        if settings.mealie_base_url:
+            recipe_slug = result.get("recipe_slug")
+            result["mealie_url"] = (
+                f"{settings.mealie_base_url}/g/{group}/r/{recipe_slug}"
+                if recipe_slug
+                else f"{settings.mealie_base_url}/g/{group}/planner"
+            )
+            side_slug = result.get("side_slug")
+            if result.get("side_name"):
+                result["side_mealie_url"] = (
+                    f"{settings.mealie_base_url}/g/{group}/r/{side_slug}"
+                    if side_slug
+                    else f"{settings.mealie_base_url}/g/{group}/planner"
+                )
+            else:
+                result["side_mealie_url"] = None
+        else:
+            result["mealie_url"] = None
+            result["side_mealie_url"] = None
 
         return result
     except ValueError as ve:

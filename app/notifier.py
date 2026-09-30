@@ -26,6 +26,10 @@ class NtfyNotifier:
         recipe_slug: Optional[str] = None,
         is_custom: bool = False,
         external_url: Optional[str] = None,
+        side_name: Optional[str] = None,
+        side_time: Optional[str] = None,
+        side_slug: Optional[str] = None,
+        side_external_url: Optional[str] = None,
     ) -> bool:
         """Send a rich push notification to the configured ntfy topic.
 
@@ -40,15 +44,18 @@ class NtfyNotifier:
         publish_url = f"{self.base_url}/"
 
         actions = []
+        side_snippet = f"\n🥗 Side: {side_name}" + (f" (⏱️ {side_time})" if side_time else "") if side_name else ""
+
         # Determine click destination and content
         if external_url:
             from urllib.parse import urlparse
             domain = urlparse(external_url).netloc.replace("www.", "")
-            title = "Tonight's Dinner: Web Recipe Request!"
+            title = "Tonight's Dinner: Web Recipe Request!" + (f" ({dish_name} + {side_name})" if side_name else "")
             message = (
                 f"Special web recipe request locked in:\n\n"
                 f"🌐 {dish_name}\n"
-                f"Source: {domain}\n\n"
+                f"Source: {domain}"
+                f"{side_snippet}\n\n"
                 f"Scheduled on tonight's meal plan (cookbook untouched)."
             )
             tags = ["globe_with_meridians", "bell"]
@@ -76,10 +83,11 @@ class NtfyNotifier:
             if settings.mealie_base_url:
                 group = settings.mealie_group_slug or "home"
                 click_url = f"{settings.mealie_base_url}/g/{group}/planner"
-            title = "Tonight's Dinner: Custom Craving!"
+            title = "Tonight's Dinner: Custom Craving!" + (f" ({dish_name} + {side_name})" if side_name else "")
             message = (
                 f"Special dinner request locked in:\n"
-                f"🍜 {dish_name}\n\n"
+                f"🍜 {dish_name}"
+                f"{side_snippet}\n\n"
                 f"Scheduled on Mealie for tonight."
             )
             tags = ["fork_and_knife", "bell"]
@@ -98,10 +106,11 @@ class NtfyNotifier:
                 group = settings.mealie_group_slug or "home"
                 click_url = f"{settings.mealie_base_url}/g/{group}/r/{recipe_slug}"
             time_str = f" • ⏱️ {total_time}" if total_time else ""
-            title = f"Tonight's Dinner: {dish_name}"
+            title = f"Tonight's Dinner: {dish_name}" + (f" + {side_name}" if side_name else "")
             message = (
                 f"Tonight's menu is locked in!\n\n"
-                f"🍽️ {dish_name}{time_str}\n\n"
+                f"🍽️ {dish_name}{time_str}"
+                f"{side_snippet}\n\n"
                 f"Scheduled on Mealie. Time to get cooking! 👩‍🍳"
             )
             tags = ["pot_of_food", "tada"]
@@ -114,6 +123,29 @@ class NtfyNotifier:
                         "clear": False,
                     }
                 )
+
+        # Add side recipe action button if available
+        if side_external_url:
+            from urllib.parse import urlparse
+            s_domain = urlparse(side_external_url).netloc.replace("www.", "")
+            actions.append(
+                {
+                    "action": "view",
+                    "label": f"Open Side ({s_domain})",
+                    "url": side_external_url,
+                    "clear": False,
+                }
+            )
+        elif side_slug and settings.mealie_base_url:
+            group = settings.mealie_group_slug or "home"
+            actions.append(
+                {
+                    "action": "view",
+                    "label": f"Open Side ({side_name})",
+                    "url": f"{settings.mealie_base_url}/g/{group}/r/{side_slug}",
+                    "clear": False,
+                }
+            )
 
         payload: Dict[str, Any] = {
             "topic": self.topic,

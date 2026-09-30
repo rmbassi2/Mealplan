@@ -251,6 +251,80 @@ def is_dinner_recipe(tax: Dict[str, Any]) -> bool:
     return False
 
 
+SIDE_ELIGIBLE_CATEGORIES = {
+    "side dish",
+    "side-dish",
+    "side",
+    "appetizer & snack",
+    "appetizer-snack",
+    "salad",
+    "vegetable",
+    "vegetables",
+}
+
+
+def is_side_recipe(tax: Dict[str, Any], recipe: Optional[Dict[str, Any]] = None) -> bool:
+    """Check if recipe belongs to Side Dish, Salad, or Vegetable category/tags."""
+    cats = tax.get("categories", set())
+    for c in cats:
+        if c in SIDE_ELIGIBLE_CATEGORIES or "side" in c or "salad" in c:
+            return True
+    tags = tax.get("tags", set())
+    if any(t in ("side", "side-dish", "vegetables", "salad", "appetizer") for t in tags):
+        return True
+    if recipe:
+        title = str(recipe.get("name", "")).lower()
+        side_keywords = [
+            "salad",
+            "potato",
+            "potatoes",
+            "fries",
+            "rice",
+            "asparagus",
+            "green bean",
+            "green beans",
+            "broccoli",
+            "garlic bread",
+            "slaw",
+            "coleslaw",
+            "roasted veg",
+            "corn on the cob",
+            "mac and cheese",
+            "baked beans",
+            "cauliflower",
+            "zucchini",
+            "brussels sprout",
+        ]
+        if any(k in title for k in side_keywords):
+            return True
+    return False
+
+
+def select_side_recipes(
+    recipes: List[Dict[str, Any]],
+    count: int = 3,
+) -> List[Dict[str, Any]]:
+    """Select 'count' diverse side dish recipes."""
+    if not recipes:
+        return []
+
+    side_candidates = []
+    for r in recipes:
+        tax = r.get("_taxonomy") or extract_recipe_taxonomy(r)
+        r["_taxonomy"] = tax
+        if is_side_recipe(tax, r):
+            side_candidates.append(r)
+
+    if not side_candidates:
+        return []
+
+    if len(side_candidates) <= count:
+        return side_candidates
+
+    random.shuffle(side_candidates)
+    return side_candidates[:count]
+
+
 def matches_filter(
     tax: Dict[str, Any],
     recipe: Dict[str, Any],

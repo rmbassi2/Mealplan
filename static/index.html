@@ -220,58 +220,221 @@
 
     </div>
 
+    <!-- View: Step 2 - Side Dish Selection -->
+    <div id="sideView" class="hidden space-y-4 pb-28">
+      <!-- Header with Back Button and Step Indicator -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <button 
+            type="button" 
+            onclick="goToStep1()" 
+            class="flex items-center space-x-1.5 text-xs font-bold text-stone-600 hover:text-stone-900 bg-white hover:bg-stone-50 active:bg-stone-100 px-3 py-1.5 rounded-full border border-stone-200 shadow-sm transition-all">
+            <span>←</span>
+            <span>Back to Mains</span>
+          </button>
+          
+          <span class="inline-flex items-center space-x-1 text-[11px] font-bold text-amber-800 bg-amber-100/70 px-3 py-1 rounded-full border border-amber-200">
+            <span>Step 2 of 2</span>
+            <span>•</span>
+            <span>Side Dish</span>
+          </span>
+        </div>
+
+        <!-- Selected Main Course Reminder Pill -->
+        <div class="p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-2xl flex items-center justify-between shadow-sm">
+          <div class="flex items-center space-x-3 min-w-0">
+            <span id="sideStepMainEmoji" class="text-2xl flex-shrink-0">🥘</span>
+            <div class="min-w-0">
+              <div class="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">Tonight's Main Course</div>
+              <div id="sideStepMainTitle" class="text-sm font-bold text-stone-900 truncate">Crispy Honey Garlic Salmon</div>
+            </div>
+          </div>
+          <button type="button" onclick="goToStep1()" class="text-xs text-amber-700 hover:text-amber-900 font-semibold underline flex-shrink-0 ml-2">Edit</button>
+        </div>
+      </div>
+
+      <!-- Sides Title & Shuffle -->
+      <div class="flex items-center justify-between pt-1">
+        <div>
+          <h2 class="text-base font-bold font-serif-title text-stone-900">Pair It With a Side</h2>
+          <p class="text-xs text-stone-500">Pick a side dish or skip if tonight is a solo meal.</p>
+        </div>
+        <button id="refreshSidesBtn" 
+                onclick="refreshSideOptions()" 
+                title="Shuffle 3 new side ideas"
+                class="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-stone-600 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all">
+          <svg id="refreshSidesIcon" class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span class="text-stone-700">Shuffle</span>
+        </button>
+      </div>
+
+      <!-- Side Cards Container -->
+      <div id="sideCardsContainer" class="space-y-3" role="radiogroup" aria-label="Side dish options">
+        <!-- Skeletons while loading -->
+        <div id="sideSkeletons" class="space-y-3">
+          <div class="h-32 rounded-2xl skeleton border border-stone-200/60"></div>
+          <div class="h-32 rounded-2xl skeleton border border-stone-200/60"></div>
+          <div class="h-32 rounded-2xl skeleton border border-stone-200/60"></div>
+        </div>
+        <!-- Rendered Side Cards -->
+        <div id="sideList" class="space-y-3 hidden"></div>
+      </div>
+
+      <!-- Quick Pantry Staples & Custom Side Card -->
+      <div id="customSideCard" class="recipe-card relative bg-white border-2 border-dashed border-stone-300 hover:border-stone-400 rounded-2xl p-4 shadow-sm transition-all duration-200">
+        <div class="flex items-start space-x-3 mb-2">
+          <div id="customSideIconWrapper" class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-lg flex-shrink-0 text-amber-700 transition-colors">
+            🥗
+          </div>
+          <div class="flex-1">
+            <h3 class="text-sm font-semibold text-stone-900 flex items-center justify-between">
+              <span>Quick Staple or Custom Side</span>
+              <span id="customSideActiveBadge" class="hidden text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full">Active</span>
+            </h3>
+            <p class="text-xs text-stone-500 mt-0.5">Tap a household staple or type any side / recipe link</p>
+          </div>
+        </div>
+
+        <!-- Quick Staple Chips -->
+        <div class="flex flex-wrap gap-1.5 py-1.5">
+          <button type="button" onclick="selectPantryStaple('Jasmine Rice', '🍚')" class="pantry-chip px-2.5 py-1 rounded-lg text-xs bg-stone-100 hover:bg-amber-100 active:bg-amber-200 text-stone-700 font-medium border border-stone-200 transition-colors">🍚 Jasmine Rice</button>
+          <button type="button" onclick="selectPantryStaple('Caesar Salad', '🥗')" class="pantry-chip px-2.5 py-1 rounded-lg text-xs bg-stone-100 hover:bg-amber-100 active:bg-amber-200 text-stone-700 font-medium border border-stone-200 transition-colors">🥗 Caesar Salad</button>
+          <button type="button" onclick="selectPantryStaple('Garlic Bread', '🥖')" class="pantry-chip px-2.5 py-1 rounded-lg text-xs bg-stone-100 hover:bg-amber-100 active:bg-amber-200 text-stone-700 font-medium border border-stone-200 transition-colors">🥖 Garlic Bread</button>
+          <button type="button" onclick="selectPantryStaple('Roasted Potatoes', '🥔')" class="pantry-chip px-2.5 py-1 rounded-lg text-xs bg-stone-100 hover:bg-amber-100 active:bg-amber-200 text-stone-700 font-medium border border-stone-200 transition-colors">🥔 Roasted Potatoes</button>
+          <button type="button" onclick="selectPantryStaple('Steamed Broccoli', '🥦')" class="pantry-chip px-2.5 py-1 rounded-lg text-xs bg-stone-100 hover:bg-amber-100 active:bg-amber-200 text-stone-700 font-medium border border-stone-200 transition-colors">🥦 Steamed Veggies</button>
+          <button type="button" onclick="selectPantryStaple('French Fries', '🍟')" class="pantry-chip px-2.5 py-1 rounded-lg text-xs bg-stone-100 hover:bg-amber-100 active:bg-amber-200 text-stone-700 font-medium border border-stone-200 transition-colors">🍟 Fries</button>
+        </div>
+
+        <div class="relative mt-2">
+          <input 
+            type="text" 
+            id="customSideInput" 
+            maxlength="250"
+            placeholder="e.g. Garden salad, fries, https://seriouseats.com/..."
+            class="w-full px-3.5 py-2.5 text-sm bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/60 transition-all outline-none text-stone-800 placeholder-stone-400"
+            oninput="handleCustomSideInput(this.value)"
+          />
+          <button 
+            id="clearCustomSideBtn"
+            onclick="clearCustomSideInput()" 
+            class="hidden absolute right-3 top-2.5 text-stone-400 hover:text-stone-600 p-0.5 text-xs font-semibold"
+            type="button"
+            title="Clear side text">
+            ✕
+          </button>
+        </div>
+
+        <!-- Side Recipe URL Live Preview Pill -->
+        <div id="sideUrlPreviewContainer" class="hidden mt-2.5 p-2.5 rounded-xl bg-sky-50 border border-sky-200/80 text-xs flex items-center justify-between space-x-2">
+          <div class="flex items-center space-x-2 min-w-0">
+            <span class="text-base flex-shrink-0">🌐</span>
+            <div class="min-w-0">
+              <div id="sideUrlPreviewTitle" class="font-bold text-sky-900 truncate">Inspecting side recipe link...</div>
+              <div id="sideUrlPreviewDomain" class="text-[11px] text-sky-600 truncate">Side test run for tonight</div>
+            </div>
+          </div>
+          <span class="text-[10px] uppercase font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-md flex-shrink-0">Side Run</span>
+        </div>
+      </div>
+
+      <!-- Skip Side Button -->
+      <button 
+        type="button" 
+        onclick="skipSideAndLockIn()" 
+        class="w-full py-3.5 px-4 rounded-xl text-xs font-bold text-stone-600 bg-stone-100 hover:bg-stone-200/80 active:bg-stone-200 border border-stone-200 transition-colors flex items-center justify-center space-x-2">
+        <span>🍽️</span>
+        <span>No Side Tonight (Just the Main Course)</span>
+      </button>
+    </div>
+
     <!-- View: Confirmation Success Screen -->
-    <div id="confirmationView" class="hidden pop-in space-y-6 pt-10 pb-8 text-center">
+    <div id="confirmationView" class="hidden pop-in space-y-5 pt-8 pb-8 text-center">
       <!-- Decorative Celebration Icon -->
-      <div class="relative mx-auto w-24 h-24">
+      <div class="relative mx-auto w-20 h-20">
         <div class="absolute inset-0 bg-amber-300 rounded-full animate-ping opacity-30"></div>
-        <div class="relative w-24 h-24 rounded-full bg-gradient-to-tr from-amber-600 via-orange-500 to-amber-500 flex items-center justify-center text-4xl shadow-xl shadow-amber-500/30 text-white border-2 border-white">
+        <div class="relative w-20 h-20 rounded-full bg-gradient-to-tr from-amber-600 via-orange-500 to-amber-500 flex items-center justify-center text-3xl shadow-xl shadow-amber-500/30 text-white border-2 border-white">
           🍽️
         </div>
       </div>
 
       <!-- Heading -->
-      <div class="space-y-2">
+      <div class="space-y-1.5">
         <span id="confirmBadge" class="inline-flex items-center space-x-1 px-3.5 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm">
           <span>✓</span>
           <span id="confirmBadgeText">MEAL PLAN UPDATED</span>
         </span>
-        <h2 class="text-3xl font-extrabold font-serif-title text-stone-900 tracking-tight">
+        <h2 class="text-2xl font-extrabold font-serif-title text-stone-900 tracking-tight">
           Dinner is locked in!
         </h2>
-        <p id="confirmSubtitle" class="text-stone-600 text-sm font-medium">
+        <p id="confirmSubtitle" class="text-stone-600 text-xs font-medium">
           Tonight's chef has been notified. 👩‍🍳
         </p>
       </div>
 
-      <!-- Selected Dinner Showcase Card -->
-      <div class="bg-white rounded-2xl p-5 border border-stone-200/90 shadow-lg text-left space-y-3 mx-1">
+      <!-- Selected Dinner Showcase: Main Dish Card -->
+      <div class="bg-white rounded-2xl p-4 border border-stone-200/90 shadow-md text-left space-y-2.5 mx-1">
         <div class="flex items-center justify-between">
-          <div class="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">Tonight's Menu Selection</div>
-          <span id="confirmPillTag" class="text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full">Tonight</span>
+          <div class="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">Tonight's Main Course</div>
+          <span id="confirmPillTag" class="text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full">Main</span>
         </div>
-        <div class="flex items-center space-x-4 pt-1">
-          <div id="confirmDishEmoji" class="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-3xl flex-shrink-0 shadow-inner">
+        <div class="flex items-center space-x-3 pt-0.5">
+          <div id="confirmDishEmoji" class="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-2xl flex-shrink-0 shadow-inner">
             🥘
           </div>
           <div class="flex-1 min-w-0">
-            <h3 id="confirmDishTitle" class="text-lg font-bold text-stone-900 leading-snug break-words">
+            <h3 id="confirmDishTitle" class="text-base font-bold text-stone-900 leading-snug break-words">
               Crispy Honey Garlic Salmon
             </h3>
             <p id="confirmDishMeta" class="text-xs text-stone-500 mt-0.5 flex items-center space-x-1">
               <span>📅</span>
               <span id="confirmDateStr">Scheduled for tonight</span>
             </p>
-            <div id="confirmLinksWrapper" class="pt-2 flex flex-wrap gap-2">
+            <div id="confirmLinksWrapper" class="pt-1.5 flex flex-wrap gap-1.5">
               <a id="confirmExternalLink" href="#" target="_blank" rel="noopener noreferrer" 
-                 class="hidden inline-flex items-center space-x-1 text-xs font-semibold text-sky-800 bg-sky-50 hover:bg-sky-100 active:bg-sky-200 px-3 py-1.5 rounded-lg border border-sky-200 transition-colors">
-                <span>🌐 Open Recipe Website</span>
-                <span class="text-xs">↗</span>
+                 class="hidden inline-flex items-center space-x-1 text-[11px] font-semibold text-sky-800 bg-sky-50 hover:bg-sky-100 active:bg-sky-200 px-2.5 py-1 rounded-lg border border-sky-200 transition-colors">
+                <span>🌐 Open Main Recipe</span>
+                <span class="text-[10px]">↗</span>
               </a>
               <a id="confirmMealieLink" href="#" target="_blank" rel="noopener noreferrer" 
-                 class="hidden inline-flex items-center space-x-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-200 transition-colors">
+                 class="hidden inline-flex items-center space-x-1 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 px-2.5 py-1 rounded-lg border border-amber-200 transition-colors">
                 <span>View in Mealie</span>
-                <span class="text-xs">↗</span>
+                <span class="text-[10px]">↗</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selected Side Dish Showcase Card -->
+      <div id="confirmSideCard" class="bg-white rounded-2xl p-4 border border-stone-200/90 shadow-md text-left space-y-2.5 mx-1">
+        <div class="flex items-center justify-between">
+          <div class="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700">Tonight's Side Dish</div>
+          <span class="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">Side</span>
+        </div>
+        <div class="flex items-center space-x-3 pt-0.5">
+          <div id="confirmSideEmoji" class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-2xl flex-shrink-0 shadow-inner">
+            🥗
+          </div>
+          <div class="flex-1 min-w-0">
+            <h3 id="confirmSideTitle" class="text-base font-bold text-stone-900 leading-snug break-words">
+              Garlic Butter Baby Potatoes
+            </h3>
+            <p id="confirmSideMeta" class="text-xs text-stone-500 mt-0.5 flex items-center space-x-1">
+              <span>⏱️</span>
+              <span id="confirmSideMetaText">25 mins</span>
+            </p>
+            <div id="confirmSideLinksWrapper" class="pt-1.5 flex flex-wrap gap-1.5">
+              <a id="confirmSideExternalLink" href="#" target="_blank" rel="noopener noreferrer" 
+                 class="hidden inline-flex items-center space-x-1 text-[11px] font-semibold text-sky-800 bg-sky-50 hover:bg-sky-100 active:bg-sky-200 px-2.5 py-1 rounded-lg border border-sky-200 transition-colors">
+                <span>🌐 Open Side Link</span>
+                <span class="text-[10px]">↗</span>
+              </a>
+              <a id="confirmSideMealieLink" href="#" target="_blank" rel="noopener noreferrer" 
+                 class="hidden inline-flex items-center space-x-1 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 px-2.5 py-1 rounded-lg border border-amber-200 transition-colors">
+                <span>View Side in Mealie</span>
+                <span class="text-[10px]">↗</span>
               </a>
             </div>
           </div>
@@ -279,7 +442,7 @@
       </div>
 
       <!-- Action: Reset / Change Mind -->
-      <div class="pt-6">
+      <div class="pt-4">
         <button 
           onclick="resetVoting()" 
           class="w-full py-3.5 px-4 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200/80 active:bg-stone-200 rounded-xl transition-all shadow-sm border border-stone-200">
@@ -290,13 +453,13 @@
 
   </main>
 
-  <!-- Sticky Bottom Bar: "Lock It In" Action -->
+  <!-- Sticky Bottom Bar: 2-Step Action -->
   <footer id="bottomBar" class="fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur-md border-t border-stone-200/80 p-4 z-40 transition-transform">
-    <div class="max-w-md mx-auto">
+    <div class="max-w-md mx-auto space-y-2">
       <button 
         id="lockItInBtn"
         disabled
-        onclick="submitDinnerChoice()"
+        onclick="handleBottomBarAction()"
         class="w-full relative flex items-center justify-center space-x-2 py-3.5 px-6 rounded-xl font-bold text-sm tracking-wide text-white transition-all duration-200 shadow-sm
                disabled:bg-stone-300 disabled:text-stone-400 disabled:cursor-not-allowed disabled:shadow-none
                enabled:bg-gradient-to-r enabled:from-amber-600 enabled:to-orange-500 enabled:hover:from-amber-700 enabled:hover:to-orange-600 enabled:active:scale-[0.99] enabled:shadow-md enabled:shadow-amber-600/25">
@@ -307,9 +470,20 @@
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
 
-        <span id="btnIcon" class="text-base">🛎️</span>
-        <span id="btnText">Lock It In</span>
+        <span id="btnIcon" class="text-base">🥗</span>
+        <span id="btnText">Next: Pick a Side</span>
       </button>
+
+      <!-- Secondary Quick Action Link -->
+      <div id="secondaryActionRow" class="text-center">
+        <button 
+          id="secondaryActionBtn" 
+          type="button" 
+          onclick="handleSecondaryAction()"
+          class="text-xs font-semibold text-stone-500 hover:text-stone-800 transition-colors">
+          or Skip Side &amp; Lock In Main Course
+        </button>
+      </div>
     </div>
   </footer>
 
@@ -333,29 +507,66 @@
       { id: 'east-asian', label: 'Asian', icon: '🥢', param: 'cuisine=east-asian' },
     ];
 
+    // State
+    let currentStep = 1; // 1: Main Course, 2: Side Dish
     let activeFilterId = 'surprise';
     let currentOptions = [];
     let selectedRecipeId = null;
     let customNote = '';
+
+    let currentSideOptions = [];
+    let selectedSideId = null;
+    let customSideNote = '';
+    let sideSkipped = false;
+
     let isSubmitting = false;
+    let urlDebounceTimeout = null;
+    let sideUrlDebounceTimeout = null;
 
     // Elements
     const votingView = document.getElementById('votingView');
+    const sideView = document.getElementById('sideView');
     const confirmationView = document.getElementById('confirmationView');
+    const bottomBar = document.getElementById('bottomBar');
+
     const skeletons = document.getElementById('skeletons');
     const recipeList = document.getElementById('recipeList');
     const refreshBtn = document.getElementById('refreshBtn');
     const refreshIcon = document.getElementById('refreshIcon');
+
+    const sideSkeletons = document.getElementById('sideSkeletons');
+    const sideList = document.getElementById('sideList');
+    const refreshSidesBtn = document.getElementById('refreshSidesBtn');
+    const refreshSidesIcon = document.getElementById('refreshSidesIcon');
+
+    const customCravingCard = document.getElementById('customCravingCard');
+    const customCravingIconWrapper = document.getElementById('customCravingIconWrapper');
+    const customActiveBadge = document.getElementById('customActiveBadge');
+    const customNoteInput = document.getElementById('customNoteInput');
+    const clearCustomBtn = document.getElementById('clearCustomBtn');
+    const urlPreviewContainer = document.getElementById('urlPreviewContainer');
+    const urlPreviewTitle = document.getElementById('urlPreviewTitle');
+    const urlPreviewDomain = document.getElementById('urlPreviewDomain');
+
+    const customSideCard = document.getElementById('customSideCard');
+    const customSideIconWrapper = document.getElementById('customSideIconWrapper');
+    const customSideActiveBadge = document.getElementById('customSideActiveBadge');
+    const customSideInput = document.getElementById('customSideInput');
+    const clearCustomSideBtn = document.getElementById('clearCustomSideBtn');
+    const sideUrlPreviewContainer = document.getElementById('sideUrlPreviewContainer');
+    const sideUrlPreviewTitle = document.getElementById('sideUrlPreviewTitle');
+    const sideUrlPreviewDomain = document.getElementById('sideUrlPreviewDomain');
+
+    const sideStepMainEmoji = document.getElementById('sideStepMainEmoji');
+    const sideStepMainTitle = document.getElementById('sideStepMainTitle');
+
     const lockItInBtn = document.getElementById('lockItInBtn');
     const btnSpinner = document.getElementById('btnSpinner');
     const btnIcon = document.getElementById('btnIcon');
     const btnText = document.getElementById('btnText');
-    const bottomBar = document.getElementById('bottomBar');
-    const customNoteInput = document.getElementById('customNoteInput');
-    const customCravingCard = document.getElementById('customCravingCard');
-    const customCravingIconWrapper = document.getElementById('customCravingIconWrapper');
-    const customActiveBadge = document.getElementById('customActiveBadge');
-    const clearCustomBtn = document.getElementById('clearCustomBtn');
+    const secondaryActionRow = document.getElementById('secondaryActionRow');
+    const secondaryActionBtn = document.getElementById('secondaryActionBtn');
+
     const errorBanner = document.getElementById('errorBanner');
     const errorMessage = document.getElementById('errorMessage');
     const dateSubtitle = document.getElementById('dateSubtitle');
@@ -399,7 +610,7 @@
       activeFilterId = filterId;
       renderFilterPills();
       selectedRecipeId = null;
-      updateLockInState();
+      updateBottomBar();
       loadOptions();
     }
 
@@ -430,10 +641,9 @@
     }
 
     function refreshOptions() {
-      // Clear selection on shuffle
       selectedRecipeId = null;
       renderCards(currentOptions);
-      updateLockInState();
+      updateBottomBar();
       loadOptions();
     }
 
@@ -554,21 +764,15 @@
       customActiveBadge.classList.add('hidden');
 
       renderCards(currentOptions);
-      updateLockInState();
+      updateBottomBar();
     }
-
-    let urlDebounceTimeout = null;
 
     // Handle typing in "Something Else" input
     function handleCustomInput(val) {
       customNote = val;
       const urlMatch = val.match(/https?:\/\/[^\s<>"]+/i);
-      const urlPreviewContainer = document.getElementById('urlPreviewContainer');
-      const urlPreviewTitle = document.getElementById('urlPreviewTitle');
-      const urlPreviewDomain = document.getElementById('urlPreviewDomain');
 
       if (val.trim().length > 0) {
-        // Automatically deselect any selected recipe card
         if (selectedRecipeId !== null) {
           selectedRecipeId = null;
           renderCards(currentOptions);
@@ -577,7 +781,6 @@
         clearCustomBtn.classList.remove('hidden');
 
         if (urlMatch) {
-          // Highlight with sky blue styling for web recipe
           customCravingCard.className = 'recipe-card relative bg-sky-50/50 border-2 border-sky-500 ring-2 ring-sky-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
           customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
           customCravingIconWrapper.textContent = '🌐';
@@ -605,7 +808,6 @@
           }, 350);
 
         } else {
-          // Standard custom craving highlight
           customCravingCard.className = 'recipe-card relative bg-amber-50/40 border-2 border-amber-500 ring-2 ring-amber-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
           customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
           customCravingIconWrapper.textContent = '🍜';
@@ -615,7 +817,6 @@
           urlPreviewContainer.classList.add('hidden');
         }
       } else {
-        // Reset custom card highlight if empty
         customCravingCard.className = 'recipe-card relative bg-white border-2 border-dashed border-stone-300 hover:border-stone-400 rounded-2xl p-4 shadow-sm transition-all duration-200';
         customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-lg flex-shrink-0 text-amber-700 transition-colors';
         customCravingIconWrapper.textContent = '🍜';
@@ -624,14 +825,14 @@
         urlPreviewContainer.classList.add('hidden');
       }
 
-      updateLockInState();
+      updateBottomBar();
     }
 
     function handleCustomFocus() {
       if (customNote.trim().length > 0 && selectedRecipeId !== null) {
         selectedRecipeId = null;
         renderCards(currentOptions);
-        updateLockInState();
+        updateBottomBar();
       }
     }
 
@@ -641,10 +842,330 @@
       handleCustomInput('');
     }
 
-    // Enable / Disable "Lock It In" button
-    function updateLockInState() {
-      const hasSelection = (selectedRecipeId !== null) || (customNote.trim().length > 0);
-      lockItInBtn.disabled = !hasSelection || isSubmitting;
+    // Step 2: Fetch and Render Side Dishes
+    async function loadSideOptions() {
+      showSideSkeletons(true);
+      refreshSidesIcon.classList.add('spin-icon');
+      try {
+        const res = await fetch('/api/side-options');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        currentSideOptions = data.options || [];
+        renderSideCards(currentSideOptions);
+      } catch (err) {
+        console.error('Failed to load side options:', err);
+        showError('Could not load side options. Tap shuffle to retry.');
+      } finally {
+        showSideSkeletons(false);
+        setTimeout(() => refreshSidesIcon.classList.remove('spin-icon'), 750);
+      }
+    }
+
+    function refreshSideOptions() {
+      selectedSideId = null;
+      loadSideOptions();
+      updateBottomBar();
+    }
+
+    function showSideSkeletons(show) {
+      if (show) {
+        sideSkeletons.classList.remove('hidden');
+        sideList.classList.add('hidden');
+      } else {
+        sideSkeletons.classList.add('hidden');
+        sideList.classList.remove('hidden');
+      }
+    }
+
+    function renderSideCards(sides) {
+      sideList.innerHTML = '';
+      if (!sides || sides.length === 0) {
+        sideList.innerHTML = `
+          <div class="text-center py-6 text-stone-500 bg-white rounded-2xl border border-stone-200 p-4">
+            <p class="text-xs font-medium">No curated sides available right now.</p>
+            <p class="text-[11px] text-stone-400 mt-0.5">Pick a quick staple below or tap shuffle.</p>
+          </div>
+        `;
+        return;
+      }
+
+      sides.forEach((side) => {
+        const isSelected = (selectedSideId === side.id);
+        const card = document.createElement('div');
+        card.className = `recipe-card cursor-pointer relative bg-white rounded-2xl overflow-hidden shadow-sm transition-all duration-200 border-2 ${
+          isSelected 
+            ? 'border-emerald-500 ring-2 ring-emerald-400/40 bg-emerald-50/20 shadow-md -translate-y-0.5' 
+            : 'border-stone-200/90 hover:border-stone-300'
+        }`;
+        card.setAttribute('role', 'radio');
+        card.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+        card.onclick = () => selectSide(side.id);
+
+        card.innerHTML = `
+          <div class="flex items-center p-3 space-x-3.5">
+            <div class="relative w-20 h-20 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0 border border-stone-200/70">
+              <img 
+                src="${side.imageUrl}" 
+                alt="${escapeHtml(side.name)}" 
+                loading="lazy"
+                class="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 100 100\\'><rect width=\\'100\\' height=\\'100\\' fill=\\'%23ecfdf5\\'/><text x=\\'50%\\' y=\\'50%\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' font-size=\\'24\\'>🥗</text></svg>';"
+              />
+              <div class="absolute bottom-1 left-1 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                ${escapeHtml(side.totalTime || '20m')}
+              </div>
+            </div>
+
+            <div class="flex-1 min-w-0 pr-1">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Curated Side</span>
+                <div class="w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                  isSelected 
+                    ? 'bg-emerald-500 text-white shadow-sm scale-105' 
+                    : 'bg-stone-100 text-stone-300 border border-stone-200'
+                }">
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+              <h3 class="text-sm font-bold text-stone-900 leading-snug mt-0.5 line-clamp-1">
+                ${escapeHtml(side.name)}
+              </h3>
+              <p class="text-xs text-stone-500 mt-0.5 line-clamp-1">
+                ${escapeHtml(side.description || "A tasty pairing for tonight's dinner.")}
+              </p>
+            </div>
+          </div>
+        `;
+
+        sideList.appendChild(card);
+      });
+    }
+
+    function selectSide(id) {
+      if (isSubmitting) return;
+
+      selectedSideId = id;
+      sideSkipped = false;
+
+      // Clear custom side text and staples
+      customSideNote = '';
+      customSideInput.value = '';
+      clearCustomSideBtn.classList.add('hidden');
+      resetCustomSideCard();
+      resetPantryChips();
+
+      renderSideCards(currentSideOptions);
+      updateBottomBar();
+    }
+
+    function resetCustomSideCard() {
+      customSideCard.className = 'recipe-card relative bg-white border-2 border-dashed border-stone-300 hover:border-stone-400 rounded-2xl p-4 shadow-sm transition-all duration-200';
+      customSideIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-lg flex-shrink-0 text-amber-700 transition-colors';
+      customSideIconWrapper.textContent = '🥗';
+      customSideActiveBadge.classList.add('hidden');
+      clearCustomSideBtn.classList.add('hidden');
+      sideUrlPreviewContainer.classList.add('hidden');
+    }
+
+    function resetPantryChips() {
+      document.querySelectorAll('.pantry-chip').forEach(chip => {
+        chip.classList.remove('bg-amber-200', 'border-amber-400', 'font-bold');
+        chip.classList.add('bg-stone-100', 'border-stone-200', 'font-medium');
+      });
+    }
+
+    function selectPantryStaple(name, emoji) {
+      if (isSubmitting) return;
+      selectedSideId = null;
+      sideSkipped = false;
+      renderSideCards(currentSideOptions);
+
+      customSideNote = `${name}`;
+      customSideInput.value = name;
+      clearCustomSideBtn.classList.remove('hidden');
+
+      // Highlight custom side card
+      customSideCard.className = 'recipe-card relative bg-emerald-50/40 border-2 border-emerald-500 ring-2 ring-emerald-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
+      customSideIconWrapper.className = 'w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
+      customSideIconWrapper.textContent = emoji || '🥗';
+      customSideActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded-full';
+      customSideActiveBadge.textContent = 'Quick Staple';
+      customSideActiveBadge.classList.remove('hidden');
+      sideUrlPreviewContainer.classList.add('hidden');
+
+      // Update chip styles
+      document.querySelectorAll('.pantry-chip').forEach(chip => {
+        if (chip.textContent.includes(name)) {
+          chip.classList.remove('bg-stone-100', 'border-stone-200', 'font-medium');
+          chip.classList.add('bg-amber-200', 'border-amber-400', 'font-bold');
+        } else {
+          chip.classList.remove('bg-amber-200', 'border-amber-400', 'font-bold');
+          chip.classList.add('bg-stone-100', 'border-stone-200', 'font-medium');
+        }
+      });
+
+      updateBottomBar();
+    }
+
+    function handleCustomSideInput(val) {
+      customSideNote = val;
+      sideSkipped = false;
+      const urlMatch = val.match(/https?:\/\/[^\s<>"]+/i);
+
+      if (val.trim().length > 0) {
+        if (selectedSideId !== null) {
+          selectedSideId = null;
+          renderSideCards(currentSideOptions);
+        }
+        clearCustomSideBtn.classList.remove('hidden');
+
+        if (urlMatch) {
+          customSideCard.className = 'recipe-card relative bg-sky-50/50 border-2 border-sky-500 ring-2 ring-sky-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
+          customSideIconWrapper.className = 'w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
+          customSideIconWrapper.textContent = '🌐';
+          customSideActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-sky-600 text-white px-2 py-0.5 rounded-full';
+          customSideActiveBadge.textContent = 'Side Recipe URL';
+          customSideActiveBadge.classList.remove('hidden');
+
+          const rawUrl = urlMatch[0];
+          sideUrlPreviewContainer.classList.remove('hidden');
+          sideUrlPreviewTitle.textContent = 'Inspecting side recipe link...';
+          sideUrlPreviewDomain.textContent = 'Test run for tonight • Mealie cookbook stays clean';
+
+          clearTimeout(sideUrlDebounceTimeout);
+          sideUrlDebounceTimeout = setTimeout(async () => {
+            try {
+              const res = await fetch(`/api/url-info?url=${encodeURIComponent(rawUrl)}`);
+              if (res.ok) {
+                const info = await res.json();
+                sideUrlPreviewTitle.textContent = info.title;
+                sideUrlPreviewDomain.textContent = `From ${info.domain} • Scheduled as side test run`;
+              }
+            } catch (e) {
+              sideUrlPreviewTitle.textContent = 'External Side Link';
+            }
+          }, 350);
+        } else {
+          customSideCard.className = 'recipe-card relative bg-emerald-50/40 border-2 border-emerald-500 ring-2 ring-emerald-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
+          customSideIconWrapper.className = 'w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
+          customSideIconWrapper.textContent = '🥗';
+          customSideActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded-full';
+          customSideActiveBadge.textContent = 'Active Side';
+          customSideActiveBadge.classList.remove('hidden');
+          sideUrlPreviewContainer.classList.add('hidden');
+        }
+      } else {
+        resetCustomSideCard();
+        resetPantryChips();
+      }
+
+      updateBottomBar();
+    }
+
+    function clearCustomSideInput() {
+      customSideNote = '';
+      customSideInput.value = '';
+      resetCustomSideCard();
+      resetPantryChips();
+      updateBottomBar();
+    }
+
+    // Step Navigation
+    function goToStep2() {
+      const hasMain = (selectedRecipeId !== null) || (customNote.trim().length > 0);
+      if (!hasMain) return;
+
+      currentStep = 2;
+      sideSkipped = false;
+
+      // Update Main Course reminder banner in Step 2
+      if (selectedRecipeId) {
+        const r = currentOptions.find(opt => opt.id === selectedRecipeId);
+        sideStepMainTitle.textContent = r ? r.name : 'Selected Recipe';
+        sideStepMainEmoji.textContent = (r && r.emoji) ? r.emoji : '🥘';
+      } else {
+        const isUrl = Boolean(customNote.match(/https?:\/\/[^\s<>"]+/i));
+        sideStepMainEmoji.textContent = isUrl ? '🌐' : '🍜';
+        sideStepMainTitle.textContent = customNote.trim();
+      }
+
+      votingView.classList.add('hidden');
+      sideView.classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      updateBottomBar();
+
+      if (currentSideOptions.length === 0) {
+        loadSideOptions();
+      }
+    }
+
+    function goToStep1() {
+      currentStep = 1;
+      sideView.classList.add('hidden');
+      votingView.classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      updateBottomBar();
+    }
+
+    // Update Bottom Bar UI
+    function updateBottomBar() {
+      if (currentStep === 1) {
+        const hasMain = (selectedRecipeId !== null) || (customNote.trim().length > 0);
+        lockItInBtn.disabled = !hasMain || isSubmitting;
+        btnIcon.textContent = '🥗';
+        btnText.textContent = 'Next: Pick a Side';
+        if (hasMain) {
+          secondaryActionRow.classList.remove('hidden');
+          secondaryActionBtn.textContent = 'or Skip Side & Lock In Main Course';
+        } else {
+          secondaryActionRow.classList.add('hidden');
+        }
+      } else if (currentStep === 2) {
+        lockItInBtn.disabled = isSubmitting;
+        const hasSide = (selectedSideId !== null) || (customSideNote.trim().length > 0);
+        if (hasSide) {
+          btnIcon.textContent = '🍽️';
+          btnText.textContent = 'Lock In Dinner & Side';
+        } else {
+          btnIcon.textContent = '🍽️';
+          btnText.textContent = 'Lock In (No Side Tonight)';
+        }
+        secondaryActionRow.classList.remove('hidden');
+        secondaryActionBtn.textContent = '← Back to Main Course';
+      }
+    }
+
+    // Handlers for Bottom Bar & Secondary Action
+    function handleBottomBarAction() {
+      if (isSubmitting) return;
+      if (currentStep === 1) {
+        goToStep2();
+      } else if (currentStep === 2) {
+        submitDinnerChoice();
+      }
+    }
+
+    function handleSecondaryAction() {
+      if (isSubmitting) return;
+      if (currentStep === 1) {
+        sideSkipped = true;
+        selectedSideId = null;
+        customSideNote = '';
+        submitDinnerChoice();
+      } else if (currentStep === 2) {
+        goToStep1();
+      }
+    }
+
+    function skipSideAndLockIn() {
+      if (isSubmitting) return;
+      sideSkipped = true;
+      selectedSideId = null;
+      customSideNote = '';
+      submitDinnerChoice();
     }
 
     // Submit Choice to Backend API
@@ -659,7 +1180,7 @@
         payload.recipe_id = selectedRecipeId;
         const recipe = currentOptions.find(r => r.id === selectedRecipeId);
         chosenName = recipe ? recipe.name : 'Selected Recipe';
-        emoji = recipe && recipe.emoji ? recipe.emoji : '🥘';
+        emoji = (recipe && recipe.emoji) ? recipe.emoji : '🥘';
       } else if (customNote.trim()) {
         payload.custom_note = customNote.trim();
         chosenName = customNote.trim();
@@ -668,9 +1189,17 @@
         return;
       }
 
+      if (!sideSkipped) {
+        if (selectedSideId) {
+          payload.side_recipe_id = selectedSideId;
+        } else if (customSideNote.trim()) {
+          payload.side_custom_note = customSideNote.trim();
+        }
+      }
+
       // Enter Submitting State
       isSubmitting = true;
-      updateLockInState();
+      updateBottomBar();
       btnSpinner.classList.remove('hidden');
       btnIcon.classList.add('hidden');
       const isUrlInput = Boolean(customNote.match(/https?:\/\/[^\s<>"]+/i));
@@ -705,21 +1234,20 @@
           mealie_url: data.mealie_url || null,
           external_url: data.external_url || null,
           source_domain: data.source_domain || null,
+          side_name: data.side_name || null,
+          side_time: data.side_time || null,
+          side_emoji: data.side_emoji || null,
+          side_external_url: data.side_external_url || null,
+          side_source_domain: data.side_source_domain || null,
+          side_mealie_url: data.side_mealie_url || null,
         };
+
         try {
           localStorage.setItem('dinnerDeciderToday', JSON.stringify(planObj));
         } catch (e) {}
 
         // Show Confirmation View
-        showConfirmation(
-          chosenDishName, 
-          chosenEmoji, 
-          data.total_time, 
-          Boolean(customNote.trim()), 
-          data.mealie_url,
-          data.external_url,
-          data.source_domain
-        );
+        showConfirmation(planObj);
 
       } catch (err) {
         console.error('Submission error:', err);
@@ -728,15 +1256,15 @@
         isSubmitting = false;
         btnSpinner.classList.add('hidden');
         btnIcon.classList.remove('hidden');
-        btnText.textContent = 'Lock It In';
-        updateLockInState();
+        updateBottomBar();
       }
     }
 
     // Transition to Confirmation Screen
-    function showConfirmation(dishTitle, emoji, totalTime, isCustom, mealieUrl, externalUrl, sourceDomain) {
-      document.getElementById('confirmDishTitle').textContent = dishTitle;
-      document.getElementById('confirmDishEmoji').textContent = emoji || (externalUrl ? '🌐' : (isCustom ? '🍜' : '🥘'));
+    function showConfirmation(plan) {
+      // Main Dish Card
+      document.getElementById('confirmDishTitle').textContent = plan.dish_name;
+      document.getElementById('confirmDishEmoji').textContent = plan.emoji || (plan.external_url ? '🌐' : (plan.is_custom ? '🍜' : '🥘'));
 
       const confirmDateStr = document.getElementById('confirmDateStr');
       const confirmBadge = document.getElementById('confirmBadge');
@@ -744,8 +1272,8 @@
       const confirmSubtitle = document.getElementById('confirmSubtitle');
       const confirmPillTag = document.getElementById('confirmPillTag');
 
-      if (externalUrl) {
-        confirmDateStr.textContent = `Recipe from ${sourceDomain || 'web'} • Scheduled for tonight`;
+      if (plan.external_url) {
+        confirmDateStr.textContent = `Recipe from ${plan.source_domain || 'web'} • Scheduled for tonight`;
         confirmBadge.className = 'inline-flex items-center space-x-1 px-3.5 py-1 rounded-full text-xs font-bold bg-sky-600 text-white shadow-sm';
         confirmBadgeText.textContent = 'TEST RUN LOCKED IN';
         confirmSubtitle.textContent = "Tonight's chef has been notified with the recipe link. 👨‍🍳";
@@ -757,37 +1285,75 @@
         confirmSubtitle.textContent = "Tonight's chef has been notified. 👩‍🍳";
         confirmPillTag.className = 'text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full';
         confirmPillTag.textContent = 'Tonight';
-        if (totalTime) {
-          confirmDateStr.textContent = `⏱️ ${totalTime} • Scheduled for tonight`;
-        } else if (isCustom) {
+        if (plan.total_time) {
+          confirmDateStr.textContent = `⏱️ ${plan.total_time} • Scheduled for tonight`;
+        } else if (plan.is_custom) {
           confirmDateStr.textContent = 'Special Request • Scheduled for tonight';
         } else {
           confirmDateStr.textContent = 'Scheduled for tonight';
         }
       }
 
-      // External link button
+      // External link button for Main
       const externalLink = document.getElementById('confirmExternalLink');
-      if (externalUrl && externalLink) {
-        externalLink.href = externalUrl;
-        const domainText = sourceDomain || 'Website';
+      if (plan.external_url && externalLink) {
+        externalLink.href = plan.external_url;
+        const domainText = plan.source_domain || 'Website';
         externalLink.querySelector('span').textContent = `🌐 Open Recipe (${domainText})`;
         externalLink.classList.remove('hidden');
       } else if (externalLink) {
         externalLink.classList.add('hidden');
       }
 
-      // Mealie link button
+      // Mealie link button for Main
       const mealieLink = document.getElementById('confirmMealieLink');
-      if (mealieUrl && mealieLink) {
-        mealieLink.href = mealieUrl;
-        mealieLink.querySelector('span').textContent = isCustom ? 'Open Mealie Planner' : 'View Recipe in Mealie';
+      if (plan.mealie_url && mealieLink) {
+        mealieLink.href = plan.mealie_url;
+        mealieLink.querySelector('span').textContent = plan.is_custom ? 'Open Mealie Planner' : 'View Recipe in Mealie';
         mealieLink.classList.remove('hidden');
       } else if (mealieLink) {
         mealieLink.classList.add('hidden');
       }
 
+      // Side Dish Card
+      const confirmSideCard = document.getElementById('confirmSideCard');
+      if (plan.side_name) {
+        confirmSideCard.classList.remove('hidden');
+        document.getElementById('confirmSideTitle').textContent = plan.side_name;
+        document.getElementById('confirmSideEmoji').textContent = plan.side_emoji || (plan.side_external_url ? '🌐' : '🥗');
+
+        const confirmSideMetaText = document.getElementById('confirmSideMetaText');
+        if (plan.side_time) {
+          confirmSideMetaText.textContent = plan.side_time;
+        } else if (plan.side_external_url) {
+          confirmSideMetaText.textContent = `Recipe from ${plan.side_source_domain || 'web'}`;
+        } else {
+          confirmSideMetaText.textContent = 'Pantry staple / side pairing';
+        }
+
+        const confirmSideExternalLink = document.getElementById('confirmSideExternalLink');
+        if (plan.side_external_url && confirmSideExternalLink) {
+          confirmSideExternalLink.href = plan.side_external_url;
+          const sDomain = plan.side_source_domain || 'Website';
+          confirmSideExternalLink.querySelector('span').textContent = `🌐 Open Side (${sDomain})`;
+          confirmSideExternalLink.classList.remove('hidden');
+        } else if (confirmSideExternalLink) {
+          confirmSideExternalLink.classList.add('hidden');
+        }
+
+        const confirmSideMealieLink = document.getElementById('confirmSideMealieLink');
+        if (plan.side_mealie_url && confirmSideMealieLink) {
+          confirmSideMealieLink.href = plan.side_mealie_url;
+          confirmSideMealieLink.classList.remove('hidden');
+        } else if (confirmSideMealieLink) {
+          confirmSideMealieLink.classList.add('hidden');
+        }
+      } else {
+        confirmSideCard.classList.add('hidden');
+      }
+
       votingView.classList.add('hidden');
+      sideView.classList.add('hidden');
       bottomBar.classList.add('hidden');
       confirmationView.classList.remove('hidden');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -802,15 +1368,7 @@
           const parsed = JSON.parse(cached);
           const todayIso = new Date().toISOString().split('T')[0];
           if (parsed && parsed.date === todayIso && parsed.dish_name) {
-            showConfirmation(
-              parsed.dish_name,
-              parsed.emoji,
-              parsed.total_time,
-              parsed.is_custom,
-              parsed.mealie_url,
-              parsed.external_url,
-              parsed.source_domain
-            );
+            showConfirmation(parsed);
           }
         }
       } catch (e) {}
@@ -824,15 +1382,7 @@
             try {
               localStorage.setItem('dinnerDeciderToday', JSON.stringify(data.plan));
             } catch (e) {}
-            showConfirmation(
-              data.plan.dish_name,
-              data.plan.emoji,
-              data.plan.total_time,
-              data.plan.is_custom,
-              data.plan.mealie_url,
-              data.plan.external_url,
-              data.plan.source_domain
-            );
+            showConfirmation(data.plan);
             return true;
           } else {
             // No plan locked in for today yet
@@ -840,6 +1390,7 @@
               localStorage.removeItem('dinnerDeciderToday');
             } catch (e) {}
             confirmationView.classList.add('hidden');
+            sideView.classList.add('hidden');
             votingView.classList.remove('hidden');
             bottomBar.classList.remove('hidden');
             if (!currentOptions || currentOptions.length === 0) {
@@ -860,13 +1411,22 @@
       } catch (e) {}
 
       confirmationView.classList.add('hidden');
+      sideView.classList.add('hidden');
       votingView.classList.remove('hidden');
       bottomBar.classList.remove('hidden');
       
+      currentStep = 1;
       selectedRecipeId = null;
       customNote = '';
       customNoteInput.value = '';
       clearCustomInput();
+
+      selectedSideId = null;
+      customSideNote = '';
+      customSideInput.value = '';
+      clearCustomSideInput();
+      sideSkipped = false;
+
       renderFilterPills();
       
       // Clean up in Mealie and backend cache as well
@@ -878,7 +1438,7 @@
         loadOptions();
       } else {
         renderCards(currentOptions);
-        updateLockInState();
+        updateBottomBar();
       }
     }
 

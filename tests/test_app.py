@@ -157,6 +157,48 @@ async def test_url_info_endpoint():
 
 
 @pytest.mark.anyio
+async def test_get_side_options_endpoint():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/side-options")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "options" in data
+        assert len(data["options"]) == 3
+        first = data["options"][0]
+        assert "id" in first
+        assert "name" in first
+        assert "totalTime" in first
+        assert "imageUrl" in first
+
+
+@pytest.mark.anyio
+async def test_choose_with_side_dish_success():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post(
+            "/api/choose",
+            json={
+                "recipe_id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e01",
+                "side_recipe_id": "side-e4b1-001",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert "Crispy Honey Garlic Salmon" in data["dish_name"]
+        assert "Garlic Butter Baby Potatoes" in data["side_name"]
+        assert data["side_emoji"] == "🥔"
+
+        # Verify /api/today reports both
+        t_resp = await client.get("/api/today")
+        assert t_resp.status_code == 200
+        t_data = t_resp.json()
+        assert t_data["has_plan"] is True
+        assert t_data["plan"]["dish_name"] == data["dish_name"]
+        assert t_data["plan"]["side_name"] == data["side_name"]
+
+
+
+@pytest.mark.anyio
 async def test_today_endpoint_returns_locked_in_choice():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # First submit a choice

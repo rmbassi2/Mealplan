@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import httpx
 
 from app.config import settings
-from app.mock_data import MOCK_RECIPES, generate_recipe_svg
-from app.taxonomy import extract_recipe_taxonomy, select_balanced_recipes
+from app.mock_data import MOCK_RECIPES, MOCK_SIDES, generate_recipe_svg
+from app.taxonomy import extract_recipe_taxonomy, select_balanced_recipes, select_side_recipes
 from app.url_helper import extract_url_from_text, fetch_recipe_url_info, clean_domain
 
 logger = logging.getLogger("mealie_client")
@@ -163,63 +163,109 @@ class MealieClient:
                             dinner_entries = [it for it in items if str(it.get("date")) == today_str]
 
                         if dinner_entries:
-                            # Keep the latest entry (highest ID or last in list)
-                            dinner_entry = dinner_entries[-1]
+                            # Classify entries into main and side
+                            main_entry = None
+                            side_entry = None
+                            for ent in dinner_entries:
+                                t_text = str(ent.get("title") or ent.get("text") or "").lower()
+                                rec_c = str(ent.get("recipe", {}).get("recipeCategory") or "").lower()
+                                if t_text.startswith("side:") or "side" in rec_c or "side" in t_text:
+                                    if not side_entry:
+                                        side_entry = ent
+                                        continue
+                                if not main_entry:
+                                    main_entry = ent
+                                elif not side_entry:
+                                    side_entry = ent
 
-                            # Automatically clean up older duplicate testing entries from Mealie!
-                            if len(dinner_entries) > 1:
-                                logger.info(
-                                    f"Cleaning up {len(dinner_entries) - 1} duplicate dinner entries for {today_str} in Mealie."
-                                )
-                                for dup in dinner_entries[:-1]:
-                                    dup_id = dup.get("id")
-                                    if dup_id:
-                                        await self.delete_mealplan_entry(dup_id)
+                            if not main_entry and dinner_entries:
+                                main_entry = dinner_entries[0]
 
-                            recipe_obj = dinner_entry.get("recipe")
-                            title = dinner_entry.get("title") or dinner_entry.get("text")
-                            recipe_id = dinner_entry.get("recipeId")
+                            # Parse main entry
+                            dish_name = "Tonight's Recipe"
+                            total_time = None
+                            recipe_slug = None
+                            is_custom = False
+                            emoji = "🥘"
+                            external_url = None
+                            source_domain = None
 
-                            if recipe_obj and isinstance(recipe_obj, dict):
-                                dish_name = recipe_obj.get("name", "Tonight's Recipe")
-                                total_time = format_recipe_time(recipe_obj)
-                                recipe_slug = recipe_obj.get("slug")
-                                is_custom = False
-                                emoji = "🥘"
-                                external_url = None
-                                source_domain = None
-                            elif title:
-                                dish_name = title
-                                total_time = None
-                                recipe_slug = None
-                                is_custom = True
-                                note_text = dinner_entry.get("text") or ""
-                                found_url = extract_url_from_text(note_text) or extract_url_from_text(title)
-                                external_url = found_url
-                                source_domain = clean_domain(found_url) if found_url else None
-                                emoji = "🌐" if external_url else "🍜"
-                            elif recipe_id:
-                                dish_name = "Tonight's Dinner"
-                                total_time = None
-                                recipe_slug = None
-                                is_custom = False
-                                external_url = None
-                                source_domain = None
-                                emoji = "🍽️"
-                                try:
-                                    r_res = await client.get(
-                                        f"{self.base_url}/api/recipes/{recipe_id}",
-                                        headers=self.headers,
-                                    )
-                                    if r_res.status_code == 200:
-                                        rd = r_res.json()
-                                        dish_name = rd.get("name", dish_name)
-                                        total_time = format_recipe_time(rd)
-                                        recipe_slug = rd.get("slug")
-                                except Exception:
-                                    pass
-                            else:
-                                continue
+                            if main_entry:
+                                recipe_obj = main_entry.get("recipe")
+                                title = main_entry.get("title") or main_entry.get("text")
+                                recipe_id = main_entry.get("recipeId")
+
+                                if recipe_obj and isinstance(recipe_obj, dict):
+                                    dish_name = recipe_obj.get("name", "Tonight's Recipe")
+                                    total_time = format_recipe_time(recipe_obj)
+                                    recipe_slug = recipe_obj.get("slug")
+                                    emoji = "🥘"
+                                elif title:
+                                    dish_name = title
+                                    is_custom = True
+                                    note_text = main_entry.get("text") or ""
+                                    found_url = extract_url_from_text(note_text) or extract_url_from_text(title)
+                                    external_url = found_url
+                                    source_domain = clean_domain(found_url) if found_url else None
+                                    emoji = "🌐" if external_url else "🍜"
+                                elif recipe_id:
+                                    dish_name = "Tonight's Dinner"
+                                    emoji = "🍽️"
+                                    try:
+                                        r_res = await client.get(
+                                            f"{self.base_url}/api/recipes/{recipe_id}",
+                                            headers=self.headers,
+                                        )
+                                        if r_res.status_code == 200:
+                                            rd = r_res.json()
+                                            dish_name = rd.get("name", dish_name)
+                                            total_time = format_recipe_time(rd)
+                                            recipe_slug = rd.get("slug")
+                                    except Exception:
+                                        pass
+
+                            # Parse side entry (if any)
+                            side_name = None
+                            side_time = None
+                            side_slug = None
+                            side_emoji = None
+                            side_external_url = None
+                            side_source_domain = None
+                            side_is_custom = False
+
+                            if side_entry:
+                                s_recipe_obj = side_entry.get("recipe")
+                                s_title = side_entry.get("title") or side_entry.get("text")
+                                s_recipe_id = side_entry.get("recipeId")
+
+                                if s_recipe_obj and isinstance(s_recipe_obj, dict):
+                                    side_name = s_recipe_obj.get("name", "Side Dish")
+                                    side_time = format_recipe_time(s_recipe_obj)
+                                    side_slug = s_recipe_obj.get("slug")
+                                    side_emoji = "🥗"
+                                elif s_title:
+                                    s_text = side_entry.get("text") or ""
+                                    s_url = extract_url_from_text(s_text) or extract_url_from_text(s_title)
+                                    side_name = re.sub(r"^side:\s*", "", s_title, flags=re.IGNORECASE)
+                                    side_is_custom = True
+                                    side_external_url = s_url
+                                    side_source_domain = clean_domain(s_url) if s_url else None
+                                    side_emoji = "🌐" if s_url else "🥗"
+                                elif s_recipe_id:
+                                    side_name = "Side Dish"
+                                    side_emoji = "🥗"
+                                    try:
+                                        r_res = await client.get(
+                                            f"{self.base_url}/api/recipes/{s_recipe_id}",
+                                            headers=self.headers,
+                                        )
+                                        if r_res.status_code == 200:
+                                            rd = r_res.json()
+                                            side_name = rd.get("name", side_name)
+                                            side_time = format_recipe_time(rd)
+                                            side_slug = rd.get("slug")
+                                    except Exception:
+                                        pass
 
                             plan = {
                                 "date": today_str,
@@ -230,6 +276,13 @@ class MealieClient:
                                 "external_url": external_url,
                                 "source_domain": source_domain,
                                 "emoji": emoji,
+                                "side_name": side_name,
+                                "side_time": side_time,
+                                "side_slug": side_slug,
+                                "side_emoji": side_emoji,
+                                "side_external_url": side_external_url,
+                                "side_source_domain": side_source_domain,
+                                "side_is_custom": side_is_custom,
                             }
                             self._cached_today_plan = plan
                             return plan
@@ -348,10 +401,88 @@ class MealieClient:
             )
         return results
 
+    async def get_side_options(self, count: int = 3) -> List[Dict[str, Any]]:
+        """Fetch side dish options from Mealie, falling back to curated mock sides if needed."""
+        if not self.mock_mode:
+            try:
+                async with httpx.AsyncClient(timeout=6.0) as client:
+                    resp = await client.get(
+                        f"{self.base_url}/api/recipes?perPage=100",
+                        headers=self.headers,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        items = (
+                            data.get("items", [])
+                            if isinstance(data, dict)
+                            else data
+                            if isinstance(data, list)
+                            else []
+                        )
+                        selected = select_side_recipes(items, count=count)
+                        results = []
+                        for r in selected:
+                            recipe_id = r.get("id") or r.get("slug")
+                            tax = r.get("_taxonomy") or extract_recipe_taxonomy(r)
+                            results.append(
+                                {
+                                    "id": recipe_id,
+                                    "name": r.get("name", "Side Dish"),
+                                    "slug": r.get("slug", ""),
+                                    "description": r.get("description") or "A tasty side to complement dinner.",
+                                    "totalTime": format_recipe_time(r),
+                                    "imageUrl": f"/api/recipe-image/{recipe_id}",
+                                    "category": "Side Dish",
+                                    "badges": tax.get("badges", []),
+                                    "emoji": "🥗",
+                                    "is_mock": False,
+                                }
+                            )
+                        if len(results) < count:
+                            needed = count - len(results)
+                            for m in random.sample(MOCK_SIDES, min(needed, len(MOCK_SIDES))):
+                                results.append(
+                                    {
+                                        "id": m["id"],
+                                        "name": m["name"],
+                                        "slug": m["slug"],
+                                        "description": m["description"],
+                                        "totalTime": m["totalTime"],
+                                        "imageUrl": f"/api/recipe-image/{m['id']}",
+                                        "category": m.get("category", "Side Dish"),
+                                        "badges": [{"icon": "✨", "label": "Pantry Fav", "type": "vibe"}],
+                                        "emoji": m.get("emoji", "🥗"),
+                                        "is_mock": True,
+                                    }
+                                )
+                        return results[:count]
+            except Exception as e:
+                logger.warning(f"Error querying Mealie for sides, using fallback: {e}")
+
+        # In mock mode or fallback
+        sample_sides = random.sample(MOCK_SIDES, min(count, len(MOCK_SIDES)))
+        return [
+            {
+                "id": m["id"],
+                "name": m["name"],
+                "slug": m["slug"],
+                "description": m["description"],
+                "totalTime": m["totalTime"],
+                "imageUrl": f"/api/recipe-image/{m['id']}",
+                "category": m.get("category", "Side Dish"),
+                "badges": [{"icon": "✨", "label": "Pantry Fav", "type": "vibe"}],
+                "emoji": m.get("emoji", "🥗"),
+                "is_mock": True,
+            }
+            for m in sample_sides
+        ]
+
     async def get_recipe_image(self, recipe_id: str) -> Tuple[bytes, str]:
         """Proxy recipe image from Mealie, or serve generated SVG if unavailable or mock."""
         # Check if recipe is in mock collection
         mock_recipe = next((m for m in MOCK_RECIPES if m["id"] == recipe_id), None)
+        if not mock_recipe:
+            mock_recipe = next((m for m in MOCK_SIDES if m["id"] == recipe_id), None)
 
         if not self.mock_mode and not mock_recipe:
             try:
@@ -386,8 +517,10 @@ class MealieClient:
         self,
         recipe_id: Optional[str] = None,
         custom_note: Optional[str] = None,
+        side_recipe_id: Optional[str] = None,
+        side_custom_note: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Submit the selected recipe or custom craving to Mealie Mealplanner API."""
+        """Submit the selected recipe or custom craving, plus optional side dish to Mealie."""
         today_str = date.today().isoformat()
         dish_name = "Dinner"
         total_time = None
@@ -464,6 +597,81 @@ class MealieClient:
         else:
             raise ValueError("Either recipe_id or custom_note must be provided")
 
+        # Parse side dish (if any)
+        side_name = None
+        side_time = None
+        side_slug = None
+        side_is_custom = False
+        side_external_url = None
+        side_source_domain = None
+        side_emoji = None
+        side_payload = None
+
+        if side_recipe_id:
+            mock_side = next((m for m in MOCK_SIDES if m["id"] == side_recipe_id), None)
+            if mock_side:
+                side_name = mock_side["name"]
+                side_time = mock_side.get("totalTime")
+                side_slug = mock_side.get("slug")
+                side_emoji = mock_side.get("emoji", "🥗")
+                side_payload = {
+                    "date": today_str,
+                    "entryType": "dinner",
+                    "title": f"Side: {side_name}",
+                    "text": f"Side: {side_name}",
+                    "recipeId": None,
+                }
+            elif not self.mock_mode:
+                try:
+                    async with httpx.AsyncClient(timeout=4.0) as client:
+                        s_resp = await client.get(
+                            f"{self.base_url}/api/recipes/{side_recipe_id}",
+                            headers=self.headers,
+                        )
+                        if s_resp.status_code == 200:
+                            s_data = s_resp.json()
+                            side_name = s_data.get("name", "Selected Side")
+                            side_time = format_recipe_time(s_data)
+                            side_slug = s_data.get("slug")
+                            side_emoji = "🥗"
+                except Exception as e:
+                    logger.debug(f"Could not retrieve side metadata for {side_recipe_id}: {e}")
+
+                side_payload = {
+                    "date": today_str,
+                    "entryType": "dinner",
+                    "recipeId": side_recipe_id,
+                    "title": "",
+                    "text": "",
+                }
+        elif side_custom_note:
+            side_is_custom = True
+            found_side_url = extract_url_from_text(side_custom_note)
+            if found_side_url:
+                side_external_url = found_side_url
+                side_source_domain = clean_domain(found_side_url)
+                page_title, _ = await fetch_recipe_url_info(found_side_url)
+                text_without_url = side_custom_note.replace(found_side_url, "").strip(" -:–—\t\r\n")
+                side_name = page_title or text_without_url or f"Side from {side_source_domain}"
+                side_emoji = "🌐"
+                side_payload = {
+                    "date": today_str,
+                    "entryType": "dinner",
+                    "title": f"Side: {side_name}",
+                    "text": f"Side Recipe Link: {found_side_url}\nSource: {side_source_domain}",
+                    "recipeId": None,
+                }
+            else:
+                side_name = side_custom_note
+                side_emoji = "🥗"
+                side_payload = {
+                    "date": today_str,
+                    "entryType": "dinner",
+                    "title": f"Side: {side_custom_note}",
+                    "text": f"Side: {side_custom_note}",
+                    "recipeId": None,
+                }
+
         emoji = "🌐" if external_url else ("🍜" if is_custom else "🥘")
         plan = {
             "date": today_str,
@@ -474,33 +682,32 @@ class MealieClient:
             "external_url": external_url,
             "source_domain": source_domain,
             "emoji": emoji,
+            "side_name": side_name,
+            "side_time": side_time,
+            "side_slug": side_slug,
+            "side_emoji": side_emoji,
+            "side_external_url": side_external_url,
+            "side_source_domain": side_source_domain,
+            "side_is_custom": side_is_custom,
         }
 
         if self.mock_mode:
-            logger.info(f"[Mock Mode] Submitted dinner choice for {today_str}: {payload}")
+            logger.info(f"[Mock Mode] Submitted dinner choice for {today_str}: {payload}, side: {side_payload}")
             self._cached_today_plan = plan
             return {
                 "status": "success",
                 "message": "Meal plan updated (Mock mode)",
-                "date": today_str,
-                "dish_name": dish_name,
-                "total_time": total_time,
-                "recipe_slug": recipe_slug,
-                "is_custom": is_custom,
-                "external_url": external_url,
-                "source_domain": source_domain,
-                "emoji": emoji,
+                **plan,
                 "entry": payload,
+                "side_entry": side_payload,
             }
 
-        # Clear any existing dinner entries for today in Mealie so exactly ONE meal exists
+        # Clear any existing dinner entries for today in Mealie so exactly tonight's meal and side exist
         try:
             await self.clear_today_dinner_entries(today_str)
         except Exception as e:
             logger.warning(f"Could not clear prior dinner entries for {today_str}: {e}")
 
-        # Try modern Mealie endpoint (/api/households/mealplans) first,
-        # then fallback to legacy (/api/groups/mealplans) if needed
         endpoints = [
             f"{self.base_url}/api/households/mealplans",
             f"{self.base_url}/api/households/mealplans/",
@@ -523,21 +730,30 @@ class MealieClient:
                     )
                     if resp.status_code in (200, 201):
                         logger.info(f"Successfully posted dinner choice to Mealie ({url}): {resp.text}")
+
+                        # Also submit side dish if selected
+                        if side_payload:
+                            try:
+                                await client.post(
+                                    url,
+                                    headers={
+                                        "Authorization": f"Bearer {self.token}",
+                                        "Content-Type": "application/json",
+                                        "Accept": "application/json",
+                                    },
+                                    json=side_payload,
+                                )
+                                logger.info(f"Successfully posted side dish to Mealie ({url})")
+                            except Exception as side_err:
+                                logger.warning(f"Could not post side dish entry: {side_err}")
+
                         self._cached_today_plan = plan
                         return {
                             "status": "success",
                             "message": "Meal plan updated",
-                            "date": today_str,
-                            "dish_name": dish_name,
-                            "total_time": total_time,
-                            "recipe_slug": recipe_slug,
-                            "is_custom": is_custom,
-                            "external_url": external_url,
-                            "source_domain": source_domain,
-                            "emoji": emoji,
+                            **plan,
                         }
                     elif resp.status_code in (404, 405):
-                        # Method not allowed or not found on this path, try next endpoint
                         last_error = f"Mealie API error ({resp.status_code}) on {url}: {resp.text}"
                         continue
                     else:
@@ -549,7 +765,6 @@ class MealieClient:
                     last_error = str(e)
                     continue
 
-        # If all candidate endpoints failed:
         raise RuntimeError(last_error or "Failed to submit meal plan: no valid endpoint responded.")
 
 
