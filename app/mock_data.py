@@ -24,6 +24,14 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
             {"name": "light-fresh", "slug": "light-fresh"},
             {"name": "gluten-free", "slug": "gluten-free"},
         ],
+        "recipeIngredient": [
+            {"food": {"name": "Salmon Fillets"}, "display": "4 fresh salmon fillets"},
+            {"food": {"name": "Honey"}, "display": "3 tbsp honey"},
+            {"food": {"name": "Garlic"}, "display": "4 cloves garlic"},
+            {"food": {"name": "Soy Sauce"}, "display": "2 tbsp soy sauce"},
+            {"food": {"name": "Lemon"}, "display": "1 fresh lemon"},
+            {"food": {"name": "Sesame Seeds"}, "display": "1 tbsp toasted sesame seeds"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e02",
@@ -42,6 +50,14 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
             {"name": "comfort-food", "slug": "comfort-food"},
             {"name": "italian", "slug": "italian"},
             {"name": "low-carb", "slug": "low-carb"},
+        ],
+        "recipeIngredient": [
+            {"food": {"name": "Chicken Breast"}, "display": "2 boneless skinless chicken breasts"},
+            {"food": {"name": "Heavy Cream"}, "display": "1 cup heavy cream"},
+            {"food": {"name": "Sun-Dried Tomatoes"}, "display": "1/2 cup sun-dried tomatoes"},
+            {"food": {"name": "Baby Spinach"}, "display": "2 cups fresh baby spinach"},
+            {"food": {"name": "Parmesan Cheese"}, "display": "1/2 cup grated parmesan cheese"},
+            {"food": {"name": "Garlic"}, "display": "3 cloves garlic"},
         ],
     },
     {
@@ -62,6 +78,12 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
             {"name": "kid-friendly", "slug": "kid-friendly"},
             {"name": "comfort-food", "slug": "comfort-food"},
         ],
+        "recipeIngredient": [
+            {"food": {"name": "Pizza Dough"}, "display": "1 ball prepared pizza dough"},
+            {"food": {"name": "San Marzano Tomatoes"}, "display": "1 can crushed San Marzano tomatoes"},
+            {"food": {"name": "Fresh Mozzarella"}, "display": "8 oz fresh mozzarella ball"},
+            {"food": {"name": "Fresh Basil"}, "display": "1/4 cup fresh basil leaves"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e04",
@@ -79,6 +101,14 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
             {"name": "mexican-texmex", "slug": "mexican-texmex"},
             {"name": "crowd-pleaser", "slug": "crowd-pleaser"},
             {"name": "comfort-food", "slug": "comfort-food"},
+        ],
+        "recipeIngredient": [
+            {"food": {"name": "Chuck Roast"}, "display": "3 lbs beef chuck roast"},
+            {"food": {"name": "Corn Tortillas"}, "display": "12 corn tortillas"},
+            {"food": {"name": "Oaxaca Cheese"}, "display": "8 oz shredded Oaxaca cheese"},
+            {"food": {"name": "Guajillo Chiles"}, "display": "4 dried guajillo chiles"},
+            {"food": {"name": "Cilantro"}, "display": "1 bunch fresh cilantro"},
+            {"food": {"name": "White Onion"}, "display": "1 medium white onion"},
         ],
     },
     {
@@ -99,6 +129,14 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
             {"name": "quick-weeknight", "slug": "quick-weeknight"},
             {"name": "east-asian", "slug": "east-asian"},
         ],
+        "recipeIngredient": [
+            {"food": {"name": "Noodles"}, "display": "8 oz ramen or lo mein noodles"},
+            {"food": {"name": "Peanut Butter"}, "display": "1/3 cup creamy peanut butter"},
+            {"food": {"name": "Soy Sauce"}, "display": "3 tbsp soy sauce"},
+            {"food": {"name": "Chili Oil"}, "display": "1 tbsp chili crisp or chili oil"},
+            {"food": {"name": "Cucumber"}, "display": "1 Persian cucumber"},
+            {"food": {"name": "Scallions"}, "display": "3 green onions"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e06",
@@ -117,6 +155,14 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
             {"name": "low-effort", "slug": "low-effort"},
             {"name": "light-fresh", "slug": "light-fresh"},
             {"name": "gluten-free", "slug": "gluten-free"},
+        ],
+        "recipeIngredient": [
+            {"food": {"name": "Chicken Thighs"}, "display": "4 bone-in chicken thighs"},
+            {"food": {"name": "Baby Potatoes"}, "display": "1 lb baby gold potatoes"},
+            {"food": {"name": "Asparagus"}, "display": "1 bunch fresh asparagus"},
+            {"food": {"name": "Rosemary"}, "display": "2 sprigs fresh rosemary"},
+            {"food": {"name": "Garlic"}, "display": "4 cloves garlic"},
+            {"food": {"name": "Lemon"}, "display": "1 fresh lemon"},
         ],
     },
     {
@@ -138,6 +184,13 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
             {"name": "comfort-food", "slug": "comfort-food"},
             {"name": "kid-friendly", "slug": "kid-friendly"},
         ],
+        "recipeIngredient": [
+            {"food": {"name": "Ground Beef"}, "display": "1 lb 80/20 ground beef"},
+            {"food": {"name": "Brioche Buns"}, "display": "4 brioche hamburger buns"},
+            {"food": {"name": "American Cheese"}, "display": "4 slices American cheese"},
+            {"food": {"name": "Yellow Onion"}, "display": "1 yellow onion"},
+            {"food": {"name": "Dill Pickles"}, "display": "sliced dill pickles"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e08",
@@ -156,6 +209,14 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
             {"name": "italian", "slug": "italian"},
             {"name": "comfort-food", "slug": "comfort-food"},
             {"name": "gluten-free", "slug": "gluten-free"},
+        ],
+        "recipeIngredient": [
+            {"food": {"name": "Arborio Rice"}, "display": "1.5 cups arborio rice"},
+            {"food": {"name": "Butternut Squash"}, "display": "2 cups cubed butternut squash"},
+            {"food": {"name": "Fresh Sage"}, "display": "6 fresh sage leaves"},
+            {"food": {"name": "Butter"}, "display": "3 tbsp unsalted butter"},
+            {"food": {"name": "Parmesan Cheese"}, "display": "1/2 cup grated parmesan cheese"},
+            {"food": {"name": "Vegetable Broth"}, "display": "4 cups vegetable broth"},
         ],
     },
     {
@@ -176,6 +237,14 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
             {"name": "east-asian", "slug": "east-asian"},
             {"name": "quick-weeknight", "slug": "quick-weeknight"},
         ],
+        "recipeIngredient": [
+            {"food": {"name": "Ground Pork"}, "display": "1 lb ground pork"},
+            {"food": {"name": "Brioche Buns"}, "display": "4 brioche buns"},
+            {"food": {"name": "Ginger"}, "display": "1 tbsp minced fresh ginger"},
+            {"food": {"name": "Garlic"}, "display": "2 cloves garlic"},
+            {"food": {"name": "Scallions"}, "display": "3 green onions"},
+            {"food": {"name": "Hoisin Sauce"}, "display": "2 tbsp hoisin sauce"},
+        ],
     },
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e10",
@@ -194,9 +263,16 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
             {"name": "quick-weeknight", "slug": "quick-weeknight"},
             {"name": "italian", "slug": "italian"},
         ],
+        "recipeIngredient": [
+            {"food": {"name": "Chicken Cutlets"}, "display": "1.5 lbs chicken cutlets"},
+            {"food": {"name": "Breadcrumbs"}, "display": "1 cup seasoned Italian breadcrumbs"},
+            {"food": {"name": "Lemon"}, "display": "1 fresh lemon"},
+            {"food": {"name": "Garlic"}, "display": "3 cloves garlic"},
+            {"food": {"name": "Butter"}, "display": "4 tbsp melted butter"},
+            {"food": {"name": "Parsley"}, "display": "2 tbsp fresh parsley"},
+        ],
     },
 ]
-
 
 MOCK_SIDES: List[Dict[str, Any]] = [
     {
@@ -214,6 +290,12 @@ MOCK_SIDES: List[Dict[str, Any]] = [
             {"name": "vegetarian", "slug": "vegetarian"},
             {"name": "comfort-food", "slug": "comfort-food"},
             {"name": "gluten-free", "slug": "gluten-free"},
+        ],
+        "recipeIngredient": [
+            {"food": {"name": "Baby Potatoes"}, "display": "1.5 lbs baby gold potatoes"},
+            {"food": {"name": "Butter"}, "display": "3 tbsp butter"},
+            {"food": {"name": "Garlic"}, "display": "4 cloves garlic"},
+            {"food": {"name": "Parsley"}, "display": "2 tbsp fresh chopped parsley"},
         ],
     },
     {
@@ -234,6 +316,12 @@ MOCK_SIDES: List[Dict[str, Any]] = [
             {"name": "light-fresh", "slug": "light-fresh"},
             {"name": "gluten-free", "slug": "gluten-free"},
         ],
+        "recipeIngredient": [
+            {"food": {"name": "Green Beans"}, "display": "1 lb fresh green beans"},
+            {"food": {"name": "Pine Nuts"}, "display": "1/4 cup toasted pine nuts"},
+            {"food": {"name": "Parsley"}, "display": "1/2 cup fresh parsley"},
+            {"food": {"name": "Red Wine Vinegar"}, "display": "2 tbsp red wine vinegar"},
+        ],
     },
     {
         "id": "side-e4b1-003",
@@ -252,6 +340,12 @@ MOCK_SIDES: List[Dict[str, Any]] = [
             {"name": "comfort-food", "slug": "comfort-food"},
             {"name": "gluten-free", "slug": "gluten-free"},
         ],
+        "recipeIngredient": [
+            {"food": {"name": "Russet Potatoes"}, "display": "4 large russet potatoes"},
+            {"food": {"name": "Lemon"}, "display": "2 fresh lemons"},
+            {"food": {"name": "Oregano"}, "display": "1 tbsp dried Greek oregano"},
+            {"food": {"name": "Garlic"}, "display": "4 cloves garlic"},
+        ],
     },
     {
         "id": "side-e4b1-004",
@@ -269,6 +363,11 @@ MOCK_SIDES: List[Dict[str, Any]] = [
             {"name": "skillet", "slug": "skillet"},
             {"name": "quick-weeknight", "slug": "quick-weeknight"},
             {"name": "east-asian", "slug": "east-asian"},
+        ],
+        "recipeIngredient": [
+            {"food": {"name": "Brussels Sprouts"}, "display": "1 lb Brussels sprouts"},
+            {"food": {"name": "White Miso"}, "display": "2 tbsp white miso paste"},
+            {"food": {"name": "Sesame Seeds"}, "display": "1 tbsp toasted sesame seeds"},
         ],
     },
     {
@@ -289,6 +388,13 @@ MOCK_SIDES: List[Dict[str, Any]] = [
             {"name": "east-asian", "slug": "east-asian"},
             {"name": "light-fresh", "slug": "light-fresh"},
         ],
+        "recipeIngredient": [
+            {"food": {"name": "Purple Cabbage"}, "display": "1/2 head purple cabbage"},
+            {"food": {"name": "Carrots"}, "display": "2 medium carrots"},
+            {"food": {"name": "Peanuts"}, "display": "1/3 cup roasted peanuts"},
+            {"food": {"name": "Ginger"}, "display": "1 tbsp grated fresh ginger"},
+            {"food": {"name": "Cilantro"}, "display": "1/4 cup cilantro"},
+        ],
     },
     {
         "id": "side-e4b1-006",
@@ -306,6 +412,11 @@ MOCK_SIDES: List[Dict[str, Any]] = [
             {"name": "grill-bbq", "slug": "grill-bbq"},
             {"name": "gluten-free", "slug": "gluten-free"},
             {"name": "low-carb", "slug": "low-carb"},
+        ],
+        "recipeIngredient": [
+            {"food": {"name": "Zucchini"}, "display": "3 medium green zucchinis"},
+            {"food": {"name": "Lemon"}, "display": "1 fresh lemon"},
+            {"food": {"name": "Parmesan Cheese"}, "display": "2 tbsp shaved parmesan"},
         ],
     },
     {
@@ -326,6 +437,13 @@ MOCK_SIDES: List[Dict[str, Any]] = [
             {"name": "american-classic", "slug": "american-classic"},
             {"name": "make-ahead", "slug": "make-ahead"},
         ],
+        "recipeIngredient": [
+            {"food": {"name": "Russet Potatoes"}, "display": "3 lbs russet potatoes"},
+            {"food": {"name": "Heavy Cream"}, "display": "1.5 cups heavy cream"},
+            {"food": {"name": "Garlic"}, "display": "3 cloves garlic"},
+            {"food": {"name": "Thyme"}, "display": "1 tsp fresh thyme"},
+            {"food": {"name": "Parmesan Cheese"}, "display": "1/2 cup grated parmesan"},
+        ],
     },
     {
         "id": "side-e4b1-008",
@@ -344,6 +462,11 @@ MOCK_SIDES: List[Dict[str, Any]] = [
             {"name": "kid-friendly", "slug": "kid-friendly"},
             {"name": "american-classic", "slug": "american-classic"},
             {"name": "gluten-free", "slug": "gluten-free"},
+        ],
+        "recipeIngredient": [
+            {"food": {"name": "Sweet Potatoes"}, "display": "3 medium sweet potatoes"},
+            {"food": {"name": "Paprika"}, "display": "1 tsp smoked paprika"},
+            {"food": {"name": "Garlic Powder"}, "display": "1/2 tsp garlic powder"},
         ],
     },
     {
@@ -364,6 +487,11 @@ MOCK_SIDES: List[Dict[str, Any]] = [
             {"name": "gluten-free", "slug": "gluten-free"},
             {"name": "dairy-free", "slug": "dairy-free"},
         ],
+        "recipeIngredient": [
+            {"food": {"name": "Rainbow Carrots"}, "display": "1.5 lbs rainbow carrots"},
+            {"food": {"name": "Pumpkin Seeds"}, "display": "1/4 cup pumpkin seeds"},
+            {"food": {"name": "Fresh Basil"}, "display": "1/2 cup fresh basil leaves"},
+        ],
     },
     {
         "id": "side-e4b1-010",
@@ -382,6 +510,13 @@ MOCK_SIDES: List[Dict[str, Any]] = [
             {"name": "quick-weeknight", "slug": "quick-weeknight"},
             {"name": "mexican-texmex", "slug": "mexican-texmex"},
             {"name": "gluten-free", "slug": "gluten-free"},
+        ],
+        "recipeIngredient": [
+            {"food": {"name": "Long-Grain Rice"}, "display": "1.5 cups long-grain white rice"},
+            {"food": {"name": "Tomato Sauce"}, "display": "1 can (8 oz) tomato sauce"},
+            {"food": {"name": "Garlic"}, "display": "2 cloves garlic"},
+            {"food": {"name": "Yellow Onion"}, "display": "1/2 yellow onion"},
+            {"food": {"name": "Cumin"}, "display": "1/2 tsp ground cumin"},
         ],
     },
 ]

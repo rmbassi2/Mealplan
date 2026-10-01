@@ -120,17 +120,26 @@
           </h1>
           <p class="text-xs text-stone-500 mt-0.5">What are you in the mood for?</p>
         </div>
-
-        <!-- Refresh Button -->
-        <button id="refreshBtn" 
-                onclick="refreshOptions()" 
-                title="Roll for 3 new dinner ideas"
-                class="flex items-center space-x-1.5 px-3 py-2 text-xs font-medium text-stone-600 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all focus:outline-none">
-          <svg id="refreshIcon" class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span class="text-stone-700">Shuffle</span>
-        </button>
+        <!-- Header Actions: Pantry & Shuffle -->
+        <div class="flex items-center space-x-1.5">
+          <button id="pantryBtn" 
+                  onclick="openPantryModal()" 
+                  title="View and update pantry inventory"
+                  class="flex items-center space-x-1 px-2.5 py-2 text-xs font-semibold text-stone-700 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all focus:outline-none">
+            <span>🧺</span>
+            <span class="hidden sm:inline">Pantry</span>
+            <span id="pantryInStockBadge" class="hidden px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full"></span>
+          </button>
+          <button id="refreshBtn" 
+                  onclick="refreshOptions()" 
+                  title="Roll for 3 new dinner ideas"
+                  class="flex items-center space-x-1.5 px-3 py-2 text-xs font-medium text-stone-600 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all focus:outline-none">
+            <svg id="refreshIcon" class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span class="text-stone-700">Shuffle</span>
+          </button>
+        </div>
       </header>
 
       <!-- Mood & Style Filter Pills Bar -->
@@ -439,6 +448,20 @@
             </div>
           </div>
         </div>
+      <!-- Missing Ingredient Shopping Card (if 1 item was missing) -->
+      <div id="confirmMissingShoppingCard" class="hidden bg-amber-50 rounded-2xl p-4 border border-amber-200/90 shadow-sm text-left space-y-2 mx-1">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-extrabold uppercase tracking-wider text-amber-800">🛒 Missing 1 Ingredient</span>
+          <span class="text-[10px] bg-amber-200/80 text-amber-900 font-semibold px-2 py-0.5 rounded-full">Pantry Alert</span>
+        </div>
+        <p class="text-xs text-amber-900 leading-relaxed">
+          You need <strong id="confirmMissingItemName">Heavy Cream</strong> for this dinner.
+        </p>
+        <button id="confirmAddToShoppingBtn" onclick="addMissingItemToShoppingList()"
+                class="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-amber-900 bg-amber-200/90 hover:bg-amber-300 active:bg-amber-400 border border-amber-300/80 transition-colors flex items-center justify-center space-x-1.5 shadow-sm">
+          <span>➕</span>
+          <span id="confirmAddToShoppingBtnText">Add to Mealie Shopping List</span>
+        </button>
       </div>
 
       <!-- Action: Reset / Change Mind -->
@@ -487,11 +510,90 @@
     </div>
   </footer>
 
+  <!-- Pantry Inventory Modal Drawer -->
+  <div id="pantryModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-warm-50 w-full max-w-md sm:max-w-lg rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[90vh]">
+      
+      <!-- Modal Header -->
+      <div class="p-4 border-b border-stone-200 bg-white flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <span class="text-2xl">🧺</span>
+          <div>
+            <h3 class="text-lg font-bold font-serif-title text-stone-900 leading-tight">Kitchen Pantry</h3>
+            <p id="pantryStatsSubtitle" class="text-[11px] text-stone-500 font-medium">Checking inventory...</p>
+          </div>
+        </div>
+        <button id="closePantryModalBtn" onclick="closePantryModal()" class="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 active:bg-stone-300 text-stone-600 flex items-center justify-center font-bold text-sm transition-colors focus:outline-none">
+          ✕
+        </button>
+      </div>
+
+      <!-- Quick Action Controls & Search -->
+      <div class="p-3.5 bg-white/70 border-b border-stone-200/80 space-y-2.5">
+        <!-- Search bar -->
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-stone-400 text-xs">🔍</span>
+          <input 
+            type="text" 
+            id="pantrySearchInput" 
+            oninput="filterPantryItems(this.value)"
+            placeholder="Search ingredients (e.g. Chicken, Cream)..." 
+            class="w-full pl-8 pr-3 py-2 text-xs rounded-xl bg-stone-100/90 border border-stone-200/90 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:bg-white"
+          />
+        </div>
+
+        <!-- Filter tabs & bulk actions -->
+        <div class="flex items-center justify-between text-xs">
+          <div class="flex items-center space-x-1" id="pantryFilterTabs">
+            <button onclick="setPantryTab('all')" id="pantryTab-all" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-600 text-white shadow-sm transition-all">All</button>
+            <button onclick="setPantryTab('in_stock')" id="pantryTab-in_stock" class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-stone-100 hover:bg-stone-200 text-stone-600 transition-all">In Stock</button>
+            <button onclick="setPantryTab('missing')" id="pantryTab-missing" class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-stone-100 hover:bg-stone-200 text-stone-600 transition-all">Missing</button>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="flex items-center space-x-1.5">
+            <button onclick="syncPantryFromRecipes()" id="syncPantryBtn" title="Discover ingredients from recipes" class="px-2 py-1 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 rounded-lg border border-amber-200/80 flex items-center space-x-1 transition-colors">
+              <span>⚡</span>
+              <span>Sync</span>
+            </button>
+            <button onclick="bulkTogglePantry(true)" title="Mark all in stock" class="px-2 py-1 text-[11px] font-semibold text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-lg border border-stone-200 transition-colors">
+              All In
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrollable Items List -->
+      <div id="pantryItemsContainer" class="flex-1 overflow-y-auto p-3.5 space-y-3">
+        <!-- Rendered items grouped by category -->
+      </div>
+
+      <!-- Add Custom Item Bar at bottom -->
+      <div class="p-3 bg-white border-t border-stone-200 flex items-center space-x-2">
+        <input 
+          type="text" 
+          id="newPantryItemInput" 
+          placeholder="Add ingredient (e.g. Tortillas)..." 
+          class="flex-1 px-3 py-2 text-xs rounded-xl bg-stone-100 border border-stone-200 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:bg-white"
+          onkeydown="if(event.key === 'Enter') addCustomPantryItem()"
+        />
+        <button 
+          onclick="addCustomPantryItem()" 
+          class="px-3 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 transition-colors shadow-sm flex items-center space-x-1">
+          <span>＋</span>
+          <span>Add</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Application Logic (Clean Modern Vanilla JS) -->
   <script>
     // State & Taxonomy Filters
     const MOOD_FILTERS = [
       { id: 'surprise', label: 'Surprise Me', icon: '✨', param: null },
+      { id: 'pantry', label: 'Pantry Ready', icon: '🧺', param: 'mood=pantry' },
       { id: 'quick', label: 'Quick (<30m)', icon: '⚡', param: 'mood=quick' },
       { id: 'comfort', label: 'Comfort Food', icon: '🧀', param: 'mood=comfort' },
       { id: 'skillet', label: 'Skillet', icon: '🍳', param: 'mood=skillet' },
@@ -671,6 +773,10 @@
         colorClass = 'bg-amber-50 text-amber-800 border-amber-200/80';
       } else if (badge.type === 'dietary') {
         colorClass = 'bg-teal-50 text-teal-800 border-teal-200/80';
+      } else if (badge.type === 'pantry') {
+        colorClass = badge.icon === '🟢' 
+          ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold' 
+          : (badge.icon === '⚠️' ? 'bg-amber-50 text-amber-900 border-amber-300 font-bold' : 'bg-stone-100 text-stone-600 border-stone-200');
       }
       return `
         <span class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${colorClass}">
@@ -745,6 +851,12 @@
             <p class="text-xs text-stone-500 mt-1 line-clamp-2 leading-relaxed">
               ${escapeHtml(recipe.description || 'A delicious, hearty home-cooked meal ready for tonight.')}
             </p>
+            ${recipe.pantry && recipe.pantry.missing_count === 1 ? `
+              <div class="mt-2 text-[11px] text-amber-800 bg-amber-50/90 border border-amber-200/80 rounded-lg px-2.5 py-1 flex items-center justify-between">
+                <span>⚠️ <strong>Missing 1 item:</strong> ${escapeHtml(recipe.pantry.missing_items[0] || '1 ingredient')}</span>
+                <span class="text-[10px] text-amber-700 font-semibold uppercase tracking-wider">1 off</span>
+              </div>
+            ` : ''}
           </div>
         `;
 
@@ -1355,11 +1467,335 @@
         confirmSideCard.classList.add('hidden');
       }
 
+      // Missing Ingredient Shopping Card
+      const confirmMissingShoppingCard = document.getElementById('confirmMissingShoppingCard');
+      const chosenRecipe = currentOptions.find(o => o.id === selectedRecipeId);
+      if (chosenRecipe && chosenRecipe.pantry && chosenRecipe.pantry.missing_count === 1 && chosenRecipe.pantry.missing_items && chosenRecipe.pantry.missing_items.length > 0) {
+        missingIngredientForShopping = chosenRecipe.pantry.missing_items[0];
+        document.getElementById('confirmMissingItemName').textContent = missingIngredientForShopping;
+        const addBtn = document.getElementById('confirmAddToShoppingBtn');
+        const addBtnText = document.getElementById('confirmAddToShoppingBtnText');
+        if (addBtn) addBtn.disabled = false;
+        if (addBtnText) addBtnText.textContent = `Add "${missingIngredientForShopping}" to Mealie Shopping List`;
+        if (confirmMissingShoppingCard) confirmMissingShoppingCard.classList.remove('hidden');
+      } else if (confirmMissingShoppingCard) {
+        confirmMissingShoppingCard.classList.add('hidden');
+      }
+
       votingView.classList.add('hidden');
       sideView.classList.add('hidden');
       bottomBar.classList.add('hidden');
       confirmationView.classList.remove('hidden');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ==========================================
+    // Pantry Management Logic
+    // ==========================================
+    let pantryItems = [];
+    let pantryStats = { total: 0, in_stock: 0, out_of_stock: 0 };
+    let currentPantryTab = 'all';
+    let pantrySearchTerm = '';
+    let missingIngredientForShopping = null;
+
+    async function openPantryModal() {
+      const modal = document.getElementById('pantryModal');
+      modal.classList.remove('hidden');
+      await loadPantry();
+    }
+
+    function closePantryModal() {
+      const modal = document.getElementById('pantryModal');
+      modal.classList.add('hidden');
+      if (!votingView.classList.contains('hidden')) {
+        loadOptions();
+      }
+    }
+
+    async function loadPantry() {
+      try {
+        const res = await fetch('/api/pantry');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        pantryItems = data.items || [];
+        pantryStats = data.stats || { total: 0, in_stock: 0, out_of_stock: 0 };
+        updatePantryHeaderBadge();
+        renderPantryList();
+      } catch (err) {
+        console.error('Failed to load pantry:', err);
+      }
+    }
+
+    function updatePantryHeaderBadge() {
+      const badge = document.getElementById('pantryInStockBadge');
+      const subtitle = document.getElementById('pantryStatsSubtitle');
+      if (pantryStats.total > 0) {
+        if (badge) {
+          badge.textContent = `${pantryStats.in_stock}/${pantryStats.total}`;
+          badge.classList.remove('hidden');
+        }
+        if (subtitle) {
+          subtitle.textContent = `${pantryStats.in_stock} in stock • ${pantryStats.out_of_stock} out of stock`;
+        }
+      }
+    }
+
+    function setPantryTab(tab) {
+      currentPantryTab = tab;
+      ['all', 'in_stock', 'missing'].forEach(t => {
+        const btn = document.getElementById(`pantryTab-${t}`);
+        if (!btn) return;
+        if (t === tab) {
+          btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-600 text-white shadow-sm transition-all';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-medium bg-stone-100 hover:bg-stone-200 text-stone-600 transition-all';
+        }
+      });
+      renderPantryList();
+    }
+
+    function filterPantryItems(term) {
+      pantrySearchTerm = (term || '').trim().toLowerCase();
+      renderPantryList();
+    }
+
+    function renderPantryList() {
+      const container = document.getElementById('pantryItemsContainer');
+      if (!container) return;
+      container.innerHTML = '';
+
+      let filtered = pantryItems.filter(item => {
+        if (pantrySearchTerm) {
+          const match = item.name.toLowerCase().includes(pantrySearchTerm) || item.display_name.toLowerCase().includes(pantrySearchTerm);
+          if (!match) return false;
+        }
+        if (currentPantryTab === 'in_stock') return item.in_stock === 1 || item.is_staple === 1;
+        if (currentPantryTab === 'missing') return item.in_stock === 0 && item.is_staple === 0;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-stone-400">
+            <span class="text-3xl">🧺</span>
+            <p class="text-xs font-semibold text-stone-500 mt-2">No pantry items found</p>
+            <p class="text-[11px] text-stone-400 mt-0.5">Try searching or tap "Sync" to auto-discover from recipes.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Group by category
+      const categories = {};
+      filtered.forEach(it => {
+        const cat = it.category || 'pantry';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(it);
+      });
+
+      const catOrder = ['protein', 'produce', 'dairy', 'grains & bakery', 'sauces & condiments', 'spices & herbs', 'pantry'];
+      const sortedCats = Object.keys(categories).sort((a, b) => {
+        let ia = catOrder.indexOf(a);
+        let ib = catOrder.indexOf(b);
+        if (ia === -1) ia = 99;
+        if (ib === -1) ib = 99;
+        return ia - ib;
+      });
+
+      const catMeta = {
+        'protein': { label: 'Meat & Seafood', icon: '🥩' },
+        'produce': { label: 'Produce & Fresh', icon: '🥦' },
+        'dairy': { label: 'Dairy & Eggs', icon: '🧀' },
+        'grains & bakery': { label: 'Grains & Bakery', icon: '🥖' },
+        'sauces & condiments': { label: 'Sauces & Condiments', icon: '🥢' },
+        'spices & herbs': { label: 'Spices & Seasonings', icon: '🧂' },
+        'pantry': { label: 'Pantry Staples', icon: '🥫' }
+      };
+
+      sortedCats.forEach(cat => {
+        const groupWrapper = document.createElement('div');
+        groupWrapper.className = 'space-y-2';
+
+        const meta = catMeta[cat] || { label: cat.toUpperCase(), icon: '📦' };
+        const inStockCount = categories[cat].filter(it => it.in_stock === 1 || it.is_staple === 1).length;
+        const totalCount = categories[cat].length;
+
+        const groupTitle = document.createElement('div');
+        groupTitle.className = 'flex items-center justify-between text-xs font-bold uppercase tracking-wider text-stone-500 px-1 pt-2 border-b border-stone-200/70 pb-1';
+        groupTitle.innerHTML = `
+          <span class="flex items-center space-x-1.5 text-stone-700">
+            <span>${meta.icon}</span>
+            <span>${escapeHtml(meta.label)}</span>
+          </span>
+          <span class="text-[11px] font-semibold text-stone-400 normal-case tracking-normal">
+            ${inStockCount} / ${totalCount} in stock
+          </span>
+        `;
+        groupWrapper.appendChild(groupTitle);
+
+        const listDiv = document.createElement('div');
+        listDiv.className = 'space-y-1.5';
+
+        categories[cat].forEach(item => {
+          const isInStock = item.in_stock === 1 || item.is_staple === 1;
+          const itemEl = document.createElement('div');
+          itemEl.className = `flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${
+            isInStock 
+              ? 'bg-white border-stone-200/90 hover:border-emerald-300 shadow-xs' 
+              : 'bg-stone-50/90 border-stone-200/70 hover:border-stone-300'
+          }`;
+          itemEl.onclick = () => togglePantryItem(item.id, isInStock);
+
+          itemEl.innerHTML = `
+            <div class="flex items-center space-x-2.5 min-w-0 flex-1 pr-2">
+              <span class="text-base flex-shrink-0">${isInStock ? '🟢' : '⚪'}</span>
+              <span class="text-sm leading-snug break-words ${
+                isInStock 
+                  ? 'font-semibold text-stone-900' 
+                  : 'font-medium text-stone-500'
+              }">
+                ${escapeHtml(item.display_name)}
+              </span>
+            </div>
+            <div class="flex items-center space-x-2 flex-shrink-0">
+              <button 
+                type="button"
+                onclick="event.stopPropagation(); togglePantryItem(${item.id}, ${isInStock});"
+                class="px-2.5 py-1 text-xs font-bold rounded-full transition-all flex items-center space-x-1 border ${
+                  isInStock 
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100' 
+                    : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                }">
+                <span>${isInStock ? '✓' : '✕'}</span>
+                <span>${isInStock ? 'In Stock' : 'Out'}</span>
+              </button>
+              <button 
+                type="button" 
+                onclick="event.stopPropagation(); deletePantryItem(${item.id});" 
+                title="Remove item" 
+                class="w-7 h-7 rounded-lg hover:bg-rose-50 hover:text-rose-600 text-stone-300 hover:border hover:border-rose-200 flex items-center justify-center text-xs transition-colors">
+                ✕
+              </button>
+            </div>
+          `;
+          listDiv.appendChild(itemEl);
+        });
+
+        groupWrapper.appendChild(listDiv);
+        container.appendChild(groupWrapper);
+      });
+    }
+
+    async function togglePantryItem(itemId, currentStatus) {
+      const item = pantryItems.find(i => i.id === itemId);
+      if (item) {
+        item.in_stock = currentStatus ? 0 : 1;
+        pantryStats.in_stock += currentStatus ? -1 : 1;
+        pantryStats.out_of_stock += currentStatus ? 1 : -1;
+        updatePantryHeaderBadge();
+        renderPantryList();
+      }
+
+      try {
+        await fetch('/api/pantry/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item_id: itemId, in_stock: !currentStatus }),
+        });
+      } catch (err) {
+        console.error('Error toggling pantry item:', err);
+        loadPantry();
+      }
+    }
+
+    async function addCustomPantryItem() {
+      const input = document.getElementById('newPantryItemInput');
+      const val = (input.value || '').trim();
+      if (!val) return;
+      input.value = '';
+
+      try {
+        const res = await fetch('/api/pantry/item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: val, in_stock: true }),
+        });
+        if (res.ok) {
+          await loadPantry();
+        }
+      } catch (err) {
+        console.error('Error adding custom pantry item:', err);
+      }
+    }
+
+    async function deletePantryItem(itemId) {
+      try {
+        const res = await fetch(`/api/pantry/item/${itemId}`, { method: 'DELETE' });
+        if (res.ok) {
+          pantryItems = pantryItems.filter(i => i.id !== itemId);
+          await loadPantry();
+        }
+      } catch (err) {
+        console.error('Error deleting pantry item:', err);
+      }
+    }
+
+    async function syncPantryFromRecipes() {
+      const btn = document.getElementById('syncPantryBtn');
+      if (btn) btn.innerHTML = '<span>⏳</span><span>Syncing...</span>';
+      try {
+        const res = await fetch('/api/pantry/sync', { method: 'POST' });
+        if (res.ok) {
+          await loadPantry();
+        }
+      } catch (err) {
+        console.error('Error syncing pantry:', err);
+      } finally {
+        if (btn) btn.innerHTML = '<span>⚡</span><span>Sync</span>';
+      }
+    }
+
+    async function bulkTogglePantry(inStock) {
+      try {
+        await fetch('/api/pantry/bulk-stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ in_stock: inStock }),
+        });
+        await loadPantry();
+      } catch (err) {
+        console.error('Error bulk updating pantry:', err);
+      }
+    }
+
+    async function addMissingItemToShoppingList() {
+      if (!missingIngredientForShopping) return;
+      const addBtn = document.getElementById('confirmAddToShoppingBtn');
+      const addBtnText = document.getElementById('confirmAddToShoppingBtnText');
+      if (addBtn) addBtn.disabled = true;
+      if (addBtnText) addBtnText.textContent = 'Adding to shopping list...';
+
+      try {
+        const res = await fetch('/api/shopping-list/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            item_name: missingIngredientForShopping,
+            recipe_id: selectedRecipeId,
+            note: '1 missing item from Dinner Decider',
+          }),
+        });
+        if (res.ok) {
+          if (addBtnText) addBtnText.textContent = `✓ Added "${missingIngredientForShopping}" to Shopping List!`;
+          if (addBtn) addBtn.className = 'w-full py-2.5 px-3 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 transition-colors flex items-center justify-center space-x-1.5 shadow-sm';
+        } else {
+          if (addBtnText) addBtnText.textContent = 'Could not add to Mealie shopping list';
+          if (addBtn) addBtn.disabled = false;
+        }
+      } catch (e) {
+        if (addBtnText) addBtnText.textContent = 'Network error adding to shopping list';
+        if (addBtn) addBtn.disabled = false;
+      }
     }
 
     // Check if a dinner plan is already locked in for today
@@ -1468,6 +1904,7 @@
     async function init() {
       initDate();
       renderFilterPills();
+      loadPantry();
       const hasPlan = await checkExistingPlan();
       if (!hasPlan) {
         loadOptions();

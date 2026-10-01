@@ -8,6 +8,7 @@ import httpx
 
 from app.config import settings
 from app.mock_data import MOCK_RECIPES, MOCK_SIDES, generate_recipe_svg
+from app.pantry import pantry_manager
 from app.taxonomy import extract_recipe_taxonomy, select_balanced_recipes, select_side_recipes
 from app.url_helper import extract_url_from_text, fetch_recipe_url_info, clean_domain
 
@@ -50,6 +51,7 @@ class MealieClient:
         self.token = settings.mealie_api_token
         self.mock_mode = settings.mock_mode or not settings.is_configured
         self._cached_today_plan: Optional[Dict[str, Any]] = None
+        self._recipe_cache: Dict[str, Dict[str, Any]] = {}
 
     @property
     def headers(self) -> Dict[str, str]:
@@ -300,6 +302,43 @@ class MealieClient:
             return self._cached_today_plan
         return None
 
+    async def add_to_shopping_list(self, item_name: str, note: Optional[str] = None) -> Dict[str, Any]:
+        """Add an item (e.g. missing ingredient) to Mealie's shopping list."""
+        if self.mock_mode:
+            logger.info(f"[Mock Mode] Added '{item_name}' to shopping list.")
+            return {
+                "status": "success",
+                "message": f"Added '{item_name}' to shopping list (Mock mode)",
+                "item_name": item_name,
+            }
+
+        endpoints = [
+            f"{self.base_url}/api/households/shopping/items",
+            f"{self.base_url}/api/groups/shopping/items",
+        ]
+        payload = {
+            "note": f"{item_name}" + (f" ({note})" if note else ""),
+            "checked": False,
+        }
+        async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+            for url in endpoints:
+                try:
+                    resp = await client.post(url, headers=self.headers, json=payload)
+                    if resp.status_code in (200, 201):
+                        logger.info(f"Successfully added '{item_name}' to Mealie shopping list via {url}")
+                        return {
+                            "status": "success",
+                            "message": f"Added '{item_name}' to shopping list",
+                            "item": resp.json() if resp.text else None,
+                        }
+                except Exception as e:
+                    logger.debug(f"Error posting to shopping list at {url}: {e}")
+
+        return {
+            "status": "error",
+            "message": f"Could not add '{item_name}' to Mealie shopping list",
+        }
+
     async def get_dinner_options(
         self,
         count: int = 3,
@@ -307,8 +346,11 @@ class MealieClient:
         protein: Optional[str] = None,
         tool: Optional[str] = None,
         cuisine: Optional[str] = None,
+        pantry_only: bool = False,
     ) -> List[Dict[str, Any]]:
-        """Fetch recipe options with taxonomy-aware balanced selection and badges."""
+        """Fetch recipe options with taxonomy-aware balanced selection, pantry status, and badges."""
+        in_stock_set = pantry_manager.get_in_stock_set()
+
         if not self.mock_mode:
             try:
                 async with httpx.AsyncClient(timeout=6.0) as client:
@@ -327,8 +369,23 @@ class MealieClient:
                         )
 
                         if items:
+                            # Auto-seed pantry if it is currently empty
+                            if pantry_manager.get_stats()["total"] == 0:
+                                pantry_manager.seed_from_recipes(items)
+                                in_stock_set = pantry_manager.get_in_stock_set()
+
+                            # Evaluate pantry status for each recipe
+                            for r in items:
+                                r["_pantry"] = pantry_manager.evaluate_recipe(r, in_stock_set)
+
+                            candidate_items = items
+                            if pantry_only or mood in ("pantry", "pantry-ready"):
+                                ready_pool = [r for r in items if r["_pantry"]["is_ready"]]
+                                if ready_pool:
+                                    candidate_items = ready_pool
+
                             selected = select_balanced_recipes(
-                                items,
+                                candidate_items,
                                 count=count,
                                 mood=mood,
                                 protein=protein,
@@ -358,6 +415,13 @@ class MealieClient:
                                         "badges": tax.get("badges", []),
                                         "tags": list(tax.get("tags", set())),
                                         "tools": list(tax.get("tools", set())),
+                                        "pantry": r.get("_pantry", {
+                                            "is_ready": True,
+                                            "missing_count": 0,
+                                            "missing_items": [],
+                                            "in_stock_items": [],
+                                            "is_full_pantry": True,
+                                        }),
                                         "is_mock": False,
                                     }
                                 )
@@ -371,9 +435,22 @@ class MealieClient:
             except Exception as e:
                 logger.warning(f"Failed to connect to Mealie ({e}), falling back to mock options.")
 
-        # Fallback / Mock Mode: Select balanced recipes from MOCK_RECIPES
+        # Fallback / Mock Mode: Auto-seed pantry if empty and evaluate MOCK_RECIPES
+        if pantry_manager.get_stats()["total"] == 0:
+            pantry_manager.seed_from_recipes(MOCK_RECIPES)
+            in_stock_set = pantry_manager.get_in_stock_set()
+
+        for m in MOCK_RECIPES:
+            m["_pantry"] = pantry_manager.evaluate_recipe(m, in_stock_set)
+
+        mock_candidates = MOCK_RECIPES
+        if pantry_only or mood in ("pantry", "pantry-ready"):
+            ready_mocks = [m for m in MOCK_RECIPES if m["_pantry"]["is_ready"]]
+            if ready_mocks:
+                mock_candidates = ready_mocks
+
         selected_mocks = select_balanced_recipes(
-            MOCK_RECIPES,
+            mock_candidates,
             count=count,
             mood=mood,
             protein=protein,
@@ -396,6 +473,13 @@ class MealieClient:
                     "tags": list(tax.get("tags", set())),
                     "tools": list(tax.get("tools", set())),
                     "emoji": m.get("emoji", "🥘"),
+                    "pantry": m.get("_pantry", {
+                        "is_ready": True,
+                        "missing_count": 0,
+                        "missing_items": [],
+                        "in_stock_items": [],
+                        "is_full_pantry": True,
+                    }),
                     "is_mock": True,
                 }
             )

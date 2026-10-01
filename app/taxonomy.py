@@ -256,6 +256,20 @@ def extract_recipe_taxonomy(recipe: Dict[str, Any]) -> Dict[str, Any]:
             badges.append({"icon": ico, "label": lbl, "type": "dietary"})
             seen_badges.add(d)
 
+    # Pantry stock badge (if _pantry metadata is attached)
+    pantry_info = recipe.get("_pantry")
+    if pantry_info:
+        missing_count = pantry_info.get("missing_count", 0)
+        missing_items = pantry_info.get("missing_items", [])
+        if missing_count == 0:
+            badges.insert(0, {"icon": "🟢", "label": "Pantry Ready", "type": "pantry"})
+        elif missing_count == 1:
+            item_lbl = missing_items[0] if missing_items else "1 item"
+            short_lbl = item_lbl if len(item_lbl) <= 16 else item_lbl[:15] + "…"
+            badges.insert(0, {"icon": "⚠️", "label": f"Need: {short_lbl}", "type": "pantry"})
+        else:
+            badges.insert(0, {"icon": "⚪", "label": f"{missing_count} Missing", "type": "pantry"})
+
     return {
         "categories": categories,
         "tools": tools,
@@ -525,6 +539,10 @@ def matches_filter(
                 return False
         elif m in ("slow-cooker", "slowcooker"):
             if "slow-cooker" not in tools:
+                return False
+        elif m in ("pantry", "pantry-ready"):
+            pantry_info = recipe.get("_pantry")
+            if pantry_info is not None and not pantry_info.get("is_ready", False):
                 return False
 
     return True

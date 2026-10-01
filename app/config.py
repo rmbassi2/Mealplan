@@ -17,6 +17,9 @@ class Settings(BaseModel):
     ntfy_base_url: str = os.getenv("NTFY_BASE_URL", "https://ntfy.sh").rstrip("/")
     ntfy_token: str = os.getenv("NTFY_TOKEN", "").strip()
 
+    # Pantry Inventory Database Path
+    pantry_db_path: str = os.getenv("PANTRY_DB_PATH", "data/pantry.db")
+
     @property
     def is_configured(self) -> bool:
         return bool(self.mealie_base_url and self.mealie_api_token)
