@@ -176,3 +176,47 @@ async def test_shopping_list_add_endpoint():
         data = resp.json()
         assert data["status"] == "success"
         assert "Heavy Cream" in data["item_name"]
+
+
+def test_seed_from_foods_and_clear(temp_pantry):
+    pm = temp_pantry
+    foods = [
+        {"name": "Organic Boneless Chicken Thighs"},
+        {"name": "Fresh Asparagus"},
+        {"name": "Kosher Salt"},  # Should be skipped as staple
+    ]
+    added = pm.seed_from_foods(foods, mark_in_stock=True)
+    assert added == 2
+    items = pm.get_all_items()
+    assert len(items) == 2
+    names = [i["name"] for i in items]
+    assert "chicken thighs" in names
+    assert "asparagus" in names
+
+    # Test clear
+    cleared = pm.clear_all_items()
+    assert cleared == 2
+    assert len(pm.get_all_items()) == 0
+
+
+@pytest.mark.anyio
+async def test_mealie_status_endpoint():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/mealie/status")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "connected" in data
+        assert "pantry" in data
+        assert "total_items" in data["pantry"]
+
+
+@pytest.mark.anyio
+async def test_pantry_sync_with_clear_existing():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Sync with clear_existing
+        resp = await client.post("/api/pantry/sync?clear_existing=true")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert "stats" in data
+        assert data["stats"]["total"] > 0

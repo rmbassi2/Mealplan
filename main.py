@@ -73,6 +73,7 @@ class ShoppingListAddRequest(BaseModel):
 @app.get("/health")
 async def health_check():
     """Healthcheck endpoint for container and deployment monitors."""
+    stats = pantry_manager.get_stats()
     return {
         "status": "healthy",
         "mock_mode": mealie_client.mock_mode,
@@ -80,6 +81,23 @@ async def health_check():
         "base_url": settings.mealie_base_url or "(none)",
         "ntfy_configured": settings.is_ntfy_configured,
         "ntfy_topic": settings.ntfy_topic or "(none)",
+        "pantry_total": stats["total"],
+        "pantry_in_stock": stats["in_stock"],
+    }
+
+
+@app.get("/api/mealie/status")
+async def get_mealie_status():
+    """Diagnostic endpoint checking live connection to Mealie and count of recipes/foods."""
+    status = await mealie_client.check_connection()
+    stats = pantry_manager.get_stats()
+    return {
+        **status,
+        "pantry": {
+            "total_items": stats["total"],
+            "in_stock": stats["in_stock"],
+            "out_of_stock": stats["out_of_stock"],
+        },
     }
 
 
@@ -222,11 +240,19 @@ async def get_pantry(
 ):
     """List pantry inventory items with statistics."""
     try:
-        # If pantry has zero items yet, auto-seed with initial recipe ingredients
+        # If pantry has zero items yet, auto-seed with Mealie foods or mock recipes
         stats = pantry_manager.get_stats()
         if stats["total"] == 0:
-            from app.mock_data import MOCK_RECIPES
-            pantry_manager.seed_from_recipes(MOCK_RECIPES, mark_in_stock=True)
+            if mealie_client.mock_mode:
+                from app.mock_data import MOCK_RECIPES
+                pantry_manager.seed_from_recipes(MOCK_RECIPES, mark_in_stock=True)
+            else:
+                foods = await mealie_client.get_all_foods()
+                if foods:
+                    pantry_manager.seed_from_foods(foods, mark_in_stock=True)
+                else:
+                    from app.mock_data import MOCK_RECIPES
+                    pantry_manager.seed_from_recipes(MOCK_RECIPES, mark_in_stock=True)
 
         items = pantry_manager.get_all_items(category=category, search=search, in_stock=in_stock)
         return {
@@ -297,15 +323,22 @@ async def delete_pantry_item(item_id: int):
 
 
 @app.post("/api/pantry/sync")
-async def sync_pantry_from_recipes():
-    """Auto-discover and populate pantry ingredients from all recipes."""
+async def sync_pantry_from_recipes(clear_existing: bool = False):
+    """Auto-discover and populate pantry ingredients from all recipes and Mealie food database."""
     try:
-        from app.mock_data import MOCK_RECIPES, MOCK_SIDES
-        recipes_to_seed = MOCK_RECIPES + MOCK_SIDES
+        if clear_existing:
+            pantry_manager.clear_all_items()
 
+        added = 0
         if not mealie_client.mock_mode:
-            import httpx
+            # 1. Primary: Seed from Mealie's food library
+            foods = await mealie_client.get_all_foods()
+            if foods:
+                added += pantry_manager.seed_from_foods(foods, mark_in_stock=True)
+
+            # 2. Secondary: Fetch recipes and parse ingredients
             try:
+                import httpx
                 async with httpx.AsyncClient(timeout=8.0) as client:
                     resp = await client.get(
                         f"{mealie_client.base_url}/api/recipes?perPage=100",
@@ -313,13 +346,20 @@ async def sync_pantry_from_recipes():
                     )
                     if resp.status_code == 200:
                         data = resp.json()
-                        items = data.get("items", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                        items = (
+                            data.get("items", [])
+                            if isinstance(data, dict)
+                            else (data if isinstance(data, list) else [])
+                        )
                         if items:
-                            recipes_to_seed = items
+                            await mealie_client.enrich_recipe_ingredients(items, max_fetch=30)
+                            added += pantry_manager.seed_from_recipes(items, mark_in_stock=True)
             except Exception as e:
                 logger.warning(f"Could not fetch Mealie recipes for pantry sync: {e}")
+        else:
+            from app.mock_data import MOCK_RECIPES, MOCK_SIDES
+            added = pantry_manager.seed_from_recipes(MOCK_RECIPES + MOCK_SIDES, mark_in_stock=True)
 
-        added = pantry_manager.seed_from_recipes(recipes_to_seed, mark_in_stock=True)
         return {
             "status": "success",
             "added_count": added,
