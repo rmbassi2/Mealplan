@@ -4,7 +4,12 @@ import tempfile
 import os
 
 from main import app
-from app.pantry import PantryManager, normalize_ingredient_name, categorize_ingredient
+from app.pantry import (
+    PantryManager,
+    normalize_ingredient_name,
+    categorize_ingredient,
+    clean_ingredient_name,
+)
 
 
 @pytest.fixture
@@ -220,3 +225,93 @@ async def test_pantry_sync_with_clear_existing():
         assert data["status"] == "success"
         assert "stats" in data
         assert data["stats"]["total"] > 0
+
+
+def test_clean_ingredient_name_discard_junk():
+    junk_inputs = [
+        "Could Not Detect Ingredients",
+        "**If You Like Lots Of Sauce, We Recommend Doubling The Sauce Recipe!**",
+        "¹/₂ Cup",
+        "****Check The Notes",
+        "Other Ideas: Beans Or Lentils, Cucumbers Sliced,",
+        "",
+        "   ",
+        "...",
+        "()",
+        "1/2",
+        "2 Tbsp",
+    ]
+    for item in junk_inputs:
+        assert clean_ingredient_name(item) is None, f"Expected {item!r} to be discarded"
+
+
+def test_clean_ingredient_name_real_world_messy_strings():
+    test_cases = [
+        ("() Beef Or Chicken Broth/Stock", "beef or chicken broth stock", "Beef Or Chicken Broth/Stock"),
+        ("() Boneless, Skinless Chicken Breast, Cut Into Small Pieces", "chicken breast", "Chicken Breast"),
+        (". Coarsely Ground Pork", "ground pork", "Ground Pork"),
+        (". Finely Ground Pork (90% Lean)", "ground pork", "Ground Pork"),
+        ("/ Beef Chuck Or Brisket ((Or Gravy Or Any Other Slow Cooking Beef) Cut Into )", "beef chuck or brisket", "Beef Chuck Or Brisket"),
+        ("/ Lamb Mince (Or Beef, Or 50/50 Beef/Lamb, Note 1)", "lamb mince", "Lamb Mince"),
+        ("1 256 Gm Potatoes Or 4 Medium", "potato", "Potatoes"),
+        ("1 290 Gm// 1 Large Or 4 Medium Onions", "onion", "Onions"),
+        ("1 300 Gm/2 Large Ripe Tomatoes", "ripe tomato", "Ripe Tomatoes"),
+        ("1 6 Large Cloves Of Garlic", "garlic", "Garlic"),
+        ("1 () Can Crushed Tomatoes", "tomato", "Crushed Tomatoes"),
+        ("1 . Yukon Gold Potatoes, Peeled And Cut Into 1/2\" Pieces", "yukon gold potato", "Yukon Gold Potatoes"),
+        ("2 X Chicken Thighs (See Notes)", "chicken thighs", "Chicken Thighs"),
+        ("3 (5-Oz) Cans Tuna, Drained", "tuna", "Tuna"),
+        ("1/2 Red Onion (Finely Sliced - This Is Approximately )", "red onion", "Red Onion"),
+        ("2 Persian Cucumbers (Thinly Sliced)", "persian cucumber", "Persian Cucumbers"),
+        ("6 Medium-Small Zucchini ( Each)", "zucchini", "Zucchini"),
+        ("1 Carrot, Peeled And Shredded Or Grated", "carrot", "Carrot"),
+        ("1 Large Green Cabbage, Stem/Core Removed", "green cabbage", "Green Cabbage"),
+        ("1 Lime, Juiced", "lime", "Lime"),
+        ("Juice From 2 Lemons", "lemon juice", "Lemon Juice"),
+    ]
+
+    for raw, expected_norm, expected_disp in test_cases:
+        res = clean_ingredient_name(raw)
+        assert res is not None, f"Expected clean result for {raw!r}"
+        norm, disp = res
+        assert norm == expected_norm, f"Norm mismatch for {raw!r}: got {norm!r}, expected {expected_norm!r}"
+        assert disp == expected_disp, f"Display mismatch for {raw!r}: got {disp!r}, expected {expected_disp!r}"
+
+
+def test_seed_from_recipes_deduplication_and_filtering(temp_pantry):
+    pm = temp_pantry
+    messy_recipes = [
+        {
+            "name": "Chicken Dinner 1",
+            "recipeIngredient": [
+                "2 X Chicken Thighs (See Notes)",
+                "1 6 Large Cloves Of Garlic",
+                "1 Medium Onion (Peeled And Diced)",
+                "Could Not Detect Ingredients",
+            ],
+        },
+        {
+            "name": "Chicken Dinner 2",
+            "recipeIngredient": [
+                "5 Chicken Thighs",
+                "8 Boneless, Skinless Chicken Thighs (About . Total)",
+                "2 Garlic Cloves (, Finely Chopped)",
+                "1 Onion Finely Chopped",
+                "**If You Like Lots Of Sauce, We Recommend Doubling The Sauce Recipe!**",
+            ],
+        },
+    ]
+
+    added = pm.seed_from_recipes(messy_recipes, mark_in_stock=True)
+    items = pm.get_all_items()
+    item_names = {i["name"]: i["display_name"] for i in items}
+
+    # Should only have 3 items: chicken thighs, garlic, onion (all duplicates merged, junk discarded)
+    assert len(items) == 3
+    assert "chicken thighs" in item_names
+    assert item_names["chicken thighs"] == "Chicken Thighs"
+    assert "garlic" in item_names
+    assert item_names["garlic"] == "Garlic"
+    assert "onion" in item_names
+    assert item_names["onion"] == "Onion"
+

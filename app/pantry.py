@@ -55,9 +55,9 @@ MEASUREMENT_WORDS = re.compile(
 )
 
 UNIT_WORDS = re.compile(
-    r"\b(cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|"
-    r"ml|liters?|cloves?|slices?|pinch(es)?|dash(es)?|cans?|jars?|packages?|pkgs?|"
-    r"heads?|bunches?|stalks?|pieces?)\b",
+    r"\b(cups?|c\.|c\b|tbsp|tbs|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|"
+    r"ml|liters?|litres?|cloves?|slices?|pinch(es)?|dash(es)?|cans?|jars?|packages?|pkgs?|"
+    r"heads?|bunches?|stalks?|pieces?|sprigs?|handfuls?)\b",
     re.IGNORECASE,
 )
 
@@ -68,39 +68,213 @@ PREP_WORDS = re.compile(
     re.IGNORECASE,
 )
 
+FRACTION_MAP: Dict[str, str] = {
+    "¼": " 1/4 ", "½": " 1/2 ", "¾": " 3/4 ",
+    "⅓": " 1/3 ", "⅔": " 2/3 ",
+    "⅛": " 1/8 ", "⅜": " 3/8 ", "⅝": " 5/8 ", "⅞": " 7/8 ",
+    "¹": "1", "²": "2", "³": "3", "⁴": "4",
+    "₁": "1", "₂": "2", "₃": "3", "₄": "4",
+}
+
+DISCARD_PATTERNS = [
+    re.compile(r"could\s+not\s+detect", re.I),
+    re.compile(r"unable\s+to\s+detect", re.I),
+    re.compile(r"check\s+the\s+notes?", re.I),
+    re.compile(r"^\s*\*{2,}", re.I),
+    re.compile(r"recommend\s+doubling", re.I),
+    re.compile(r"^other\s+ideas\b", re.I),
+    re.compile(r"^tips?\s*:", re.I),
+    re.compile(r"^substitutions?\s*:", re.I),
+    re.compile(r"^variations?\s*:", re.I),
+    re.compile(r"^instructions?\s*:", re.I),
+    re.compile(r"^directions?\s*:", re.I),
+    re.compile(r"^step\s*\d+", re.I),
+]
+
+PREP_WORDS_PATTERN = (
+    r"\b(finely|coarsely|roughly|thinly|fresh|freshly|lightly|chopped|diced|minced|"
+    r"sliced|crushed|grated|shredded|peeled|halved|quartered|drained|juiced|"
+    r"zested|cooked|uncooked|packed|melted|softened|warm|cold|hot|trimmed|"
+    r"cored|stemmed|cleaned|thawed|cut\s+into|cut\s+in|boneless|skinless|organic|dried|cloves?)\b"
+)
+PREP_REGEX = re.compile(PREP_WORDS_PATTERN, re.I)
+
+PREP_TRAILING_CHECK = re.compile(
+    r"\b(cut|peeled|sliced|chopped|diced|minced|grated|shredded|crushed|cored|"
+    r"stem|halved|quartered|drained|juiced|zested|cooked|thawed|trimmed|cleaned|"
+    r"packed|finely|roughly|coarsely|lightly|plus|for garnish|for serving|to serve|"
+    r"to taste|divided|optional|not spicy|any brand|brand fine|seeds removed|about)\b",
+    re.I,
+)
+
+FOOD_NOUN_CHECK = re.compile(
+    r"\b(chicken|beef|pork|lamb|turkey|meat|fish|shrimp|salmon|tuna|steak|bacon|"
+    r"onion|garlic|tomato|potato|carrot|cabbage|pepper|chile|zucchini|cucumber|"
+    r"basil|parsley|cilantro|rosemary|thyme|sage|dill|lemon|lime|spinach|lettuce|"
+    r"beans|lentils|rice|pasta|noodle|cheese|milk|cream|butter|broth|stock|oil|"
+    r"flour|sugar|sauce|powder|spice|curry|sprouts|ginger|fillets?)\b",
+    re.I,
+)
+
+PLURAL_MAP: Dict[str, str] = {
+    "tomatoes": "tomato",
+    "potatoes": "potato",
+    "onions": "onion",
+    "carrots": "carrot",
+    "cucumbers": "cucumber",
+    "limes": "lime",
+    "lemons": "lemon",
+    "cloves": "garlic",
+}
+
+
+def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
+    """Sanitize messy scraped recipe ingredient strings into clean canonical names and display labels.
+
+    Returns (normalized_name, display_name) or None if discarded.
+    """
+    if not raw or not raw.strip():
+        return None
+
+    # 1. Discard non-ingredient instructions, scraper errors, or blog notes
+    for pat in DISCARD_PATTERNS:
+        if pat.search(raw):
+            return None
+
+    text = raw.strip()
+
+    # 2. Normalize fractions (vulgar fractions, superscripts/subscripts)
+    for k, v in FRACTION_MAP.items():
+        text = text.replace(k, v)
+    text = re.sub(r"¹\s*\/\s*₂", " 1/2 ", text)
+
+    # 3. Strip leading noise characters: (), [], ., /, -, *, (Or )
+    text = re.sub(r"^[\s\(\)\[\]\.\/\,\-\*\:\;\#\~]+", "", text)
+    text = re.sub(r"^\(?\s*or\b\s*\)?\s*", "", text, flags=re.I)
+
+    # Normalize "juice from 2 lemons" -> "lemon juice"
+    text = re.sub(r"^juice\s+(of|from)\s+(\d+\s*)?lemons?", "lemon juice", text, flags=re.I)
+    text = re.sub(r"^juice\s+(of|from)\s+(\d+\s*)?limes?", "lime juice", text, flags=re.I)
+
+    # 4. Remove empty parens/brackets
+    text = re.sub(r"\(\s*\)", " ", text)
+    text = re.sub(r"\[\s*\]", " ", text)
+
+    # 5. Remove parenthetical expressions (notes, measurements, preps)
+    while "(" in text and ")" in text:
+        new_text = re.sub(r"\([^()]*\)", " ", text)
+        if new_text == text:
+            break
+        text = new_text
+
+    # Strip unmatched dangling parens
+    text = re.sub(r"[()]", " ", text)
+
+    # 6. Strip trailing prep and instructions after commas from the right
+    parts = [p.strip() for p in text.split(",") if p.strip()]
+    while len(parts) > 1:
+        last = parts[-1]
+        if PREP_TRAILING_CHECK.search(last) and not FOOD_NOUN_CHECK.search(last):
+            parts.pop()
+        else:
+            break
+    text = ", ".join(parts)
+
+    # 7. Strip trailing notes and quantity alternatives
+    text = re.sub(r"\s+or\b\s+(\d+\s*)?(large|medium|small|each)?\s*$", "", text, flags=re.I)
+    text = re.sub(r"\s+or\b\s+of\s+each\s*$", "", text, flags=re.I)
+    text = re.sub(r"\s+or\b\s+\.\s+each\s*$", "", text, flags=re.I)
+    text = re.sub(r"\s+(finely\s+chopped|finely\s+diced|coarsely\s+ground|thinly\s+sliced|minced|grated|peeled)\s*$", "", text, flags=re.I)
+
+    # 8. Strip leading quantities, metric units, units, sizing
+    while True:
+        prev = text
+        text = re.sub(r"^\s*\d+(\.\d+)?\s+to\s+\d+(\.\d+)?\s*", "", text, flags=re.I)
+        text = re.sub(r"^\s*(\d+(\.\d+)?\s*[-–—/]\s*\d+(\.\d+)?|\d+([./]\d+)?)\s*", "", text)
+        text = re.sub(r"^\s*(gm|g|grams?|kg|kgs|kilos?|ml|mls|milliliters?|litres?|liters?|l)\b\/?\/?\s*", "", text, flags=re.I)
+        text = re.sub(r"^\s*(cups?|c\.|c\b|tbsp|tbs|tablespoons?|tsp|teaspoons?|cans?|jars?|pkgs?|packages?|heads?|bunches?|stalks?|pieces?|cloves?|slices?|sprigs?|handfuls?)\b\s*", "", text, flags=re.I)
+        text = re.sub(r"^\s*(large|medium|small|medium-small|extra-large|xl|big)\b\s*", "", text, flags=re.I)
+        text = re.sub(r"^\s*(x|of|about|or)\b\s*", "", text, flags=re.I)
+        text = re.sub(r"^[\s\.\,\/\-\:\;]+", "", text)
+        if text == prev:
+            break
+
+    # Strip "Optional: " prefix
+    text = re.sub(r"^optional\s*:\s*", "", text, flags=re.I)
+
+    # Normalize whitespace
+    text = re.sub(r"\s+", " ", text).strip()
+
+    # Discard if too short or lacking alphabetic substance
+    if not re.search(r"[a-zA-Z]{2,}", text):
+        return None
+
+    # Discard if only a measurement unit word remains
+    if re.fullmatch(r"(cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|grams?|g|kg|ml|litres?|liters?|pinch|dash|c)", text, re.I):
+        return None
+
+    # Clean leading prep adjectives from display name for a clean UI presentation
+    clean_display = re.sub(r"^(?:(finely|coarsely|roughly|thinly|fresh|freshly|lightly|packed|chopped|diced|minced|grated|shredded|peeled|cooked|boneless|skinless)\s*,?\s*)+", "", text, flags=re.I).strip()
+    if not clean_display or len(clean_display) < 2:
+        clean_display = text
+
+    display = clean_display.title()
+    if display in ("Garlic Cloves", "Large Garlic Cloves"):
+        display = "Garlic"
+
+    # Normalized name: lowercased, prep words and punctuation removed for grouping
+    norm = text.lower()
+    norm = re.sub(r"[-–—]", " ", norm)
+    norm = PREP_REGEX.sub(" ", norm)
+    norm = re.sub(r"[^\w\s]", " ", norm)
+    norm = re.sub(r"\s+", " ", norm).strip()
+
+    # Singularize common end words for tighter grouping
+    tokens = norm.split()
+    if tokens:
+        last_tok = tokens[-1]
+        if last_tok in PLURAL_MAP:
+            tokens[-1] = PLURAL_MAP[last_tok]
+            norm = " ".join(tokens)
+
+    if norm in ("cloves", "garlic cloves"):
+        norm = "garlic"
+
+    if not norm or len(norm) < 2:
+        return None
+
+    return norm, display
+
 
 def normalize_ingredient_name(raw: str) -> str:
     """Clean and normalize an ingredient name for fuzzy matching."""
-    if not raw:
-        return ""
-    text = raw.lower().strip()
-    # Remove measurement expressions and prep words
-    text = MEASUREMENT_WORDS.sub(" ", text)
-    text = PREP_WORDS.sub(" ", text)
-    text = UNIT_WORDS.sub(" ", text)
-    # Remove standalone numbers or fractions
-    text = re.sub(r"\b\d+([./]\d+)?\b", " ", text)
-    # Remove punctuation & extra whitespace
-    text = re.sub(r"[^\w\s-]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    cleaned = clean_ingredient_name(raw)
+    if cleaned:
+        return cleaned[0]
+    return ""
 
 
 def categorize_ingredient(name: str) -> str:
     """Smart heuristic categorization for pantry items."""
     n = name.lower()
-    if any(k in n for k in ["chicken", "beef", "pork", "steak", "turkey", "lamb", "bacon", "salmon", "shrimp", "fish", "tuna", "patty", "patties"]):
-        return "protein"
+    # Spices & seasonings first (e.g. garlic powder, onion powder, curry powder)
+    if any(k in n for k in ["powder", "paprika", "cumin", "oregano", "sesame", "cinnamon", "spice", "nutmeg", "curry", "seasoning", "coriander"]):
+        return "spices & herbs"
+    # Sauces, condiments, broths
+    if any(k in n for k in ["broth", "stock", "bouillon", "boulion", "sauce", "oil", "vinegar", "hoisin", "peanut butter", "honey", "miso", "mustard", "mayo"]):
+        return "sauces & condiments"
+    # Dairy
     if any(k in n for k in ["milk", "cream", "cheese", "butter", "yogurt", "mozzarella", "parmesan", "cheddar"]):
         return "dairy"
-    if any(k in n for k in ["tomato", "onion", "garlic", "spinach", "lettuce", "cilantro", "basil", "parsley", "lemon", "lime", "potato", "carrot", "broccoli", "zucchini", "cucumber", "cabbage", "sprouts", "sage", "rosemary", "chile", "peppers"]):
-        return "produce"
-    if any(k in n for k in ["rice", "noodle", "pasta", "bread", "bun", "dough", "tortilla", "spaghetti", "orzo"]):
+    # Protein
+    if any(k in n for k in ["chicken", "beef", "pork", "steak", "turkey", "lamb", "bacon", "salmon", "shrimp", "fish", "tuna", "patty", "patties", "meat"]):
+        return "protein"
+    # Grains & bakery
+    if any(k in n for k in ["rice", "noodle", "pasta", "bread", "bun", "dough", "tortilla", "spaghetti", "orzo", "quinoa", "oat"]):
         return "grains & bakery"
-    if any(k in n for k in ["oil", "vinegar", "soy sauce", "hoisin", "sauce", "peanut butter", "honey", "broth", "miso"]):
-        return "sauces & condiments"
-    if any(k in n for k in ["paprika", "cumin", "oregano", "sesame", "cinnamon", "spice", "nutmeg"]):
-        return "spices & herbs"
+    # Produce
+    if any(k in n for k in ["tomato", "onion", "garlic", "spinach", "lettuce", "cilantro", "basil", "parsley", "lemon", "lime", "potato", "carrot", "broccoli", "zucchini", "cucumber", "cabbage", "sprouts", "sage", "rosemary", "chile", "peppers", "avocado", "herb"]):
+        return "produce"
     return "pantry"
 
 
@@ -275,11 +449,17 @@ class PantryManager:
     ) -> Dict[str, Any]:
         """Add or update a pantry item."""
         self._invalidate_cache()
-        norm_name = normalize_ingredient_name(name)
+        cleaned = clean_ingredient_name(name)
+        if cleaned:
+            norm_name, default_display = cleaned
+            clean_display = (display_name or default_display).strip()
+        else:
+            norm_name = normalize_ingredient_name(name)
+            clean_display = (display_name or name).strip().title()
+
         if not norm_name:
             norm_name = name.strip().lower()
 
-        clean_display = (display_name or name).strip().title()
         cat = category or categorize_ingredient(norm_name)
 
         with self._get_connection() as conn:
@@ -315,7 +495,7 @@ class PantryManager:
     def seed_from_recipes(
         self, recipes: List[Dict[str, Any]], mark_in_stock: bool = True
     ) -> int:
-        """Extract ingredients from recipes and populate pantry if missing."""
+        """Extract ingredients from recipes, sanitize them, and populate pantry."""
         added_count = 0
         self._invalidate_cache()
 
@@ -326,11 +506,12 @@ class PantryManager:
                 if isinstance(item, dict):
                     raw_name = (
                         item.get("food", {}).get("name")
-                        if isinstance(item.get("food"), dict)
+                        if isinstance(item.get("food"), dict) and item.get("food", {}).get("name")
                         else (
                             item.get("name")
                             or item.get("display")
                             or item.get("note")
+                            or item.get("originalText")
                             or ""
                         )
                     )
@@ -340,23 +521,22 @@ class PantryManager:
                 if not raw_name:
                     continue
 
-                norm = normalize_ingredient_name(raw_name)
-                if not norm or norm in DEFAULT_STAPLES:
+                cleaned = clean_ingredient_name(raw_name)
+                if not cleaned:
                     continue
 
-                clean_display = raw_name.strip()
-                # Clean up display if it has quantity leading
-                clean_display = MEASUREMENT_WORDS.sub("", clean_display).strip().title()
-                if not clean_display:
-                    clean_display = norm.title()
+                norm, clean_display = cleaned
+                if not norm or norm in DEFAULT_STAPLES:
+                    continue
 
                 cat = categorize_ingredient(norm)
 
                 with self._get_connection() as conn:
                     cursor = conn.execute(
-                        "SELECT id FROM pantry_items WHERE name = ?", (norm,)
+                        "SELECT id, display_name FROM pantry_items WHERE name = ?", (norm,)
                     )
-                    if not cursor.fetchone():
+                    row = cursor.fetchone()
+                    if not row:
                         conn.execute(
                             """
                             INSERT INTO pantry_items (name, display_name, category, in_stock, is_staple, updated_at)
@@ -366,6 +546,15 @@ class PantryManager:
                         )
                         conn.commit()
                         added_count += 1
+                    else:
+                        # If existing display_name is much messier or longer, upgrade to clean title
+                        old_disp = row["display_name"]
+                        if len(clean_display) < len(old_disp) and not re.search(r"[\(\)\[\]\/]", clean_display):
+                            conn.execute(
+                                "UPDATE pantry_items SET display_name = ? WHERE id = ?",
+                                (clean_display, row["id"]),
+                            )
+                            conn.commit()
 
         logger.info(f"Seeded {added_count} new ingredients into pantry database.")
         return added_count
@@ -397,22 +586,22 @@ class PantryManager:
             if not raw_name:
                 continue
 
-            norm = normalize_ingredient_name(raw_name)
-            if not norm or norm in DEFAULT_STAPLES:
+            cleaned = clean_ingredient_name(raw_name)
+            if not cleaned:
                 continue
 
-            clean_display = raw_name.strip()
-            clean_display = MEASUREMENT_WORDS.sub("", clean_display).strip().title()
-            if not clean_display:
-                clean_display = norm.title()
+            norm, clean_display = cleaned
+            if not norm or norm in DEFAULT_STAPLES:
+                continue
 
             cat = categorize_ingredient(norm)
 
             with self._get_connection() as conn:
                 cursor = conn.execute(
-                    "SELECT id FROM pantry_items WHERE name = ?", (norm,)
+                    "SELECT id, display_name FROM pantry_items WHERE name = ?", (norm,)
                 )
-                if not cursor.fetchone():
+                row = cursor.fetchone()
+                if not row:
                     conn.execute(
                         """
                         INSERT INTO pantry_items (name, display_name, category, in_stock, is_staple, updated_at)
@@ -422,6 +611,12 @@ class PantryManager:
                     )
                     conn.commit()
                     added_count += 1
+                elif len(clean_display) < len(row["display_name"]):
+                    conn.execute(
+                        "UPDATE pantry_items SET display_name = ? WHERE id = ?",
+                        (clean_display, row["id"]),
+                    )
+                    conn.commit()
 
         logger.info(f"Seeded {added_count} new foods into pantry database.")
         return added_count
@@ -456,11 +651,12 @@ class PantryManager:
             if isinstance(item, dict):
                 raw_name = (
                     item.get("food", {}).get("name")
-                    if isinstance(item.get("food"), dict)
+                    if isinstance(item.get("food"), dict) and item.get("food", {}).get("name")
                     else (
                         item.get("name")
                         or item.get("note")
                         or item.get("display")
+                        or item.get("originalText")
                         or ""
                     )
                 )
@@ -472,7 +668,12 @@ class PantryManager:
             if not raw_name:
                 continue
 
-            norm = normalize_ingredient_name(raw_name)
+            cleaned = clean_ingredient_name(raw_name)
+            if not cleaned:
+                # Discard non-ingredient notes or scraper artifacts
+                continue
+
+            norm, clean_display = cleaned
             if not norm:
                 continue
 
@@ -491,11 +692,7 @@ class PantryManager:
                         has_match = True
                         break
 
-            clean_label = display_name or norm.title()
-            # Tidy display label: remove leading numbers if raw
-            clean_label = re.sub(r"^\s*[\d./-]+\s*(cups?|tbsp|tsp|lbs?|oz|g)?\s*", "", clean_label).strip().title()
-            if not clean_label:
-                clean_label = norm.title()
+            clean_label = clean_display
 
             if has_match:
                 in_stock_items.append(clean_label)
