@@ -478,6 +478,49 @@ class MealieClient:
         await asyncio.gather(*[fetch_one(r) for r in missing_items], return_exceptions=True)
         return recipes
 
+    async def get_all_cookbook_recipes(self) -> List[Dict[str, Any]]:
+        """Fetch all recipes in the user's cookbook with their full ingredients."""
+        if self.mock_mode:
+            from app.mock_data import MOCK_RECIPES, MOCK_SIDES
+            return MOCK_RECIPES + MOCK_SIDES
+
+        recipes: List[Dict[str, Any]] = []
+        page = 1
+        per_page = 100
+
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            while True:
+                try:
+                    resp = await client.get(
+                        f"{self.base_url}/api/recipes?page={page}&perPage={per_page}",
+                        headers=self.headers,
+                    )
+                    if resp.status_code != 200:
+                        break
+                    data = resp.json()
+                    items = (
+                        data.get("items", [])
+                        if isinstance(data, dict)
+                        else data
+                        if isinstance(data, list)
+                        else []
+                    )
+                    if not items:
+                        break
+                    recipes.extend(items)
+                    total = data.get("total", len(recipes)) if isinstance(data, dict) else len(recipes)
+                    if len(recipes) >= total or len(items) < per_page:
+                        break
+                    page += 1
+                except Exception as e:
+                    logger.warning(f"Error fetching recipe page {page}: {e}")
+                    break
+
+        if recipes:
+            await self.enrich_recipe_ingredients(recipes, max_fetch=len(recipes))
+
+        return recipes
+
     async def get_dinner_options(
         self,
         count: int = 3,
@@ -508,12 +551,11 @@ class MealieClient:
                         )
 
                         if items:
-                            # Auto-seed pantry from foods if pantry is currently empty
+                            # Auto-seed pantry strictly from actual cookbook recipes if empty
                             if pantry_manager.get_stats()["total"] == 0:
-                                foods = await self.get_all_foods()
-                                if foods:
-                                    pantry_manager.seed_from_foods(foods)
-                                    in_stock_set = pantry_manager.get_in_stock_set()
+                                await self.enrich_recipe_ingredients(items, max_fetch=len(items))
+                                pantry_manager.seed_from_recipes(items)
+                                in_stock_set = pantry_manager.get_in_stock_set()
 
                             # If filtering strictly by pantry-ready, enrich candidate pool
                             needs_pantry_filter = pantry_only or mood in ("pantry", "pantry-ready")
