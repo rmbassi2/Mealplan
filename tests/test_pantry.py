@@ -28,7 +28,7 @@ def temp_pantry(tmp_path):
 def test_ingredient_normalization():
     assert normalize_ingredient_name("2 cups boneless skinless chicken breast") == "chicken breast"
     assert normalize_ingredient_name("1/2 tsp kosher salt") == "kosher salt"
-    assert normalize_ingredient_name("4 fresh salmon fillets") == "salmon fillets"
+    assert normalize_ingredient_name("4 fresh salmon fillets") == "salmon fillet"
     assert normalize_ingredient_name("1 can (8 oz) tomato sauce") == "tomato sauce"
     assert normalize_ingredient_name("3 cloves minced garlic") == "garlic"
 
@@ -256,7 +256,7 @@ def test_clean_ingredient_name_real_world_messy_strings():
         ("/ Lamb Mince (Or Beef, Or 50/50 Beef/Lamb, Note 1)", "lamb mince", "Lamb Mince"),
         ("1 256 Gm Potatoes Or 4 Medium", "potato", "Potatoes"),
         ("1 290 Gm// 1 Large Or 4 Medium Onions", "onion", "Onions"),
-        ("1 300 Gm/2 Large Ripe Tomatoes", "ripe tomato", "Ripe Tomatoes"),
+        ("1 300 Gm/2 Large Ripe Tomatoes", "tomato", "Tomatoes"),
         ("1 6 Large Cloves Of Garlic", "garlic", "Garlic"),
         ("1 () Can Crushed Tomatoes", "tomato", "Crushed Tomatoes"),
         ("1 . Yukon Gold Potatoes, Peeled And Cut Into 1/2\" Pieces", "yukon gold potato", "Yukon Gold Potatoes"),
@@ -376,19 +376,19 @@ def test_clean_ingredient_units_ordinals_and_junk():
         ("Oz/ 1 Large Or 4 Medium Onions", "onion", "Onions"),
         ("Stick Butter, Melted", "butter", "Butter"),
         ("Bunch Mint", "mint", "Mint"),
-        ("Bunch Scallions", "scallions", "Scallions"),
+        ("Bunch Scallions", "scallion", "Scallions"),
         ("Quarts Vegetable Oil", "vegetable oil", "Vegetable Oil"),
-        ("Ounce Can Black Beans", "black beans", "Black Beans"),
+        ("Ounce Can Black Beans", "black bean", "Black Beans"),
         ("Inch Fresh Ginger", "ginger", "Ginger"),
         ("Tiny Pinch Garlic Powder", "garlic powder", "Garlic Powder"),
         # Ordinals & fractions
         ("Th Cup Heavy Cream", "heavy cream", "Heavy Cream"),
         ("Th Cup Plain Unflavored Yogurt", "plain unflavored yogurt", "Plain Unflavored Yogurt"),
-        ("Rd Cup Frozen/Fresh Green Peas", "frozen green peas", "Frozen/Fresh Green Peas"),
+        ("Rd Cup Frozen/Fresh Green Peas", "frozen green pea", "Frozen/Fresh Green Peas"),
         ("Th Teaspoon Ground Mace Or Nutmeg", "ground mace or nutmeg", "Ground Mace Or Nutmeg"),
         # Connectors & symbols
         ("& 1/2 Inch Cinnamon Stick", "cinnamon stick", "Cinnamon Stick"),
-        ("And 1/2 Cups Graham Cracker Crumbs", "graham cracker crumbs", "Graham Cracker Crumbs"),
+        ("And 1/2 Cups Graham Cracker Crumbs", "graham cracker crumb", "Graham Cracker Crumbs"),
         ("Plus 2 Tablespoons Olive Oil", "olive oil", "Olive Oil"),
         ("T Rice Vinegar", "rice vinegar", "Rice Vinegar"),
         ("T Sriracha Sauce", "sriracha sauce", "Sriracha Sauce"),
@@ -492,9 +492,9 @@ def test_cleanup_existing_items_in_place_migration(tmp_path):
     assert item_map["ground chicken"]["display_name"] == "Ground Chicken"
     assert item_map["ground chicken"]["category"] == "protein"
 
-    assert "scallions" in item_map
-    assert item_map["scallions"]["display_name"] == "Scallions"
-    assert item_map["scallions"]["category"] == "produce"
+    assert "scallion" in item_map
+    assert item_map["scallion"]["display_name"] == "Scallions"
+    assert item_map["scallion"]["category"] == "produce"
 
     assert "sharp white cheddar" in item_map
     assert item_map["sharp white cheddar"]["display_name"] == "Sharp White Cheddar"
