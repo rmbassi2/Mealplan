@@ -89,13 +89,20 @@ DISCARD_PATTERNS = [
     re.compile(r"^instructions?\s*:", re.I),
     re.compile(r"^directions?\s*:", re.I),
     re.compile(r"^step\s*\d+", re.I),
+    re.compile(r"^for\s+greasing\b", re.I),
+    re.compile(r"^recipe\s+(guacamole|pico\s+de\s+gallo)\b", re.I),
+    re.compile(r"for\s+serving,?\s+if\s+desired", re.I),
+    re.compile(r"^vegetables?\s+of\s+choice", re.I),
+    re.compile(r"^skewers?\b", re.I),
+    re.compile(r"^pound\s+peeled,?\s+i\s+use", re.I),
 ]
 
 PREP_WORDS_PATTERN = (
-    r"\b(finely|coarsely|roughly|thinly|fresh|freshly|lightly|chopped|diced|minced|"
-    r"sliced|crushed|grated|shredded|peeled|halved|quartered|drained|juiced|"
-    r"zested|cooked|uncooked|packed|melted|softened|warm|cold|hot|trimmed|"
-    r"cored|stemmed|cleaned|thawed|cut\s+into|cut\s+in|boneless|skinless|organic|dried|cloves?)\b"
+    r"\b(finely|coarsely|roughly|thinly|fresh-squeezed|squeezed|freshly|fresh|lightly|"
+    r"chopped|diced|minced|sliced|crushed|grated|shredded|peeled|halved|quartered|"
+    r"drained|juiced|zested|cooked|uncooked|packed|melted|softened|warm|cold|hot|"
+    r"trimmed|cored|stemmed|cleaned|thawed|cut\s+into|cut\s+in|boneless|skinless|"
+    r"organic|dried|cloves?|unsalted|salted)\b"
 )
 PREP_REGEX = re.compile(PREP_WORDS_PATTERN, re.I)
 
@@ -103,16 +110,35 @@ PREP_TRAILING_CHECK = re.compile(
     r"\b(cut|peeled|sliced|chopped|diced|minced|grated|shredded|crushed|cored|"
     r"stem|halved|quartered|drained|juiced|zested|cooked|thawed|trimmed|cleaned|"
     r"packed|finely|roughly|coarsely|lightly|plus|for garnish|for serving|to serve|"
-    r"to taste|divided|optional|not spicy|any brand|brand fine|seeds removed|about)\b",
+    r"to taste|divided|optional|not spicy|any brand|brand fine|seeds removed|about|"
+    r"browned|room temp|room temperature|warmed up|softened|melted|cubed|very cold)\b",
     re.I,
 )
 
 FOOD_NOUN_CHECK = re.compile(
-    r"\b(chicken|beef|pork|lamb|turkey|meat|fish|shrimp|salmon|tuna|steak|bacon|"
+    r"\b(chicken|beef|pork|lamb|turkey|meat|fish|shrimp|salmon|tuna|steak|bacon|sausage|"
     r"onion|garlic|tomato|potato|carrot|cabbage|pepper|chile|zucchini|cucumber|"
     r"basil|parsley|cilantro|rosemary|thyme|sage|dill|lemon|lime|spinach|lettuce|"
-    r"beans|lentils|rice|pasta|noodle|cheese|milk|cream|butter|broth|stock|oil|"
-    r"flour|sugar|sauce|powder|spice|curry|sprouts|ginger|fillets?)\b",
+    r"beans|lentils|rice|pasta|noodle|spaghetti|cheese|milk|cream|butter|yogurt|"
+    r"broth|stock|oil|flour|sugar|sauce|powder|spice|curry|sprouts|ginger|fillets?|"
+    r"pecans?|walnuts?|almonds?|cashews?|peanuts?|tofu|paneer|oats?|bread|bun|buns)\b",
+    re.I,
+)
+
+UNIT_PREFIX_REGEX = re.compile(
+    r"^\s*(?:"
+    r"(\d+(\.\d+)?\s*[-–—/]\s*\d+(\.\d+)?|\d+([./]\d+)?)\s*|"
+    r"(th|rd|st|nd)\s+|"
+    r"(\d+(\.\d+)?\s*)?(gm|g|grams?|kg|kgs|kilos?|ml|mls|milliliters?|litres?|liters?|l)\b\/?\/?\s*|"
+    r"(\d+(\.\d+)?\s*)?(cups?|c\.|c|tbsp|tbs|tablespoons?|tsp|teaspoons?|t)\b\s*|"
+    r"(\d+(\.\d+)?\s*)?(lbs?|lb\.|pounds?|oz|oz\.|ounces?)\b\/?\/?\s*|"
+    r"(\d+(\.\d+)?\s*)?(cans?|jars?|pkgs?|packages?|heads?|bunches?|bunch|stalks?|pieces?|piece|sprigs?|springs?|handfuls?|sticks?|stick|quarts?|qt|gallons?|gal|containers?|container|box(?:es)?|bottles?|knobs?|slices?|cloves?|ribs?)\b\s*|"
+    r"(pinch(?:es)?|tiny\s+pinch|dash(?:es)?)\b\s*(?:of\s+)?|"
+    r"(large|medium|small|medium-small|extra-large|xl|big|tiny|inch(?:es)?|knob)\b\s*|"
+    r"(x|of|about|or|and|plus|with)\b\s*|"
+    r"i\s+use\b\s*|"
+    r"\/\s*\d+(\.\d+)?\s*(kg|g|gm|lb|lbs|oz|ml|l)\b\s*"
+    r")",
     re.I,
 )
 
@@ -126,6 +152,41 @@ PLURAL_MAP: Dict[str, str] = {
     "lemons": "lemon",
     "cloves": "garlic",
 }
+
+
+def is_staple_ingredient(norm: str, raw: str = "") -> bool:
+    """Identify common staples like salt, pepper, water, pan spray, plain sugar, and flour."""
+    n = norm.lower().strip()
+    r = raw.lower().strip() if raw else ""
+
+    # 1. Salt variants: salt present, but not salt pork, salt cod, salted pretzels, salted caramel
+    if "salt" in n or "salt" in r:
+        if not any(k in n or k in r for k in ["pork", "cod", "beef", "pretzel", "caramel", "cracker", "butter"]):
+            return True
+
+    # 2. Pepper (black/white/ground pepper, cracked pepper - not bell pepper, chile pepper, cayenne)
+    if "pepper" in n or "pepper" in r:
+        if any(k in n or k in r for k in ["black pepper", "white pepper", "ground pepper", "freshly ground pepper", "cracked pepper", "ground black pepper"]) or n in ("pepper", "salt and pepper", "salt & pepper"):
+            return True
+
+    # 3. Water variants: plain water, filtered, ice cubes (not watermelon, coconut water, etc.)
+    if "water" in n or "ice cubes" in n or "water" in r or "ice cubes" in r:
+        if not any(k in n or k in r for k in ["chestnut", "melon", "coconut", "cress", "rose"]):
+            return True
+
+    # 4. Cooking spray / pan greasing
+    if any(k in n or k in r for k in ["cooking spray", "vegetable spray", "greasing"]):
+        return True
+
+    # 5. Plain sugar (not brown sugar, coconut sugar, confectioners sugar)
+    if n in ("sugar", "granulated sugar", "white sugar", "white granulated sugar"):
+        return True
+
+    # 6. Plain all-purpose flour
+    if n in ("all purpose flour", "all-purpose flour", "plain flour", "unbleached all purpose flour"):
+        return True
+
+    return False
 
 
 def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
@@ -143,14 +204,20 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
 
     text = raw.strip()
 
+    # Strip trailing pipe or noise
+    text = re.sub(r"[\s\|\&\+]+$", "", text)
+
     # 2. Normalize fractions (vulgar fractions, superscripts/subscripts)
     for k, v in FRACTION_MAP.items():
         text = text.replace(k, v)
     text = re.sub(r"¹\s*\/\s*₂", " 1/2 ", text)
 
-    # 3. Strip leading noise characters: (), [], ., /, -, *, (Or )
-    text = re.sub(r"^[\s\(\)\[\]\.\/\,\-\*\:\;\#\~]+", "", text)
+    # 3. Strip leading noise characters: (), [], ., /, -, *, &, +, |, (Or ), (And )
+    text = re.sub(r"^[\s\(\)\[\]\.\/\,\-\*\:\;\#\~\&\+\|]+", "", text)
     text = re.sub(r"^\(?\s*or\b\s*\)?\s*", "", text, flags=re.I)
+    text = re.sub(r"^\(?\s*and\b\s*\)?\s*", "", text, flags=re.I)
+    text = re.sub(r"^optional\s*:\s*", "", text, flags=re.I)
+    text = re.sub(r"^(?:fresh-squeezed|-squeezed|squeezed|ly\s+)\s*", "", text, flags=re.I)
 
     # Normalize "juice from 2 lemons" -> "lemon juice"
     text = re.sub(r"^juice\s+(of|from)\s+(\d+\s*)?lemons?", "lemon juice", text, flags=re.I)
@@ -184,23 +251,16 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
     text = re.sub(r"\s+or\b\s+(\d+\s*)?(large|medium|small|each)?\s*$", "", text, flags=re.I)
     text = re.sub(r"\s+or\b\s+of\s+each\s*$", "", text, flags=re.I)
     text = re.sub(r"\s+or\b\s+\.\s+each\s*$", "", text, flags=re.I)
+    text = re.sub(r"\s+(for garnish|for serving|to serve|to taste|if desired|as needed|as desired)\s*$", "", text, flags=re.I)
     text = re.sub(r"\s+(finely\s+chopped|finely\s+diced|coarsely\s+ground|thinly\s+sliced|minced|grated|peeled)\s*$", "", text, flags=re.I)
 
-    # 8. Strip leading quantities, metric units, units, sizing
+    # 8. Strip leading quantities, metric units, units, sizing, ordinals in a loop
     while True:
         prev = text
-        text = re.sub(r"^\s*\d+(\.\d+)?\s+to\s+\d+(\.\d+)?\s*", "", text, flags=re.I)
-        text = re.sub(r"^\s*(\d+(\.\d+)?\s*[-–—/]\s*\d+(\.\d+)?|\d+([./]\d+)?)\s*", "", text)
-        text = re.sub(r"^\s*(gm|g|grams?|kg|kgs|kilos?|ml|mls|milliliters?|litres?|liters?|l)\b\/?\/?\s*", "", text, flags=re.I)
-        text = re.sub(r"^\s*(cups?|c\.|c\b|tbsp|tbs|tablespoons?|tsp|teaspoons?|cans?|jars?|pkgs?|packages?|heads?|bunches?|stalks?|pieces?|cloves?|slices?|sprigs?|handfuls?)\b\s*", "", text, flags=re.I)
-        text = re.sub(r"^\s*(large|medium|small|medium-small|extra-large|xl|big)\b\s*", "", text, flags=re.I)
-        text = re.sub(r"^\s*(x|of|about|or)\b\s*", "", text, flags=re.I)
-        text = re.sub(r"^[\s\.\,\/\-\:\;]+", "", text)
+        text = UNIT_PREFIX_REGEX.sub("", text)
+        text = re.sub(r"^[\s\.\,\/\-\:\;\&\+\|]+", "", text)
         if text == prev:
             break
-
-    # Strip "Optional: " prefix
-    text = re.sub(r"^optional\s*:\s*", "", text, flags=re.I)
 
     # Normalize whitespace
     text = re.sub(r"\s+", " ", text).strip()
@@ -210,11 +270,20 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
         return None
 
     # Discard if only a measurement unit word remains
-    if re.fullmatch(r"(cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|grams?|g|kg|ml|litres?|liters?|pinch|dash|c)", text, re.I):
+    if re.fullmatch(r"(cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|grams?|g|kg|ml|litres?|liters?|pinch|dash|c|t|lb|lbs|pound|pounds)", text, re.I):
         return None
 
     # Clean leading prep adjectives from display name for a clean UI presentation
-    clean_display = re.sub(r"^(?:(finely|coarsely|roughly|thinly|fresh|freshly|lightly|packed|chopped|diced|minced|grated|shredded|peeled|cooked|boneless|skinless)\s*,?\s*)+", "", text, flags=re.I).strip()
+    clean_display = text
+    clean_display = re.sub(r"^(?:fresh-squeezed|-squeezed|squeezed|ly\s+)\s*", "", clean_display, flags=re.I)
+    clean_display = re.sub(
+        r"^(?:(finely|coarsely|roughly|thinly|freshly\b|fresh\b|lightly|packed|chopped|diced|minced|"
+        r"grated|shredded|peeled|cooked|boneless|skinless|unsalted|salted|chopped\s+or\s+halved|halved|quartered|or\b)\s*,?\s*)+",
+        "",
+        clean_display,
+        flags=re.I,
+    ).strip()
+    clean_display = re.sub(r"^[\s\-\,\.\:\;\/]+", "", clean_display)
     if not clean_display or len(clean_display) < 2:
         clean_display = text
 
@@ -257,24 +326,62 @@ def normalize_ingredient_name(raw: str) -> str:
 def categorize_ingredient(name: str) -> str:
     """Smart heuristic categorization for pantry items."""
     n = name.lower()
-    # Spices & seasonings first (e.g. garlic powder, onion powder, curry powder)
-    if any(k in n for k in ["powder", "paprika", "cumin", "oregano", "sesame", "cinnamon", "spice", "nutmeg", "curry", "seasoning", "coriander"]):
+
+    # 1. Spices & Seasonings
+    if any(k in n for k in [
+        "powder", "paprika", "cumin", "oregano", "cinnamon", "spice", "nutmeg",
+        "curry", "seasoning", "coriander", "allspice", "cardamom", "clove",
+        "turmeric", "cayenne", "chili flake", "red pepper flake", "mace", "peppercorn"
+    ]) or re.search(r"\b(rubs?)\b", n):
         return "spices & herbs"
-    # Sauces, condiments, broths
-    if any(k in n for k in ["broth", "stock", "bouillon", "boulion", "sauce", "oil", "vinegar", "hoisin", "peanut butter", "honey", "miso", "mustard", "mayo"]):
+
+    # 2. Sauces & Condiments
+    if any(k in n for k in [
+        "broth", "stock", "bouillon", "boulion", "sauce", "vinegar", "hoisin",
+        "peanut butter", "honey", "miso", "mustard", "mayo", "ketchup",
+        "sriracha", "worcestershire", "tahini", "relish", "dressing", "syrup"
+    ]):
         return "sauces & condiments"
-    # Dairy
-    if any(k in n for k in ["milk", "cream", "cheese", "butter", "yogurt", "mozzarella", "parmesan", "cheddar"]):
+
+    # 3. Dairy & Eggs
+    if (
+        any(k in n for k in [
+            "milk", "cream", "cheese", "butter", "yogurt", "mozzarella", "parmesan",
+            "cheddar", "feta", "boursin", "pecorino", "gruyere",
+            "gruyère", "jack", "ricotta", "half-and-half", "buttermilk"
+        ])
+        or (re.search(r"\b(eggs?)\b", n) and "eggplant" not in n)
+    ):
         return "dairy"
-    # Protein
-    if any(k in n for k in ["chicken", "beef", "pork", "steak", "turkey", "lamb", "bacon", "salmon", "shrimp", "fish", "tuna", "patty", "patties", "meat"]):
-        return "protein"
-    # Grains & bakery
-    if any(k in n for k in ["rice", "noodle", "pasta", "bread", "bun", "dough", "tortilla", "spaghetti", "orzo", "quinoa", "oat"]):
+
+    # 4. Grains & Bakery
+    if any(k in n for k in [
+        "rice", "noodle", "pasta", "bread", "dough", "tortilla", "spaghetti",
+        "orzo", "quinoa", "flour", "pita", "starter", "risotto",
+        "crumbs", "cracker", "tagliatelle", "cereal"
+    ]) or re.search(r"\b(buns?|rolls?|oats?|oatmeal)\b", n):
         return "grains & bakery"
-    # Produce
-    if any(k in n for k in ["tomato", "onion", "garlic", "spinach", "lettuce", "cilantro", "basil", "parsley", "lemon", "lime", "potato", "carrot", "broccoli", "zucchini", "cucumber", "cabbage", "sprouts", "sage", "rosemary", "chile", "peppers", "avocado", "herb"]):
+
+    # 5. Protein
+    if any(k in n for k in [
+        "chicken", "beef", "pork", "steak", "turkey", "lamb", "bacon", "salmon",
+        "shrimp", "fish", "tuna", "patty", "patties", "meat", "sausage", "chorizo",
+        "pancetta", "guanciale", "prosciutto", "salami", "tofu", "paneer", "mince"
+    ]) or re.search(r"\b(ham|cod)\b", n):
+        return "protein"
+
+    # 6. Produce & Fresh
+    if any(k in n for k in [
+        "tomato", "onion", "garlic", "spinach", "lettuce", "cilantro", "basil", "parsley",
+        "lemon", "lime", "potato", "carrot", "broccoli", "zucchini", "cucumber", "cabbage",
+        "sprouts", "sage", "rosemary", "chile", "chili", "peppers", "avocado", "herb",
+        "mint", "scallion", "shallot", "leek", "celery", "fennel", "mushroom", "bean",
+        "kale", "ginger", "cauliflower", "rhubarb", "edamame", "eggplant",
+        "chive", "jalapeno", "jalapeño", "serrano", "romaine", "apple", "banana", "berry",
+        "mango", "peach", "fruit", "slaw"
+    ]) or re.search(r"\b(peas?|corn)\b", n):
         return "produce"
+
     return "pantry"
 
 
@@ -299,7 +406,7 @@ class PantryManager:
         return conn
 
     def init_db(self):
-        """Initialize pantry SQLite schema."""
+        """Initialize pantry SQLite schema and perform automatic migrations."""
         with self._get_connection() as conn:
             conn.execute(
                 """
@@ -321,6 +428,78 @@ class PantryManager:
                 "CREATE INDEX IF NOT EXISTS idx_pantry_in_stock ON pantry_items (in_stock)"
             )
             conn.commit()
+
+        self.cleanup_existing_items()
+
+    def cleanup_existing_items(self) -> int:
+        """Sanitize, deduplicate, and remove staples/junk from existing SQLite rows in-place."""
+        self._invalidate_cache()
+        cleaned_count = 0
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT id, name, display_name, category, in_stock FROM pantry_items")
+            items = [dict(r) for r in cursor.fetchall()]
+
+            for row in items:
+                # 1. Remove staples
+                if is_staple_ingredient(row["name"], row["display_name"]):
+                    conn.execute("DELETE FROM pantry_items WHERE id = ?", (row["id"],))
+                    cleaned_count += 1
+                    continue
+
+                # 2. Re-clean name using display_name or name
+                cleaned = clean_ingredient_name(row["display_name"]) or clean_ingredient_name(row["name"])
+                if not cleaned:
+                    conn.execute("DELETE FROM pantry_items WHERE id = ?", (row["id"],))
+                    cleaned_count += 1
+                    continue
+
+                clean_norm, clean_disp = cleaned
+                if is_staple_ingredient(clean_norm, clean_disp):
+                    conn.execute("DELETE FROM pantry_items WHERE id = ?", (row["id"],))
+                    cleaned_count += 1
+                    continue
+
+                clean_cat = categorize_ingredient(clean_norm)
+
+                if clean_norm != row["name"]:
+                    # Check if another row already exists with clean_norm
+                    cursor = conn.execute(
+                        "SELECT id, in_stock, display_name FROM pantry_items WHERE name = ? AND id != ?",
+                        (clean_norm, row["id"]),
+                    )
+                    existing = cursor.fetchone()
+                    if existing:
+                        # Merge stock status
+                        if row["in_stock"] == 1 and existing["in_stock"] == 0:
+                            conn.execute("UPDATE pantry_items SET in_stock = 1 WHERE id = ?", (existing["id"],))
+                        conn.execute("DELETE FROM pantry_items WHERE id = ?", (row["id"],))
+                        cleaned_count += 1
+                    else:
+                        conn.execute(
+                            """
+                            UPDATE pantry_items 
+                            SET name = ?, display_name = ?, category = ?, updated_at = CURRENT_TIMESTAMP 
+                            WHERE id = ?
+                            """,
+                            (clean_norm, clean_disp, clean_cat, row["id"]),
+                        )
+                        cleaned_count += 1
+                elif clean_disp != row["display_name"] or clean_cat != row["category"]:
+                    conn.execute(
+                        """
+                        UPDATE pantry_items 
+                        SET display_name = ?, category = ?, updated_at = CURRENT_TIMESTAMP 
+                        WHERE id = ?
+                        """,
+                        (clean_disp, clean_cat, row["id"]),
+                    )
+                    cleaned_count += 1
+
+            conn.commit()
+
+        if cleaned_count:
+            logger.info(f"Cleaned up / migrated {cleaned_count} pantry items in database.")
+        return cleaned_count
 
     def _invalidate_cache(self):
         self._in_stock_cache = None
@@ -496,6 +675,7 @@ class PantryManager:
         self, recipes: List[Dict[str, Any]], mark_in_stock: bool = True
     ) -> int:
         """Extract ingredients from recipes, sanitize them, and populate pantry."""
+        self.cleanup_existing_items()
         added_count = 0
         self._invalidate_cache()
 
@@ -526,7 +706,7 @@ class PantryManager:
                     continue
 
                 norm, clean_display = cleaned
-                if not norm or norm in DEFAULT_STAPLES:
+                if not norm or norm in DEFAULT_STAPLES or is_staple_ingredient(norm, raw_name):
                     continue
 
                 cat = categorize_ingredient(norm)
@@ -591,7 +771,7 @@ class PantryManager:
                 continue
 
             norm, clean_display = cleaned
-            if not norm or norm in DEFAULT_STAPLES:
+            if not norm or norm in DEFAULT_STAPLES or is_staple_ingredient(norm, raw_name):
                 continue
 
             cat = categorize_ingredient(norm)
@@ -677,8 +857,8 @@ class PantryManager:
             if not norm:
                 continue
 
-            # Always treat built-in staples (salt, pepper, water, oil) as in stock
-            if norm in DEFAULT_STAPLES or any(s in norm for s in ["salt", "water", "black pepper"]):
+            # Always treat built-in staples (salt, pepper, water, oil, AP flour, sugar, pan spray) as in stock
+            if norm in DEFAULT_STAPLES or is_staple_ingredient(norm, raw_name):
                 continue
 
             # Check if ingredient matches in-stock set
