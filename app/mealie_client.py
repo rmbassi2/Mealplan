@@ -397,9 +397,9 @@ class MealieClient:
             return []
 
         endpoints = [
-            f"{self.base_url}/api/foods?perPage=500",
-            f"{self.base_url}/api/households/foods?perPage=500",
-            f"{self.base_url}/api/groups/foods?perPage=500",
+            f"{self.base_url}/api/foods?perPage=50",
+            f"{self.base_url}/api/households/foods?perPage=50",
+            f"{self.base_url}/api/groups/foods?perPage=50",
         ]
         async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
             for url in endpoints:
@@ -451,7 +451,10 @@ class MealieClient:
     async def enrich_recipe_ingredients(
         self, recipes: List[Dict[str, Any]], max_fetch: int = 50
     ) -> List[Dict[str, Any]]:
-        """Ensure recipe objects have recipeIngredient populated by fetching full recipe details."""
+        """Ensure recipe objects have recipeIngredient populated by fetching full recipe details.
+        
+        Uses concurrency of 2 and pacing delays to avoid exhausting Mealie's internal SQLAlchemy connection pool.
+        """
         if self.mock_mode or not recipes:
             return recipes
 
@@ -464,11 +467,13 @@ class MealieClient:
         if not missing_items:
             return recipes
 
-        sem = asyncio.Semaphore(10)
+        # Throttle concurrent recipe detail queries so Mealie's pool (5 + 10 overflow) is never saturated
+        sem = asyncio.Semaphore(2)
 
         async def fetch_one(r: Dict[str, Any]):
             slug_or_id = r.get("slug") or r.get("id")
             async with sem:
+                await asyncio.sleep(0.05)  # Yield and give Mealie's worker pool time to recycle connections
                 full = await self.get_full_recipe(slug_or_id)
                 if full:
                     r["recipeIngredient"] = full.get("recipeIngredient") or full.get("ingredients") or []
@@ -486,7 +491,7 @@ class MealieClient:
 
         recipes: List[Dict[str, Any]] = []
         page = 1
-        per_page = 100
+        per_page = 25  # Keep under 30 items per page to prevent Mealie N+1 permission storms
 
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             while True:
@@ -512,6 +517,7 @@ class MealieClient:
                     if len(recipes) >= total or len(items) < per_page:
                         break
                     page += 1
+                    await asyncio.sleep(0.05)
                 except Exception as e:
                     logger.warning(f"Error fetching recipe page {page}: {e}")
                     break
@@ -537,7 +543,7 @@ class MealieClient:
             try:
                 async with httpx.AsyncClient(timeout=8.0) as client:
                     resp = await client.get(
-                        f"{self.base_url}/api/recipes?perPage=100",
+                        f"{self.base_url}/api/recipes?perPage=30",
                         headers=self.headers,
                     )
                     if resp.status_code == 200:
@@ -681,7 +687,7 @@ class MealieClient:
             try:
                 async with httpx.AsyncClient(timeout=6.0) as client:
                     resp = await client.get(
-                        f"{self.base_url}/api/recipes?perPage=100",
+                        f"{self.base_url}/api/recipes?perPage=30",
                         headers=self.headers,
                     )
                     if resp.status_code == 200:
