@@ -39,3 +39,8 @@ htmlcov/
 .vscode/
 .idea/
 *.swp
+
+# SQLite Databases
+*.db
+*.sqlite3
+!data/.gitkeep

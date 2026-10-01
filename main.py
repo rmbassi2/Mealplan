@@ -9,6 +9,7 @@ from pydantic import BaseModel, model_validator
 from app.config import settings
 from app.mealie_client import mealie_client
 from app.notifier import notifier
+from app.pantry import pantry_manager
 from app.url_helper import fetch_recipe_url_info, clean_domain
 
 # Configure logging
@@ -20,8 +21,8 @@ logger = logging.getLogger("dinner_decider")
 
 app = FastAPI(
     title="Dinner Decider",
-    description="A lightweight, mobile-first dinner voting web app integrated with Mealie.",
-    version="1.0.0",
+    description="A lightweight, mobile-first dinner voting web app integrated with Mealie and smart pantry inventory.",
+    version="1.1.0",
 )
 
 # Enable CORS for convenience
@@ -47,6 +48,26 @@ class DinnerChoice(BaseModel):
         if not has_recipe and not has_custom:
             raise ValueError("Either recipe_id or custom_note must be provided.")
         return self
+
+
+class PantryToggleRequest(BaseModel):
+    item_id: Optional[int] = None
+    name: Optional[str] = None
+    in_stock: Optional[bool] = None
+
+
+class PantryItemCreate(BaseModel):
+    name: str
+    display_name: Optional[str] = None
+    category: Optional[str] = "pantry"
+    in_stock: bool = True
+    is_staple: bool = False
+
+
+class ShoppingListAddRequest(BaseModel):
+    item_name: str
+    recipe_id: Optional[str] = None
+    note: Optional[str] = None
 
 
 @app.get("/health")
@@ -137,6 +158,7 @@ async def get_taxonomy_filters():
     return {
         "moods": [
             {"id": "surprise", "label": "Surprise Me", "icon": "✨"},
+            {"id": "pantry", "label": "Pantry Ready", "icon": "🧺"},
             {"id": "quick", "label": "Quick (<30m)", "icon": "⚡"},
             {"id": "comfort", "label": "Comfort Food", "icon": "🧀"},
             {"id": "skillet", "label": "Skillet", "icon": "🍳"},
@@ -163,8 +185,9 @@ async def get_dinner_options(
     protein: Optional[str] = None,
     tool: Optional[str] = None,
     cuisine: Optional[str] = None,
+    pantry_only: Optional[bool] = False,
 ):
-    """Fetch 3 balanced dinner recipe options from Mealie, with optional mood, protein, tool, or cuisine filtering."""
+    """Fetch 3 balanced dinner recipe options from Mealie, with optional mood, protein, tool, cuisine, or pantry filtering."""
     try:
         options = await mealie_client.get_dinner_options(
             count=3,
@@ -172,6 +195,7 @@ async def get_dinner_options(
             protein=protein,
             tool=tool,
             cuisine=cuisine,
+            pantry_only=bool(pantry_only or (mood in ("pantry", "pantry-ready"))),
         )
         return {
             "options": options,
@@ -181,12 +205,160 @@ async def get_dinner_options(
                 "protein": protein,
                 "tool": tool,
                 "cuisine": cuisine,
+                "pantry_only": pantry_only,
             },
             "is_mock": mealie_client.mock_mode or any(o.get("is_mock") for o in options),
         }
     except Exception as e:
         logger.error(f"Error fetching dinner options: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch dinner options")
+
+
+@app.get("/api/pantry")
+async def get_pantry(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    in_stock: Optional[bool] = None,
+):
+    """List pantry inventory items with statistics."""
+    try:
+        # If pantry has zero items yet, auto-seed with initial recipe ingredients
+        stats = pantry_manager.get_stats()
+        if stats["total"] == 0:
+            from app.mock_data import MOCK_RECIPES
+            pantry_manager.seed_from_recipes(MOCK_RECIPES, mark_in_stock=True)
+
+        items = pantry_manager.get_all_items(category=category, search=search, in_stock=in_stock)
+        return {
+            "items": items,
+            "stats": pantry_manager.get_stats(),
+        }
+    except Exception as e:
+        logger.error(f"Error querying pantry: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load pantry inventory")
+
+
+@app.post("/api/pantry/toggle")
+async def toggle_pantry_item(req: PantryToggleRequest):
+    """Toggle in_stock availability for a single pantry item."""
+    try:
+        updated = pantry_manager.toggle_item(item_id=req.item_id, name=req.name, in_stock=req.in_stock)
+        if not updated:
+            raise HTTPException(status_code=404, detail="Pantry item not found")
+        return {
+            "status": "success",
+            "item": updated,
+            "stats": pantry_manager.get_stats(),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling pantry item: {e}")
+        raise HTTPException(status_code=500, detail="Failed to toggle pantry item")
+
+
+@app.post("/api/pantry/item")
+async def upsert_pantry_item(item: PantryItemCreate):
+    """Add or update a custom item in the pantry inventory."""
+    try:
+        saved = pantry_manager.upsert_item(
+            name=item.name,
+            display_name=item.display_name,
+            category=item.category,
+            in_stock=item.in_stock,
+            is_staple=item.is_staple,
+        )
+        return {
+            "status": "success",
+            "item": saved,
+            "stats": pantry_manager.get_stats(),
+        }
+    except Exception as e:
+        logger.error(f"Error saving pantry item: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save pantry item")
+
+
+@app.delete("/api/pantry/item/{item_id}")
+async def delete_pantry_item(item_id: int):
+    """Remove an item from the pantry inventory."""
+    try:
+        success = pantry_manager.delete_item(item_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Item not found")
+        return {
+            "status": "success",
+            "stats": pantry_manager.get_stats(),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting pantry item: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete pantry item")
+
+
+@app.post("/api/pantry/sync")
+async def sync_pantry_from_recipes():
+    """Auto-discover and populate pantry ingredients from all recipes."""
+    try:
+        from app.mock_data import MOCK_RECIPES, MOCK_SIDES
+        recipes_to_seed = MOCK_RECIPES + MOCK_SIDES
+
+        if not mealie_client.mock_mode:
+            import httpx
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    resp = await client.get(
+                        f"{mealie_client.base_url}/api/recipes?perPage=100",
+                        headers=mealie_client.headers,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        items = data.get("items", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                        if items:
+                            recipes_to_seed = items
+            except Exception as e:
+                logger.warning(f"Could not fetch Mealie recipes for pantry sync: {e}")
+
+        added = pantry_manager.seed_from_recipes(recipes_to_seed, mark_in_stock=True)
+        return {
+            "status": "success",
+            "added_count": added,
+            "stats": pantry_manager.get_stats(),
+        }
+    except Exception as e:
+        logger.error(f"Error syncing pantry: {e}")
+        raise HTTPException(status_code=500, detail="Failed to sync pantry")
+
+
+@app.post("/api/pantry/bulk-stock")
+async def bulk_stock_pantry(in_stock: bool = True):
+    """Set all pantry items to in-stock or out-of-stock."""
+    try:
+        items = pantry_manager.get_all_items()
+        for it in items:
+            pantry_manager.toggle_item(item_id=it["id"], in_stock=in_stock)
+        return {
+            "status": "success",
+            "message": f"Updated {len(items)} items to {'in-stock' if in_stock else 'out-of-stock'}",
+            "stats": pantry_manager.get_stats(),
+        }
+    except Exception as e:
+        logger.error(f"Error bulk updating pantry: {e}")
+        raise HTTPException(status_code=500, detail="Failed to bulk update pantry")
+
+
+@app.post("/api/shopping-list/add")
+async def add_missing_item_to_shopping_list(req: ShoppingListAddRequest):
+    """Add a missing ingredient to Mealie's shopping list."""
+    try:
+        result = await mealie_client.add_to_shopping_list(
+            item_name=req.item_name,
+            note=req.note or (f"For recipe {req.recipe_id}" if req.recipe_id else "From Dinner Decider"),
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error adding to shopping list: {e}")
+        raise HTTPException(status_code=500, detail="Failed to add to shopping list")
 
 
 @app.get("/api/side-options")
