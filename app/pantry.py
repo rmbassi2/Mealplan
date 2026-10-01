@@ -94,7 +94,8 @@ DISCARD_PATTERNS = [
     re.compile(r"for\s+serving,?\s+if\s+desired", re.I),
     re.compile(r"^vegetables?\s+of\s+choice", re.I),
     re.compile(r"^skewers?\b", re.I),
-    re.compile(r"^pound\s+peeled,?\s+i\s+use", re.I),
+    re.compile(r".*\bcount\s+size\b.*", re.I),
+    re.compile(r"^seasoning\s+package\b", re.I),
 ]
 
 PREP_WORDS_PATTERN = (
@@ -102,7 +103,7 @@ PREP_WORDS_PATTERN = (
     r"chopped|diced|minced|sliced|crushed|grated|shredded|peeled|halved|quartered|"
     r"drained|juiced|zested|cooked|uncooked|packed|melted|softened|warm|cold|hot|"
     r"trimmed|cored|stemmed|cleaned|thawed|cut\s+into|cut\s+in|boneless|skinless|"
-    r"organic|dried|cloves?|unsalted|salted)\b"
+    r"organic|dried|cloves?|unsalted|salted|ripe|mashed|beaten|crumbled|pressed)\b"
 )
 PREP_REGEX = re.compile(PREP_WORDS_PATTERN, re.I)
 
@@ -111,7 +112,8 @@ PREP_TRAILING_CHECK = re.compile(
     r"stem|halved|quartered|drained|juiced|zested|cooked|thawed|trimmed|cleaned|"
     r"packed|finely|roughly|coarsely|lightly|plus|for garnish|for serving|to serve|"
     r"to taste|divided|optional|not spicy|any brand|brand fine|seeds removed|about|"
-    r"browned|room temp|room temperature|warmed up|softened|melted|cubed|very cold)\b",
+    r"browned|room temp|room temperature|warmed up|softened|melted|cubed|very cold|"
+    r"beaten|crumbled|pressed|bubbly|fridge|preferably)\b",
     re.I,
 )
 
@@ -143,6 +145,16 @@ UNIT_PREFIX_REGEX = re.compile(
 )
 
 PLURAL_MAP: Dict[str, str] = {
+    "breasts": "breast",
+    "cutlets": "cutlet",
+    "fillets": "fillet",
+    "steaks": "steak",
+    "patties": "patty",
+    "ribs": "rib",
+    "wings": "wing",
+    "drumsticks": "drumstick",
+    "sausages": "sausage",
+    "shrimps": "shrimp",
     "tomatoes": "tomato",
     "potatoes": "potato",
     "onions": "onion",
@@ -151,6 +163,77 @@ PLURAL_MAP: Dict[str, str] = {
     "limes": "lime",
     "lemons": "lemon",
     "cloves": "garlic",
+    "scallions": "scallion",
+    "shallots": "shallot",
+    "mushrooms": "mushroom",
+    "bananas": "banana",
+    "apples": "apple",
+    "peaches": "peach",
+    "berries": "berry",
+    "strawberries": "strawberry",
+    "blueberries": "blueberry",
+    "avocados": "avocado",
+    "peppers": "pepper",
+    "chiles": "chile",
+    "chillies": "chilli",
+    "chilies": "chili",
+    "beans": "bean",
+    "peas": "pea",
+    "sprouts": "sprout",
+    "radishes": "radish",
+    "zucchinis": "zucchini",
+    "eggplants": "eggplant",
+    "leaves": "leaf",
+    "eggs": "egg",
+    "yolks": "yolk",
+    "whites": "white",
+    "cheeses": "cheese",
+    "buns": "bun",
+    "rolls": "roll",
+    "tortillas": "tortilla",
+    "crackers": "cracker",
+    "crumbs": "crumb",
+    "breadcrumbs": "breadcrumb",
+    "noodles": "noodle",
+    "wafers": "wafer",
+    "cookies": "cookie",
+    "pretzels": "pretzel",
+    "seeds": "seed",
+    "walnuts": "walnut",
+    "pecans": "pecan",
+    "almonds": "almond",
+    "peanuts": "peanut",
+    "cashews": "cashew",
+    "pistachios": "pistachio",
+    "oils": "oil",
+}
+
+HERB_LEAF_PATTERNS = re.compile(
+    r"^(basil|rosemary|thyme|oregano|parsley|spinach|cilantro|mint|coriander)\s+leaves$", re.I
+)
+CHEESE_BASE_PATTERNS = re.compile(
+    r"^(cheddar|mozzarella|parmesan|feta|gruyère|gruyere|monterey\s+jack|provolone|swiss|gouda|asiago)\s+cheese$", re.I
+)
+
+SYNONYMS: Dict[str, Tuple[str, str]] = {
+    "bicarbonate of soda": ("baking soda", "Baking Soda"),
+    "all spice powder": ("allspice", "Allspice"),
+    "mayonnaise": ("mayo", "Mayo"),
+    "beansprouts": ("bean sprout", "Bean Sprouts"),
+    "fresno chili": ("fresno chile", "Fresno Chile"),
+    "jalapeno pepper": ("jalapeno", "Jalapeno"),
+    "chardonnay wine": ("chardonnay", "Chardonnay"),
+    "dry bay leaf": ("bay leaf", "Bay Leaf"),
+    "dry thyme": ("thyme", "Thyme"),
+    "dry linguine": ("linguine", "Linguine"),
+    "regular breadcrumbs": ("breadcrumb", "Breadcrumbs"),
+    "whole fully cooked bone in ham": ("ham", "Ham"),
+    "active sourdough starter": ("sourdough starter", "Sourdough Starter"),
+    "unfed sourdough starter": ("sourdough starter", "Sourdough Starter"),
+    "sourdough starter ripe": ("sourdough starter", "Sourdough Starter"),
+    "canned black beans": ("black bean", "Black Beans"),
+    "canned chickpeas": ("chickpea", "Chickpeas"),
+    "canned black olives": ("black olive", "Black Olives"),
 }
 
 
@@ -204,30 +287,16 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
 
     text = raw.strip()
 
-    # Strip trailing pipe or noise
-    text = re.sub(r"[\s\|\&\+]+$", "", text)
-
     # 2. Normalize fractions (vulgar fractions, superscripts/subscripts)
     for k, v in FRACTION_MAP.items():
         text = text.replace(k, v)
     text = re.sub(r"¹\s*\/\s*₂", " 1/2 ", text)
 
-    # 3. Strip leading noise characters: (), [], ., /, -, *, &, +, |, (Or ), (And )
-    text = re.sub(r"^[\s\(\)\[\]\.\/\,\-\*\:\;\#\~\&\+\|]+", "", text)
-    text = re.sub(r"^\(?\s*or\b\s*\)?\s*", "", text, flags=re.I)
-    text = re.sub(r"^\(?\s*and\b\s*\)?\s*", "", text, flags=re.I)
-    text = re.sub(r"^optional\s*:\s*", "", text, flags=re.I)
-    text = re.sub(r"^(?:fresh-squeezed|-squeezed|squeezed|ly\s+)\s*", "", text, flags=re.I)
-
-    # Normalize "juice from 2 lemons" -> "lemon juice"
-    text = re.sub(r"^juice\s+(of|from)\s+(\d+\s*)?lemons?", "lemon juice", text, flags=re.I)
-    text = re.sub(r"^juice\s+(of|from)\s+(\d+\s*)?limes?", "lime juice", text, flags=re.I)
-
-    # 4. Remove empty parens/brackets
+    # 3. Remove empty parens/brackets
     text = re.sub(r"\(\s*\)", " ", text)
     text = re.sub(r"\[\s*\]", " ", text)
 
-    # 5. Remove parenthetical expressions (notes, measurements, preps)
+    # 4. Remove parenthetical expressions (notes, measurements, preps)
     while "(" in text and ")" in text:
         new_text = re.sub(r"\([^()]*\)", " ", text)
         if new_text == text:
@@ -237,11 +306,48 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
     # Strip unmatched dangling parens
     text = re.sub(r"[()]", " ", text)
 
+    # 5. Strip em-dash / hyphen explanatory clauses (e.g. "Avocado Oil – Helps Keep The Crumb Tender")
+    text = re.sub(r"\s+[–—-]\s+.*$", "", text)
+
+    # Strip trailing "+ more"
+    text = re.sub(r"\s*\+\s*more.*$", "", text, flags=re.I)
+
+    # Strip trailing pipe or noise
+    text = re.sub(r"[\s\|\&\+]+$", "", text)
+
+    # 6. Strip leading noise characters: (), [], ., /, -, *, &, +, |, (Or ), (And )
+    text = re.sub(r"^[\s\(\)\[\]\.\/\,\-\*\:\;\#\~\&\+\|]+", "", text)
+    text = re.sub(r"^\(?\s*or\b\s*\)?\s*", "", text, flags=re.I)
+    text = re.sub(r"^\(?\s*and\b\s*\)?\s*", "", text, flags=re.I)
+    text = re.sub(r"^optional\s*:\s*", "", text, flags=re.I)
+    text = re.sub(r"^(?:fresh-squeezed|-squeezed|squeezed|ly\s+)\s*", "", text, flags=re.I)
+    text = re.sub(r"^\s*to\s+(\d+(\.\d+)?\s*[-–—/]\s*\d+|\d+([./]\d+)?)\s*", "", text, flags=re.I)
+    text = re.sub(r"^\s*to\s+(\d+\s*)?(tbsp|tablespoons?|tsp|teaspoons?|cups?)\b\.?\s*", "", text, flags=re.I)
+    text = re.sub(r"^\s*to\s+", "", text, flags=re.I)
+    text = re.sub(r"^\s*length\s+(?=ginger\b)", "", text, flags=re.I)
+    text = re.sub(r"^\s*canned\s+", "", text, flags=re.I)
+    text = re.sub(r"^\s*more\s+", "", text, flags=re.I)
+    text = re.sub(r"^\s*(?:active|unfed)\s+(?=sourdough\s+starter)", "", text, flags=re.I)
+    text = re.sub(r"^\s*dry\s+(?=(?:linguine|pasta|thyme|bay\s+leaf)\b)", "", text, flags=re.I)
+    text = re.sub(r"^\s*regular\s+(?=breadcrumbs?\b)", "", text, flags=re.I)
+    text = re.sub(r"^\s*old[- ]fashioned\s+(?:whole\s+)?(?=rolled\s+oats\b)", "", text, flags=re.I)
+    text = re.sub(r"^\s*whole\s+fully\s+cooked\s+bone[- ]in\s+(?=ham\b)", "", text, flags=re.I)
+    text = re.sub(r"^\s*mashed\s+(?=ripe\s+)?(?=bananas?\b)", "", text, flags=re.I)
+    text = re.sub(r"^\s*ripe\s+(?=bananas?\b)", "", text, flags=re.I)
+
+    # Normalize "juice from 2 lemons" -> "lemon juice"
+    text = re.sub(r"^juice\s+(of|from)\s+(\d+\s*)?lemons?", "lemon juice", text, flags=re.I)
+    text = re.sub(r"^juice\s+(of|from)\s+(\d+\s*)?limes?", "lime juice", text, flags=re.I)
+
     # 6. Strip trailing prep and instructions after commas from the right
     parts = [p.strip() for p in text.split(",") if p.strip()]
     while len(parts) > 1:
-        last = parts[-1]
-        if PREP_TRAILING_CHECK.search(last) and not FOOD_NOUN_CHECK.search(last):
+        last = parts[-1].lower()
+        if (
+            PREP_TRAILING_CHECK.search(last)
+            or re.search(r"\b(minced|diced|chopped|grated|sliced|peeled|beaten|warmed|ripe|cooked|halved|quartered|drained|melted|softened|crumbled|fed|unfed|bubbly|fridge|seeds|ribs|knob|preferably|about|tablespoon|tbsp|teaspoon|tsp|cup|oz|gram)\b", last)
+            or re.match(r"^(from\s+\d+|from\s+a\b|\d+\s*(tbsp|tsp|cup|oz|tablespoon))", last)
+        ) and not FOOD_NOUN_CHECK.search(last):
             parts.pop()
         else:
             break
@@ -252,6 +358,7 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
     text = re.sub(r"\s+or\b\s+of\s+each\s*$", "", text, flags=re.I)
     text = re.sub(r"\s+or\b\s+\.\s+each\s*$", "", text, flags=re.I)
     text = re.sub(r"\s+(for garnish|for serving|to serve|to taste|if desired|as needed|as desired)\s*$", "", text, flags=re.I)
+    text = re.sub(r"\s+(cut into\b.*|chopped into\b.*|pressed and\b.*|beaten to blend|beaten|crumbled.*|seeds and ribs removed|seeds removed|ground into\b.*|for the grill grates|for cooking|for frying|from above|fed or unfed is fine|straight from the fridge|bubbly and active)\s*$", "", text, flags=re.I)
     text = re.sub(r"\s+(finely\s+chopped|finely\s+diced|coarsely\s+ground|thinly\s+sliced|minced|grated|peeled)\s*$", "", text, flags=re.I)
 
     # 8. Strip leading quantities, metric units, units, sizing, ordinals in a loop
@@ -278,7 +385,8 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
     clean_display = re.sub(r"^(?:fresh-squeezed|-squeezed|squeezed|ly\s+)\s*", "", clean_display, flags=re.I)
     clean_display = re.sub(
         r"^(?:(finely|coarsely|roughly|thinly|freshly\b|fresh\b|lightly|packed|chopped|diced|minced|"
-        r"grated|shredded|peeled|cooked|boneless|skinless|unsalted|salted|chopped\s+or\s+halved|halved|quartered|or\b)\s*,?\s*)+",
+        r"grated|shredded|peeled|cooked|boneless|skinless|unsalted|salted|chopped\s+or\s+halved|halved|quartered|or\b|"
+        r"ripe|mashed|beaten|crumbled|pressed)\s*,?\s*)+",
         "",
         clean_display,
         flags=re.I,
@@ -288,7 +396,26 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
         clean_display = text
 
     display = clean_display.title()
-    if display in ("Garlic Cloves", "Large Garlic Cloves"):
+
+    # Herb leaf normalization: "Basil Leaves" -> "Basil"
+    m_herb = HERB_LEAF_PATTERNS.match(display)
+    if m_herb:
+        display = m_herb.group(1).title()
+
+    # Cheese base normalization: "Cheddar Cheese" -> "Cheddar"
+    m_cheese = CHEESE_BASE_PATTERNS.match(display)
+    if m_cheese:
+        display = m_cheese.group(1).title()
+
+    if display == "Chicken Breasts":
+        display = "Chicken Breast"
+    elif display == "Egg":
+        display = "Eggs"
+    elif display == "Scallion":
+        display = "Scallions"
+    elif display == "Oils":
+        display = "Oil"
+    elif display in ("Garlic Cloves", "Large Garlic Cloves"):
         display = "Garlic"
 
     # Normalized name: lowercased, prep words and punctuation removed for grouping
@@ -308,6 +435,11 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
 
     if norm in ("cloves", "garlic cloves"):
         norm = "garlic"
+
+    if norm in SYNONYMS:
+        syn_norm, syn_disp = SYNONYMS[norm]
+        norm = syn_norm
+        display = syn_disp
 
     if not norm or len(norm) < 2:
         return None
@@ -330,16 +462,18 @@ def categorize_ingredient(name: str) -> str:
     # 1. Spices & Seasonings
     if any(k in n for k in [
         "powder", "paprika", "cumin", "oregano", "cinnamon", "spice", "nutmeg",
-        "curry", "seasoning", "coriander", "allspice", "cardamom", "clove",
-        "turmeric", "cayenne", "chili flake", "red pepper flake", "mace", "peppercorn"
-    ]) or re.search(r"\b(rubs?)\b", n):
+        "curry", "seasoning", "coriander", "allspice", "cardamom", "clove", "cloves",
+        "turmeric", "cayenne", "chili flake", "red pepper flake", "mace", "peppercorn",
+        "bay leaf", "bay leaves", "kasoori methi", "marjoram", "thyme", "star anise"
+    ]) or re.search(r"\b(rubs?|dill)\b", n):
         return "spices & herbs"
 
-    # 2. Sauces & Condiments
+    # 2. Sauces & Condiments (including cooking oils)
     if any(k in n for k in [
         "broth", "stock", "bouillon", "boulion", "sauce", "vinegar", "hoisin",
         "peanut butter", "honey", "miso", "mustard", "mayo", "ketchup",
-        "sriracha", "worcestershire", "tahini", "relish", "dressing", "syrup"
+        "sriracha", "worcestershire", "tahini", "relish", "dressing", "syrup",
+        "oil", "oils", "anchovy"
     ]):
         return "sauces & condiments"
 
@@ -348,9 +482,10 @@ def categorize_ingredient(name: str) -> str:
         any(k in n for k in [
             "milk", "cream", "cheese", "butter", "yogurt", "mozzarella", "parmesan",
             "cheddar", "feta", "boursin", "pecorino", "gruyere",
-            "gruyère", "jack", "ricotta", "half-and-half", "buttermilk"
+            "gruyère", "jack", "ricotta", "half and half", "half-and-half", "buttermilk",
+            "ciliegine", "bocconcini"
         ])
-        or (re.search(r"\b(eggs?)\b", n) and "eggplant" not in n)
+        or (re.search(r"\b(eggs?|yolks?)\b", n) and "eggplant" not in n)
     ):
         return "dairy"
 
@@ -358,7 +493,8 @@ def categorize_ingredient(name: str) -> str:
     if any(k in n for k in [
         "rice", "noodle", "pasta", "bread", "dough", "tortilla", "spaghetti",
         "orzo", "quinoa", "flour", "pita", "starter", "risotto",
-        "crumbs", "cracker", "tagliatelle", "cereal"
+        "crumbs", "cracker", "tagliatelle", "cereal", "linguine", "panko",
+        "pretzel", "cookie", "biscuit"
     ]) or re.search(r"\b(buns?|rolls?|oats?|oatmeal)\b", n):
         return "grains & bakery"
 
@@ -378,8 +514,9 @@ def categorize_ingredient(name: str) -> str:
         "mint", "scallion", "shallot", "leek", "celery", "fennel", "mushroom", "bean",
         "kale", "ginger", "cauliflower", "rhubarb", "edamame", "eggplant",
         "chive", "jalapeno", "jalapeño", "serrano", "romaine", "apple", "banana", "berry",
-        "mango", "peach", "fruit", "slaw"
-    ]) or re.search(r"\b(peas?|corn)\b", n):
+        "berries", "mango", "peach", "fruit", "slaw", "artichoke", "pomegranate", "cranberr",
+        "fig", "raisin", "olive", "chickpea"
+    ]) or re.search(r"\b(peas?|corn|peppers?|chillies?)\b", n):
         return "produce"
 
     return "pantry"
