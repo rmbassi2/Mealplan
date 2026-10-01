@@ -248,11 +248,11 @@ def test_clean_ingredient_name_discard_junk():
 
 def test_clean_ingredient_name_real_world_messy_strings():
     test_cases = [
-        ("() Beef Or Chicken Broth/Stock", "beef or chicken broth stock", "Beef Or Chicken Broth/Stock"),
+        ("() Beef Or Chicken Broth/Stock", "beef broth", "Beef Broth"),
         ("() Boneless, Skinless Chicken Breast, Cut Into Small Pieces", "chicken breast", "Chicken Breast"),
         (". Coarsely Ground Pork", "ground pork", "Ground Pork"),
         (". Finely Ground Pork (90% Lean)", "ground pork", "Ground Pork"),
-        ("/ Beef Chuck Or Brisket ((Or Gravy Or Any Other Slow Cooking Beef) Cut Into )", "beef chuck or brisket", "Beef Chuck Or Brisket"),
+        ("/ Beef Chuck Or Brisket ((Or Gravy Or Any Other Slow Cooking Beef) Cut Into )", "beef chuck roast", "Beef Chuck Roast"),
         ("/ Lamb Mince (Or Beef, Or 50/50 Beef/Lamb, Note 1)", "lamb mince", "Lamb Mince"),
         ("1 256 Gm Potatoes Or 4 Medium", "potato", "Potatoes"),
         ("1 290 Gm// 1 Large Or 4 Medium Onions", "onion", "Onions"),
@@ -383,21 +383,21 @@ def test_clean_ingredient_units_ordinals_and_junk():
         ("Tiny Pinch Garlic Powder", "garlic powder", "Garlic Powder"),
         # Ordinals & fractions
         ("Th Cup Heavy Cream", "heavy cream", "Heavy Cream"),
-        ("Th Cup Plain Unflavored Yogurt", "plain unflavored yogurt", "Plain Unflavored Yogurt"),
+        ("Th Cup Plain Unflavored Yogurt", "plain yogurt", "Plain Yogurt"),
         ("Rd Cup Frozen/Fresh Green Peas", "frozen green pea", "Frozen/Fresh Green Peas"),
-        ("Th Teaspoon Ground Mace Or Nutmeg", "ground mace or nutmeg", "Ground Mace Or Nutmeg"),
+        ("Th Teaspoon Ground Mace Or Nutmeg", "nutmeg", "Nutmeg"),
         # Connectors & symbols
         ("& 1/2 Inch Cinnamon Stick", "cinnamon stick", "Cinnamon Stick"),
         ("And 1/2 Cups Graham Cracker Crumbs", "graham cracker crumb", "Graham Cracker Crumbs"),
         ("Plus 2 Tablespoons Olive Oil", "olive oil", "Olive Oil"),
         ("T Rice Vinegar", "rice vinegar", "Rice Vinegar"),
-        ("T Sriracha Sauce", "sriracha sauce", "Sriracha Sauce"),
-        ("Sharp White Cheddar |", "sharp white cheddar", "Sharp White Cheddar"),
+        ("T Sriracha Sauce", "sriracha", "Sriracha"),
+        ("Sharp White Cheddar |", "cheddar", "Cheddar"),
         # Prefixes & mangling
         ("-Squeezed Lime Juice", "lime juice", "Lime Juice"),
         ("Fresh-Squeezed Lime Juice", "lime juice", "Lime Juice"),
-        ("Ly Chopped Parsley Or Chives For Garnish", "parsley or chives", "Parsley Or Chives"),
-        ("Freshly Chopped Parsley Or Chives For Garnish", "parsley or chives", "Parsley Or Chives"),
+        ("Ly Chopped Parsley Or Chives For Garnish", "parsley", "Parsley"),
+        ("Freshly Chopped Parsley Or Chives For Garnish", "parsley", "Parsley"),
     ]
 
     for raw, exp_norm, exp_disp in test_cases:
@@ -496,8 +496,8 @@ def test_cleanup_existing_items_in_place_migration(tmp_path):
     assert item_map["scallion"]["display_name"] == "Scallions"
     assert item_map["scallion"]["category"] == "produce"
 
-    assert "sharp white cheddar" in item_map
-    assert item_map["sharp white cheddar"]["display_name"] == "Sharp White Cheddar"
-    assert item_map["sharp white cheddar"]["category"] == "dairy"
+    assert "cheddar" in item_map
+    assert item_map["cheddar"]["display_name"] == "Cheddar"
+    assert item_map["cheddar"]["category"] == "dairy"
 
 

@@ -96,6 +96,11 @@ DISCARD_PATTERNS = [
     re.compile(r"^skewers?\b", re.I),
     re.compile(r".*\bcount\s+size\b.*", re.I),
     re.compile(r"^seasoning\s+package\b", re.I),
+    re.compile(r"^lettuce,\s*tomato.*", re.I),
+    re.compile(r"^thai\s+basil,\s*mi[nt].*", re.I),
+    re.compile(r"^lemon\s+wedges,?\s*(?:fresh\s+)?oregano.*", re.I),
+    re.compile(r"^peas\s+and\s+carrots\b", re.I),
+    re.compile(r"^broccoli\s+and\s+cauliflower\b", re.I),
 ]
 
 PREP_WORDS_PATTERN = (
@@ -234,6 +239,170 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "canned black beans": ("black bean", "Black Beans"),
     "canned chickpeas": ("chickpea", "Chickpeas"),
     "canned black olives": ("black olive", "Black Olives"),
+
+    # Meat & Seafood consolidations
+    "beef chuck or brisket": ("beef chuck roast", "Beef Chuck Roast"),
+    "guanciale or smoked pancetta": ("pancetta", "Pancetta"),
+    "firm tofu or paneer": ("firm tofu", "Firm Tofu"),
+    "lean ground meat like ground beef or ground turkey": ("ground beef", "Ground Beef"),
+    "ground beef chuck": ("ground beef", "Ground Beef"),
+    "lean ground beef": ("ground beef", "Ground Beef"),
+    "chicken cutlet": ("chicken breast", "Chicken Breast"),
+    "chicken cutlets": ("chicken breast", "Chicken Breast"),
+    "thin slices prosciutto": ("prosciutto", "Prosciutto"),
+
+    # Produce consolidations
+    "baby yellow potato": ("baby potato", "Baby Potatoes"),
+    "baby yellow potatoes": ("baby potato", "Baby Potatoes"),
+    "baby yukon gold potato": ("baby yukon gold potato", "Baby Yukon Gold Potatoes"),
+    "baby yukon gold potatoes": ("baby yukon gold potato", "Baby Yukon Gold Potatoes"),
+    "red potato": ("potato", "Potatoes"),
+    "red potatoes": ("potato", "Potatoes"),
+    "baby tomato": ("cherry tomato", "Cherry Tomatoes"),
+    "baby tomatoes": ("cherry tomato", "Cherry Tomatoes"),
+    "grape or cherry tomato": ("cherry tomato", "Cherry Tomatoes"),
+    "grape or cherry tomatoes": ("cherry tomato", "Cherry Tomatoes"),
+    "whole peeled tomato": ("tomato", "Tomato"),
+    "whole peeled tomatoes": ("tomato", "Tomato"),
+    "sweet onion": ("yellow onion", "Yellow Onion"),
+    "white onion": ("onion", "Onion"),
+    "small red onion": ("red onion", "Red Onion"),
+    "yellow or red onion": ("yellow onion", "Yellow Onion"),
+    "green onion": ("scallion", "Scallions"),
+    "cauliflower head": ("cauliflower", "Cauliflower"),
+    "corn kernels": ("corn", "Corn"),
+    "english cucumber": ("cucumber", "Cucumber"),
+    "fennel bulb": ("fennel", "Fennel"),
+    "flat leaf parsley": ("parsley", "Parsley"),
+    "ginger root": ("ginger", "Ginger"),
+    "green pepper": ("green bell pepper", "Green Bell Pepper"),
+    "red pepper": ("red bell pepper", "Red Bell Pepper"),
+    "red or green bell pepper": ("red bell pepper", "Red Bell Pepper"),
+    "green chile peppers": ("green chile", "Green Chiles"),
+    "lime wedges": ("lime", "Lime"),
+    "pomegranate arils": ("pomegranate", "Pomegranate"),
+    "sliced peaches": ("peach", "Peaches"),
+    "parsley or chives": ("parsley", "Parsley"),
+    "serrano or jalapeno pepper": ("serrano", "Serrano"),
+    "slaw mix or thin cabbage": ("cabbage", "Cabbage"),
+    "slaw mix or thin sliced cabbage": ("cabbage", "Cabbage"),
+    "scotch bonnet peppers or habanero chile": ("scotch bonnet pepper", "Scotch Bonnet Pepper"),
+    "scotch bonnet peppers or habanero chiles": ("scotch bonnet pepper", "Scotch Bonnet Pepper"),
+    "to 2 scotch bonnet peppers or habanero chiles": ("scotch bonnet pepper", "Scotch Bonnet Pepper"),
+
+    # Dairy & Eggs
+    "danish creamery butter": ("butter", "Butter"),
+    "sharp white cheddar": ("cheddar", "Cheddar"),
+    "sharp yellow cheddar": ("cheddar", "Cheddar"),
+    "white or yellow sharp cheddar": ("cheddar", "Cheddar"),
+    "mozzarella ball": ("mozzarella", "Mozzarella"),
+    "shaved parmesan": ("parmesan", "Parmesan"),
+    "whole milk": ("milk", "Milk"),
+    "full fat brick cream cheese": ("cream cheese", "Cream Cheese"),
+    "full fat cream cheese": ("cream cheese", "Cream Cheese"),
+    "full fat sour cream": ("sour cream", "Sour Cream"),
+    "plain greek yogurt": ("greek yogurt", "Greek Yogurt"),
+    "whole milk plain strained yogurt": ("greek yogurt", "Greek Yogurt"),
+    "plain unflavored yogurt": ("plain yogurt", "Plain Yogurt"),
+    "plain yogurt or sour cream": ("plain yogurt", "Plain Yogurt"),
+    "yogurt": ("plain yogurt", "Plain Yogurt"),
+    "heavy cream or coconut milk": ("heavy cream", "Heavy Cream"),
+    "oat milk or milk of choice": ("oat milk", "Oat Milk"),
+    "ciliegine or bocconcini": ("ciliegine", "Ciliegine"),
+
+    # Grains & Bakery
+    "caputo 00 americana flour": ("flour", "Flour"),
+    "king arthur bread flour": ("bread flour", "Bread Flour"),
+    "all purpose or bread flour": ("bread flour", "Bread Flour"),
+    "chang s pad thai dried rice sticks": ("rice noodles", "Rice Noodles"),
+    "panko breadcrumbs": ("panko", "Panko"),
+    "crushed ritz crackers": ("ritz crackers", "Ritz Crackers"),
+    "carnaroli risotto rice": ("risotto rice", "Risotto Rice"),
+    "long grain white rice": ("white rice", "White Rice"),
+    "short grain rice": ("white rice", "White Rice"),
+    "risoni orzo": ("orzo", "Orzo"),
+    "risoni or orzo": ("orzo", "Orzo"),
+    "greek pita bread pockets or flatbreads": ("pita bread", "Pita Bread"),
+    "tortillas of choice": ("tortilla", "Tortillas"),
+    "rolled oats or quick oats": ("rolled oats", "Rolled Oats"),
+    "old fashioned rolled oats": ("rolled oats", "Rolled Oats"),
+    "old fashioned whole rolled oats": ("rolled oats", "Rolled Oats"),
+
+    # Sauces & Condiments
+    "beef or chicken broth stock": ("beef broth", "Beef Broth"),
+    "chicken or vegetable broth": ("chicken broth", "Chicken Broth"),
+    "chicken stock": ("chicken broth", "Chicken Broth"),
+    "low sodium chicken broth": ("chicken broth", "Chicken Broth"),
+    "low sodium chicken stock": ("chicken broth", "Chicken Broth"),
+    "bouillon cube": ("chicken broth", "Chicken Broth"),
+    "chicken boulion": ("chicken broth", "Chicken Broth"),
+    "browning sauce or dark molasses": ("browning sauce", "Browning Sauce"),
+    "butter or extra virgin olive oil": ("butter", "Butter"),
+    "chili crisp or your favorite chili oil": ("chili crisp", "Chili Crisp"),
+    "cooking oil of your choice": ("cooking oil", "Cooking Oil"),
+    "neutral oil": ("cooking oil", "Cooking Oil"),
+    "oil": ("cooking oil", "Cooking Oil"),
+    "asian sesame oil": ("sesame oil", "Sesame Oil"),
+    "toasted sesame oil": ("sesame oil", "Sesame Oil"),
+    "country style dijon mustard": ("dijon mustard", "Dijon Mustard"),
+    "grainy dijon mustard": ("dijon mustard", "Dijon Mustard"),
+    "american yellow mustard": ("yellow mustard", "Yellow Mustard"),
+    "creamy unsweetened peanut butter": ("peanut butter", "Peanut Butter"),
+    "smooth natural peanut butter": ("peanut butter", "Peanut Butter"),
+    "honey or maple syrup": ("honey", "Honey"),
+    "hot sauce or ketchup optional": ("hot sauce", "Hot Sauce"),
+    "sauce or ketchup optional": ("hot sauce", "Hot Sauce"),
+    "reduced sodium soy sauce": ("low sodium soy sauce", "Low-Sodium Soy Sauce"),
+    "remaining caramel sauce": ("caramel sauce", "Caramel Sauce"),
+    "remaining salted caramel sauce": ("caramel sauce", "Caramel Sauce"),
+    "sweet white miso": ("miso paste", "Miso Paste"),
+    "sriracha sauce": ("sriracha", "Sriracha"),
+    "white wine vinegar or champagne vinegar": ("white wine vinegar", "White Wine Vinegar"),
+
+    # Spices & Seasonings
+    "barbecue rub or spice mix": ("barbecue rub", "Barbecue Rub"),
+    "cayenne": ("cayenne pepper", "Cayenne Pepper"),
+    "coriander cilantro": ("cilantro", "Cilantro"),
+    "coriander cilantro leaf": ("cilantro", "Cilantro"),
+    "coriander powder": ("ground coriander", "Ground Coriander"),
+    "cumin seed": ("cumin", "Cumin"),
+    "ginger powder": ("ground ginger", "Ground Ginger"),
+    "green cardamoms": ("cardamom", "Cardamom"),
+    "ground allspice": ("allspice", "Allspice"),
+    "ground cardamom": ("cardamom", "Cardamom"),
+    "ground chilli or cayenne pepper": ("cayenne pepper", "Cayenne Pepper"),
+    "ground cinnamon": ("cinnamon", "Cinnamon"),
+    "ground cumin": ("cumin", "Cumin"),
+    "ground mace or nutmeg": ("nutmeg", "Nutmeg"),
+    "kashmiri red chilli powder": ("kashmiri chilli powder", "Kashmiri Chilli Powder"),
+    "onion or garlic powder": ("onion powder", "Onion Powder"),
+    "onion powder or garlic powder": ("onion powder", "Onion Powder"),
+    "regular or smoked paprika": ("smoked paprika", "Smoked Paprika"),
+    "rosemary or thyme": ("rosemary", "Rosemary"),
+    "smoked paprika or paprika for a little color": ("smoked paprika", "Smoked Paprika"),
+    "spanish paprika": ("paprika", "Paprika"),
+    "sweet paprika": ("paprika", "Paprika"),
+    "turmeric powder": ("turmeric", "Turmeric"),
+
+    # Pantry Staples
+    "cashew nuts": ("cashew", "Cashews"),
+    "instant rise yeast": ("instant yeast", "Instant Yeast"),
+    "dark brown sugar": ("brown sugar", "Brown Sugar"),
+    "light brown sugar": ("brown sugar", "Brown Sugar"),
+    "light or dark brown sugar": ("brown sugar", "Brown Sugar"),
+    "chocolate chip": ("chocolate chip", "Chocolate Chips"),
+    "semisweet chocolate chips": ("chocolate chip", "Chocolate Chips"),
+    "dark or semisweet chocolate chips": ("chocolate chip", "Chocolate Chips"),
+    "pecans or walnuts": ("pecan", "Pecans"),
+    "pure vanilla extract": ("vanilla extract", "Vanilla Extract"),
+    "vanilla": ("vanilla extract", "Vanilla Extract"),
+    "raw almonds": ("almond", "Almonds"),
+    "slivered almonds": ("almond", "Almonds"),
+    "walnut piece": ("walnut", "Walnuts"),
+    "whole cloves": ("clove", "Cloves"),
+    "ground cloves": ("clove", "Cloves"),
+    "tamarind puree not concentrate": ("tamarind puree", "Tamarind Puree"),
+    "dr pepper or coke": ("cola", "Cola"),
 }
 
 
@@ -324,6 +493,10 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
     text = re.sub(r"^\s*to\s+(\d+(\.\d+)?\s*[-–—/]\s*\d+|\d+([./]\d+)?)\s*", "", text, flags=re.I)
     text = re.sub(r"^\s*to\s+(\d+\s*)?(tbsp|tablespoons?|tsp|teaspoons?|cups?)\b\.?\s*", "", text, flags=re.I)
     text = re.sub(r"^\s*to\s+", "", text, flags=re.I)
+    text = re.sub(r"^\s*(?:remaining|leftover)\s+", "", text, flags=re.I)
+    text = re.sub(r"^\s*danish\s+creamery\s+", "", text, flags=re.I)
+    text = re.sub(r"^\s*caputo\s+00\s+americana\s+", "", text, flags=re.I)
+    text = re.sub(r"^\s*king\s+arthur\s+", "", text, flags=re.I)
     text = re.sub(r"^\s*length\s+(?=ginger\b)", "", text, flags=re.I)
     text = re.sub(r"^\s*canned\s+", "", text, flags=re.I)
     text = re.sub(r"^\s*more\s+", "", text, flags=re.I)
@@ -398,14 +571,18 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
     display = clean_display.title()
 
     # Herb leaf normalization: "Basil Leaves" -> "Basil"
+    herb_base = None
     m_herb = HERB_LEAF_PATTERNS.match(display)
     if m_herb:
         display = m_herb.group(1).title()
+        herb_base = m_herb.group(1).lower()
 
     # Cheese base normalization: "Cheddar Cheese" -> "Cheddar"
+    cheese_base = None
     m_cheese = CHEESE_BASE_PATTERNS.match(display)
     if m_cheese:
         display = m_cheese.group(1).title()
+        cheese_base = m_cheese.group(1).lower()
 
     if display == "Chicken Breasts":
         display = "Chicken Breast"
@@ -418,20 +595,29 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
     elif display in ("Garlic Cloves", "Large Garlic Cloves"):
         display = "Garlic"
 
-    # Normalized name: lowercased, prep words and punctuation removed for grouping
-    norm = text.lower()
-    norm = re.sub(r"[-–—]", " ", norm)
-    norm = PREP_REGEX.sub(" ", norm)
-    norm = re.sub(r"[^\w\s]", " ", norm)
-    norm = re.sub(r"\s+", " ", norm).strip()
+    # Normalize accents for clean UI and grouping
+    display = display.replace("ñ", "n").replace("Ñ", "N").replace("è", "e").replace("é", "e")
 
-    # Singularize common end words for tighter grouping
-    tokens = norm.split()
-    if tokens:
-        last_tok = tokens[-1]
-        if last_tok in PLURAL_MAP:
-            tokens[-1] = PLURAL_MAP[last_tok]
-            norm = " ".join(tokens)
+    # Normalized name: lowercased, prep words and punctuation removed for grouping
+    if herb_base:
+        norm = herb_base
+    elif cheese_base:
+        norm = cheese_base
+    else:
+        norm = text.lower()
+        norm = norm.replace("ñ", "n").replace("è", "e").replace("é", "e")
+        norm = re.sub(r"[-–—]", " ", norm)
+        norm = PREP_REGEX.sub(" ", norm)
+        norm = re.sub(r"[^\w\s]", " ", norm)
+        norm = re.sub(r"\s+", " ", norm).strip()
+
+        # Singularize common end words for tighter grouping
+        tokens = norm.split()
+        if tokens:
+            last_tok = tokens[-1]
+            if last_tok in PLURAL_MAP:
+                tokens[-1] = PLURAL_MAP[last_tok]
+                norm = " ".join(tokens)
 
     if norm in ("cloves", "garlic cloves"):
         norm = "garlic"
@@ -459,25 +645,49 @@ def categorize_ingredient(name: str) -> str:
     """Smart heuristic categorization for pantry items."""
     n = name.lower()
 
-    # 1. Spices & Seasonings
+    # 1. Special Pantry items (canned beans, pulses, sodas, tomato paste/soup, seeds/nuts, wines)
     if any(k in n for k in [
-        "powder", "paprika", "cumin", "oregano", "cinnamon", "spice", "nutmeg",
-        "curry", "seasoning", "coriander", "allspice", "cardamom", "clove", "cloves",
-        "turmeric", "cayenne", "chili flake", "red pepper flake", "mace", "peppercorn",
-        "bay leaf", "bay leaves", "kasoori methi", "marjoram", "thyme", "star anise"
-    ]) or re.search(r"\b(rubs?|dill)\b", n):
-        return "spices & herbs"
-
-    # 2. Sauces & Condiments (including cooking oils)
-    if any(k in n for k in [
-        "broth", "stock", "bouillon", "boulion", "sauce", "vinegar", "hoisin",
-        "peanut butter", "honey", "miso", "mustard", "mayo", "ketchup",
-        "sriracha", "worcestershire", "tahini", "relish", "dressing", "syrup",
-        "oil", "oils", "anchovy"
+        "black bean", "canned black bean", "cannellini", "chickpea",
+        "tomato paste", "tomato soup", "cola", "soda", "wine", "chardonnay",
+        "tequila", "triple sec", "sugar", "yeast", "cornstarch", "baking soda",
+        "chocolate chip", "almond", "pecan", "walnut", "cashew", "peanut",
+        "flax seed", "chia seed", "sunflower seed", "msg", "old bay", "tamarind",
+        "shortening", "levain"
     ]):
+        return "pantry"
+
+    # 2. Pickles / relishes in sauces & condiments (before dill check in spices)
+    if "pickle" in n or "relish" in n:
         return "sauces & condiments"
 
-    # 3. Dairy & Eggs
+    # 3. Cilantro in produce (before coriander check in spices)
+    if "cilantro" in n:
+        return "produce"
+
+    # 4. Fresh apples in produce (before honey in sauces)
+    if "apple" in n and "applesauce" not in n and "cider" not in n:
+        return "produce"
+
+    # 5. Spices & Seasonings
+    if any(k in n for k in [
+        "powder", "paprika", "cumin", "oregano", "cinnamon", "spice", "nutmeg",
+        "curry", "seasoning", "allspice", "cardamom", "clove", "cloves",
+        "turmeric", "cayenne", "chili flake", "red pepper flake", "mace", "peppercorn",
+        "bay leaf", "bay leaves", "kasoori methi", "marjoram", "thyme", "star anise",
+        "fennel seed"
+    ]) or re.search(r"\b(rubs?|dill|coriander)\b", n):
+        return "spices & herbs"
+
+    # 6. Sauces & Condiments (including cooking oils)
+    if any(k in n for k in [
+        "broth", "stock", "bouillon", "boulion", "sauce", "vinegar", "hoisin",
+        "peanut butter", "miso", "mustard", "mayo", "ketchup",
+        "sriracha", "worcestershire", "tahini", "dressing", "syrup",
+        "oil", "oils", "anchovy"
+    ]) or re.search(r"\bhoney\b", n):
+        return "sauces & condiments"
+
+    # 7. Dairy & Eggs
     if (
         any(k in n for k in [
             "milk", "cream", "cheese", "butter", "yogurt", "mozzarella", "parmesan",
@@ -489,7 +699,7 @@ def categorize_ingredient(name: str) -> str:
     ):
         return "dairy"
 
-    # 4. Grains & Bakery
+    # 8. Grains & Bakery
     if any(k in n for k in [
         "rice", "noodle", "pasta", "bread", "dough", "tortilla", "spaghetti",
         "orzo", "quinoa", "flour", "pita", "starter", "risotto",
@@ -498,7 +708,7 @@ def categorize_ingredient(name: str) -> str:
     ]) or re.search(r"\b(buns?|rolls?|oats?|oatmeal)\b", n):
         return "grains & bakery"
 
-    # 5. Protein
+    # 9. Protein
     if any(k in n for k in [
         "chicken", "beef", "pork", "steak", "turkey", "lamb", "bacon", "salmon",
         "shrimp", "fish", "tuna", "patty", "patties", "meat", "sausage", "chorizo",
@@ -506,17 +716,17 @@ def categorize_ingredient(name: str) -> str:
     ]) or re.search(r"\b(ham|cod)\b", n):
         return "protein"
 
-    # 6. Produce & Fresh
+    # 10. Produce & Fresh
     if any(k in n for k in [
-        "tomato", "onion", "garlic", "spinach", "lettuce", "cilantro", "basil", "parsley",
+        "tomato", "onion", "garlic", "spinach", "lettuce", "basil", "parsley",
         "lemon", "lime", "potato", "carrot", "broccoli", "zucchini", "cucumber", "cabbage",
-        "sprouts", "sage", "rosemary", "chile", "chili", "peppers", "avocado", "herb",
-        "mint", "scallion", "shallot", "leek", "celery", "fennel", "mushroom", "bean",
+        "sprout", "sprouts", "sage", "rosemary", "chile", "chili", "chilli", "pepper", "peppers",
+        "avocado", "herb", "mint", "scallion", "shallot", "leek", "celery", "fennel", "mushroom",
         "kale", "ginger", "cauliflower", "rhubarb", "edamame", "eggplant",
-        "chive", "jalapeno", "jalapeño", "serrano", "romaine", "apple", "banana", "berry",
+        "chive", "jalapeno", "serrano", "romaine", "apple", "banana", "berry",
         "berries", "mango", "peach", "fruit", "slaw", "artichoke", "pomegranate", "cranberr",
-        "fig", "raisin", "olive", "chickpea"
-    ]) or re.search(r"\b(peas?|corn|peppers?|chillies?)\b", n):
+        "fig", "raisin", "olive", "brussels"
+    ]) or re.search(r"\b(peas?|corn|peppers?|chillies?|chillis?)\b", n):
         return "produce"
 
     return "pantry"
