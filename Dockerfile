@@ -41,8 +41,8 @@ COPY app/ ./app/
 COPY static/ ./static/
 COPY main.py .
 
-# Ensure app files are owned by appuser
-RUN chown -R appuser:appgroup /app
+# Ensure data directory exists and app files are owned by appuser
+RUN mkdir -p /app/data && chown -R appuser:appgroup /app
 
 # Switch to non-root user
 USER appuser

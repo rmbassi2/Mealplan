@@ -6,6 +6,8 @@ services:
     container_name: dinner-decider
     ports:
       - "${BIND_IP:-127.0.0.1}:${PORT:-8000}:8000"
+    volumes:
+      - ./data:/app/data
     environment:
       - PORT=8000
       - MEALIE_BASE_URL=${MEALIE_BASE_URL:-}
@@ -15,6 +17,7 @@ services:
       - NTFY_BASE_URL=${NTFY_BASE_URL:-https://ntfy.sh}
       - NTFY_TOKEN=${NTFY_TOKEN:-}
       - MOCK_MODE=${MOCK_MODE:-false}
+      - PANTRY_DB_PATH=${PANTRY_DB_PATH:-data/pantry.db}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]

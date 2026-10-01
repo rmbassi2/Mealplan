@@ -7,18 +7,22 @@ A lightweight, mobile-first web app designed for effortless dinner decision-maki
 ## ✨ Features
 
 - **📱 Mobile-First Bistro UX:** Designed specifically for smartphones (warm aesthetic, touch-friendly cards, clear typography, and subtle micro-interactions).
-- **🎲 Curated Recipe Shuffle:** Pulls 3 random recipes from your Mealie recipe library with one tap.
+- **🎲 Curated Recipe Shuffle:** Pulls 3 random recipes from your Mealie recipe library with one tap, powered by an anti-monotony weighted shuffle algorithm.
+- **🧺 Embedded Pantry Inventory & "Pantry Ready" Filtering:** Built-in SQLite pantry engine (`data/pantry.db`) with automatic recipe ingredient discovery, culinary normalization, and kitchen staples bypass. The `🧺 Pantry Ready` carousel filter surfaces recipes you can cook right now (0 missing ingredients) or are at most 1 item off from making.
+- **🛒 One-Tap Mealie Shopping List Integration:** When locking in a dinner that is 1 ingredient off, an inline prompt lets you add the missing item straight to Mealie's household shopping list.
+- **🥗 2-Step Side Dish Pairing:** Optional second step allowing you to pair tonight's main with a recommended side dish or household staple (e.g. Jasmine Rice, Caesar Salad, Garlic Bread) before final confirmation.
 - **🖼️ Built-in Image Proxy:** Safely proxies and caches Mealie recipe images (`/api/recipe-image/{id}`) so client browsers never need direct access or credentials to your Mealie instance.
 - **🍜 Custom Craving ("Something Else"):** An intuitive input field for takeout, leftovers, or specific cravings. Typing in this field automatically deselects recipe cards.
 - **📅 Instant Mealie Meal Plan Scheduling:** Submits either the recipe ID or custom text to Mealie's `/api/groups/mealplans` endpoint for today's date (`YYYY-MM-DD`).
 - **🛡️ Built-in Mock & Resilient Fallback Mode:** Seamlessly falls back to curated mock recipes with beautiful vector dish illustrations if Mealie is temporarily offline, unreachable, or unconfigured during initial setup.
-- **🐳 Multi-stage Docker Container:** Production-ready Python 3.11-slim container running as an unprivileged non-root user with healthchecks and Docker Compose support.
+- **🐳 Multi-stage Docker Container:** Production-ready Python 3.12-slim container running as an unprivileged non-root user with healthchecks, persistent data volumes, and Docker Compose support.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Backend:** Python (FastAPI, `httpx`, `pydantic`, `python-dotenv`, `uvicorn`)
+- **Backend:** Python (FastAPI, `httpx`, `pydantic`, `python-dotenv`, `uvicorn`, `sqlite3`)
+- **Database:** SQLite (`data/pantry.db` for zero-friction persistent pantry tracking)
 - **Frontend:** Single-page app served directly by FastAPI with Tailwind CSS (CDN) and zero heavy Node.js/npm dependencies.
 - **Containerization:** Multi-stage `Dockerfile` & `docker-compose.yml`.
 
@@ -156,27 +160,50 @@ Dinner Decider uses **[ntfy.sh](https://ntfy.sh/)** to immediately alert the che
 
 ---
 
+## 🧺 Pantry Inventory & "Pantry Ready" Decider
+
+Dinner Decider includes a zero-friction, embedded pantry inventory tracker designed to eliminate dinner-time ingredient friction:
+
+1. **Auto-Seeding & Normalization:** On startup or when clicking **⚡ Sync**, the backend automatically scans your recipes and seeds the pantry database. Measurements and culinary prep verbs are cleaned, and common staples (*salt, black pepper, cooking oils, water*) are bypassed so basic ingredients never disqualify dishes.
+2. **Interactive Drawer Modal:** Tap the **🧺 Pantry** header button to view current stock. Filter by status (*All*, *In Stock*, *Missing*) or search instantly. Tap any item to toggle between **✓ In Stock** and **✕ Out**.
+3. **"Pantry Ready" Carousel Filter:** Tap the **🧺 Pantry Ready** filter pill in the style bar to filter the carousel to meals you have 100% of the ingredients for, or are at most 1 item off from making.
+4. **Missing Ingredient Badges & Alerts:** Recipe cards display clear stock badges (`🟢 Pantry Ready` or `⚠️ Need: [Item]`) and inline missing item alerts.
+5. **One-Tap Mealie Shopping List:** When locking in a dinner missing 1 item, tap **Add to Mealie Shopping List** to instantly push the deficit item to your Mealie household list.
+6. **Data Persistence:** Stored in a lightweight SQLite database (`data/pantry.db`). When running in Docker, `./data:/app/data` is mounted to ensure persistence across restarts.
+
+---
+
 ## 📡 API Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/health` | Healthcheck returning service status and Mealie connection mode |
-| `GET` | `/api/options` | Returns 3 randomly selected dinner recipes |
+| `GET` | `/api/options` | Returns 3 curated dinner recipes (supports `?mood=pantry`, `?protein=...`, etc.) |
+| `GET` | `/api/side-options` | Returns 3 curated side dish pairings |
 | `GET` | `/api/recipe-image/{recipe_id}` | Proxies recipe image from Mealie (with SVG fallback) |
 | `POST` | `/api/choose` | Submits recipe or custom craving to Mealie Mealplanner API |
+| `GET` | `/api/pantry` | Retrieves inventory items and in-stock/out-of-stock statistics |
+| `POST` | `/api/pantry/toggle` | Toggles an ingredient's in-stock status |
+| `POST` | `/api/pantry/item` | Adds a custom ingredient to the pantry inventory |
+| `DELETE` | `/api/pantry/item/{id}` | Deletes an ingredient from the pantry |
+| `POST` | `/api/pantry/sync` | Scans recipes and auto-discovers newly added ingredients |
+| `POST` | `/api/pantry/bulk-stock` | Sets all pantry items to in-stock |
+| `POST` | `/api/shopping-list/add` | Appends a missing ingredient directly to Mealie's shopping list |
 
 ### Example Choice Submission:
 ```json
 // Option A: Recipe Selection
 POST /api/choose
 {
-  "recipe_id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e01"
+  "recipe_id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e01",
+  "side_recipe_id": "optional-side-recipe-uuid"
 }
 
 // Option B: Custom Craving
 POST /api/choose
 {
-  "custom_note": "Spicy Thai Green Curry Takeout"
+  "custom_note": "Spicy Thai Green Curry Takeout",
+  "side_note": "Jasmine Rice"
 }
 ```
 
