@@ -392,20 +392,29 @@ class MealieClient:
                 }
 
     async def get_all_foods(self) -> List[Dict[str, Any]]:
-        """Fetch all food/ingredient items from Mealie's food database."""
+        """Fetch all food/ingredient items from Mealie's food database with paginated pacing."""
         if self.mock_mode:
             return []
 
-        endpoints = [
-            f"{self.base_url}/api/foods?perPage=50",
-            f"{self.base_url}/api/households/foods?perPage=50",
-            f"{self.base_url}/api/groups/foods?perPage=50",
+        base_endpoints = [
+            f"{self.base_url}/api/foods",
+            f"{self.base_url}/api/households/foods",
+            f"{self.base_url}/api/groups/foods",
         ]
-        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
-            for url in endpoints:
+
+        per_page = 25  # Safe pagination batch size to prevent DB pool pressure
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            for base_url in base_endpoints:
+                foods: List[Dict[str, Any]] = []
+                page = 1
                 try:
-                    resp = await client.get(url, headers=self.headers)
-                    if resp.status_code == 200:
+                    while True:
+                        resp = await client.get(
+                            f"{base_url}?page={page}&perPage={per_page}",
+                            headers=self.headers,
+                        )
+                        if resp.status_code != 200:
+                            break
                         data = resp.json()
                         items = (
                             data.get("items", [])
@@ -414,11 +423,21 @@ class MealieClient:
                             if isinstance(data, list)
                             else []
                         )
-                        if items:
-                            logger.info(f"Fetched {len(items)} food items from Mealie via {url}")
-                            return items
+                        if not items:
+                            break
+                        foods.extend(items)
+                        total = data.get("total", len(foods)) if isinstance(data, dict) else len(foods)
+                        if len(foods) >= total or len(items) < per_page:
+                            break
+                        page += 1
+                        await asyncio.sleep(0.05)
+
+                    if foods:
+                        logger.info(f"Fetched {len(foods)} food items from Mealie via {base_url}")
+                        return foods
                 except Exception as e:
-                    logger.debug(f"Error fetching foods from {url}: {e}")
+                    logger.debug(f"Error fetching foods from {base_url}: {e}")
+
         return []
 
     async def get_full_recipe(self, slug_or_id: str) -> Optional[Dict[str, Any]]:
