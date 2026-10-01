@@ -1512,13 +1512,21 @@
       }
     }
 
+    let mealieStatus = null;
+
     async function loadPantry() {
       try {
-        const res = await fetch('/api/pantry');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const [pRes, mRes] = await Promise.all([
+          fetch('/api/pantry'),
+          fetch('/api/mealie/status').catch(() => null)
+        ]);
+        if (!pRes.ok) throw new Error(`HTTP ${pRes.status}`);
+        const data = await pRes.json();
         pantryItems = data.items || [];
         pantryStats = data.stats || { total: 0, in_stock: 0, out_of_stock: 0 };
+        if (mRes && mRes.ok) {
+          mealieStatus = await mRes.json();
+        }
         updatePantryHeaderBadge();
         renderPantryList();
       } catch (err) {
@@ -1535,7 +1543,17 @@
           badge.classList.remove('hidden');
         }
         if (subtitle) {
-          subtitle.textContent = `${pantryStats.in_stock} in stock • ${pantryStats.out_of_stock} out of stock`;
+          let sourceText = '';
+          if (mealieStatus) {
+            if (mealieStatus.connected) {
+              sourceText = ` • 🟢 Mealie Connected (${mealieStatus.recipe_count} recipes)`;
+            } else if (mealieStatus.mock_mode) {
+              sourceText = ` • ⚪ Demo Mode`;
+            } else {
+              sourceText = ` • ⚠️ Mealie Disconnected`;
+            }
+          }
+          subtitle.textContent = `${pantryStats.in_stock} in stock • ${pantryStats.out_of_stock} out${sourceText}`;
         }
       }
     }
@@ -1744,7 +1762,12 @@
       const btn = document.getElementById('syncPantryBtn');
       if (btn) btn.innerHTML = '<span>⏳</span><span>Syncing...</span>';
       try {
-        const res = await fetch('/api/pantry/sync', { method: 'POST' });
+        let url = '/api/pantry/sync';
+        // If syncing from Mealie, offer to clear initial demo items
+        if (confirm("Sync pantry with Mealie:\n\n• Click OK to refresh from your Mealie library (clears initial demo items).\n• Click Cancel to keep current items and only add newly discovered ingredients.")) {
+          url += '?clear_existing=true';
+        }
+        const res = await fetch(url, { method: 'POST' });
         if (res.ok) {
           await loadPantry();
         }

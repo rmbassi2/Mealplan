@@ -62,7 +62,7 @@ UNIT_WORDS = re.compile(
 )
 
 PREP_WORDS = re.compile(
-    r"\b(diced|chopped|minced|sliced|crushed|grated|shredded|melted|softened|"
+    r"\b(organic|diced|chopped|minced|sliced|crushed|grated|shredded|melted|softened|"
     r"warm|cold|fresh|freshly|dried|ground|boneless|skinless|cooked|uncooked|"
     r"to taste|divided|optional|room temperature)\b",
     re.IGNORECASE,
@@ -368,6 +368,62 @@ class PantryManager:
                         added_count += 1
 
         logger.info(f"Seeded {added_count} new ingredients into pantry database.")
+        return added_count
+
+    def clear_all_items(self) -> int:
+        """Clear all pantry items from the database."""
+        self._invalidate_cache()
+        with self._get_connection() as conn:
+            cursor = conn.execute("DELETE FROM pantry_items")
+            conn.commit()
+            deleted = cursor.rowcount
+        logger.info(f"Cleared {deleted} items from pantry database.")
+        return deleted
+
+    def seed_from_foods(
+        self, foods: List[Dict[str, Any]], mark_in_stock: bool = True
+    ) -> int:
+        """Populate pantry from Mealie food database items."""
+        added_count = 0
+        self._invalidate_cache()
+
+        for item in foods:
+            raw_name = ""
+            if isinstance(item, dict):
+                raw_name = item.get("name") or item.get("display") or item.get("title") or ""
+            elif isinstance(item, str):
+                raw_name = item
+
+            if not raw_name:
+                continue
+
+            norm = normalize_ingredient_name(raw_name)
+            if not norm or norm in DEFAULT_STAPLES:
+                continue
+
+            clean_display = raw_name.strip()
+            clean_display = MEASUREMENT_WORDS.sub("", clean_display).strip().title()
+            if not clean_display:
+                clean_display = norm.title()
+
+            cat = categorize_ingredient(norm)
+
+            with self._get_connection() as conn:
+                cursor = conn.execute(
+                    "SELECT id FROM pantry_items WHERE name = ?", (norm,)
+                )
+                if not cursor.fetchone():
+                    conn.execute(
+                        """
+                        INSERT INTO pantry_items (name, display_name, category, in_stock, is_staple, updated_at)
+                        VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+                        """,
+                        (norm, clean_display, cat, 1 if mark_in_stock else 0),
+                    )
+                    conn.commit()
+                    added_count += 1
+
+        logger.info(f"Seeded {added_count} new foods into pantry database.")
         return added_count
 
     def evaluate_recipe(

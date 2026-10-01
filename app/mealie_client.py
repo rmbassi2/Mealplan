@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import random
 import re
@@ -339,6 +340,144 @@ class MealieClient:
             "message": f"Could not add '{item_name}' to Mealie shopping list",
         }
 
+    async def check_connection(self) -> Dict[str, Any]:
+        """Test live Mealie connectivity and return diagnostic info."""
+        if self.mock_mode:
+            return {
+                "connected": False,
+                "mock_mode": True,
+                "message": "App is running in Mock Mode (either MOCK_MODE=true or MEALIE credentials not set).",
+                "base_url": self.base_url or "(none)",
+                "recipe_count": 0,
+                "food_count": 0,
+            }
+
+        async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+            try:
+                # 1. Test recipes endpoint
+                r_resp = await client.get(f"{self.base_url}/api/recipes?perPage=1", headers=self.headers)
+                if r_resp.status_code != 200:
+                    return {
+                        "connected": False,
+                        "mock_mode": False,
+                        "status_code": r_resp.status_code,
+                        "message": f"Mealie returned HTTP {r_resp.status_code} at /api/recipes. Check your MEALIE_API_TOKEN.",
+                        "base_url": self.base_url,
+                    }
+
+                r_data = r_resp.json()
+                total_recipes = r_data.get("total", 0) if isinstance(r_data, dict) else len(r_data)
+
+                # 2. Test foods endpoint
+                f_resp = await client.get(f"{self.base_url}/api/foods?perPage=1", headers=self.headers)
+                total_foods = 0
+                if f_resp.status_code == 200:
+                    f_data = f_resp.json()
+                    total_foods = f_data.get("total", 0) if isinstance(f_data, dict) else len(f_data)
+
+                return {
+                    "connected": True,
+                    "mock_mode": False,
+                    "message": "Successfully connected to Mealie!",
+                    "base_url": self.base_url,
+                    "recipe_count": total_recipes,
+                    "food_count": total_foods,
+                }
+            except Exception as e:
+                return {
+                    "connected": False,
+                    "mock_mode": False,
+                    "message": f"Could not reach Mealie at {self.base_url}: {str(e)}",
+                    "base_url": self.base_url,
+                }
+
+    async def get_all_foods(self) -> List[Dict[str, Any]]:
+        """Fetch all food/ingredient items from Mealie's food database."""
+        if self.mock_mode:
+            return []
+
+        endpoints = [
+            f"{self.base_url}/api/foods?perPage=500",
+            f"{self.base_url}/api/households/foods?perPage=500",
+            f"{self.base_url}/api/groups/foods?perPage=500",
+        ]
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+            for url in endpoints:
+                try:
+                    resp = await client.get(url, headers=self.headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        items = (
+                            data.get("items", [])
+                            if isinstance(data, dict)
+                            else data
+                            if isinstance(data, list)
+                            else []
+                        )
+                        if items:
+                            logger.info(f"Fetched {len(items)} food items from Mealie via {url}")
+                            return items
+                except Exception as e:
+                    logger.debug(f"Error fetching foods from {url}: {e}")
+        return []
+
+    async def get_full_recipe(self, slug_or_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch full recipe details including recipeIngredient from Mealie."""
+        if self.mock_mode:
+            for r in MOCK_RECIPES + MOCK_SIDES:
+                if r.get("id") == slug_or_id or r.get("slug") == slug_or_id:
+                    return r
+            return None
+
+        if slug_or_id in self._recipe_cache:
+            return self._recipe_cache[slug_or_id]
+
+        url = f"{self.base_url}/api/recipes/{slug_or_id}"
+        try:
+            async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+                resp = await client.get(url, headers=self.headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    self._recipe_cache[slug_or_id] = data
+                    if data.get("slug"):
+                        self._recipe_cache[data["slug"]] = data
+                    if data.get("id"):
+                        self._recipe_cache[data["id"]] = data
+                    return data
+        except Exception as e:
+            logger.debug(f"Error fetching full recipe {slug_or_id}: {e}")
+        return None
+
+    async def enrich_recipe_ingredients(
+        self, recipes: List[Dict[str, Any]], max_fetch: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Ensure recipe objects have recipeIngredient populated by fetching full recipe details."""
+        if self.mock_mode or not recipes:
+            return recipes
+
+        missing_items = [
+            r for r in recipes
+            if not (r.get("recipeIngredient") or r.get("ingredients"))
+            and (r.get("slug") or r.get("id"))
+        ][:max_fetch]
+
+        if not missing_items:
+            return recipes
+
+        sem = asyncio.Semaphore(10)
+
+        async def fetch_one(r: Dict[str, Any]):
+            slug_or_id = r.get("slug") or r.get("id")
+            async with sem:
+                full = await self.get_full_recipe(slug_or_id)
+                if full:
+                    r["recipeIngredient"] = full.get("recipeIngredient") or full.get("ingredients") or []
+                    if full.get("tools") and not r.get("tools"):
+                        r["tools"] = full.get("tools")
+
+        await asyncio.gather(*[fetch_one(r) for r in missing_items], return_exceptions=True)
+        return recipes
+
     async def get_dinner_options(
         self,
         count: int = 3,
@@ -353,7 +492,7 @@ class MealieClient:
 
         if not self.mock_mode:
             try:
-                async with httpx.AsyncClient(timeout=6.0) as client:
+                async with httpx.AsyncClient(timeout=8.0) as client:
                     resp = await client.get(
                         f"{self.base_url}/api/recipes?perPage=100",
                         headers=self.headers,
@@ -369,20 +508,23 @@ class MealieClient:
                         )
 
                         if items:
-                            # Auto-seed pantry if it is currently empty
+                            # Auto-seed pantry from foods if pantry is currently empty
                             if pantry_manager.get_stats()["total"] == 0:
-                                pantry_manager.seed_from_recipes(items)
-                                in_stock_set = pantry_manager.get_in_stock_set()
+                                foods = await self.get_all_foods()
+                                if foods:
+                                    pantry_manager.seed_from_foods(foods)
+                                    in_stock_set = pantry_manager.get_in_stock_set()
 
-                            # Evaluate pantry status for each recipe
-                            for r in items:
-                                r["_pantry"] = pantry_manager.evaluate_recipe(r, in_stock_set)
-
-                            candidate_items = items
-                            if pantry_only or mood in ("pantry", "pantry-ready"):
+                            # If filtering strictly by pantry-ready, enrich candidate pool
+                            needs_pantry_filter = pantry_only or mood in ("pantry", "pantry-ready")
+                            if needs_pantry_filter:
+                                await self.enrich_recipe_ingredients(items, max_fetch=40)
+                                for r in items:
+                                    r["_pantry"] = pantry_manager.evaluate_recipe(r, in_stock_set)
                                 ready_pool = [r for r in items if r["_pantry"]["is_ready"]]
-                                if ready_pool:
-                                    candidate_items = ready_pool
+                                candidate_items = ready_pool if ready_pool else items
+                            else:
+                                candidate_items = items
 
                             selected = select_balanced_recipes(
                                 candidate_items,
@@ -392,6 +534,12 @@ class MealieClient:
                                 tool=tool,
                                 cuisine=cuisine,
                             )
+
+                            # Enrich the final selected recipes with full ingredients if not already done
+                            await self.enrich_recipe_ingredients(selected, max_fetch=len(selected))
+                            for r in selected:
+                                if "_pantry" not in r:
+                                    r["_pantry"] = pantry_manager.evaluate_recipe(r, in_stock_set)
                             results = []
                             for r in selected:
                                 tax = r.get("_taxonomy") or extract_recipe_taxonomy(r)
