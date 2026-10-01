@@ -9,6 +9,7 @@ from app.pantry import (
     normalize_ingredient_name,
     categorize_ingredient,
     clean_ingredient_name,
+    is_staple_ingredient,
 )
 
 
@@ -314,4 +315,189 @@ def test_seed_from_recipes_deduplication_and_filtering(temp_pantry):
     assert item_names["garlic"] == "Garlic"
     assert "onion" in item_names
     assert item_names["onion"] == "Onion"
+
+
+def test_is_staple_ingredient():
+    staples = [
+        "Salt & Pepper",
+        "Salt And Pepper To Taste",
+        "Cooking Salt / Kosher Salt",
+        "Fine Sea Salt",
+        "Flaky Sea Salt",
+        "Kosher Salt And Freshly Ground Pepper",
+        "Warm Water, Filtered",
+        "Filtered Water, Room Temperature",
+        "Water – Warm But Not Hot",
+        "Ice Cubes",
+        "Nonstick Cooking Spray, For Greasing",
+        "Vegetable Spray For Greasing Bowl",
+        "White Granulated Sugar",
+        "& 1/2 Teaspoon Salt",
+        "Water",
+        "Black Pepper",
+        "Kosher Salt",
+        "All-Purpose Flour",
+        "Sugar",
+    ]
+    for s in staples:
+        cleaned = clean_ingredient_name(s)
+        norm = cleaned[0] if cleaned else s.lower()
+        assert is_staple_ingredient(norm, s), f"Expected staple for {s!r}"
+
+    non_staples = [
+        ("Chili Pepper", "chili pepper"),
+        ("Bell Pepper", "bell pepper"),
+        ("Brown Sugar", "brown sugar"),
+        ("Coconut Sugar", "coconut sugar"),
+        ("Bread Flour", "bread flour"),
+        ("Watermelon", "watermelon"),
+        ("Salt Pork", "salt pork"),
+    ]
+    for raw, expected_norm in non_staples:
+        cleaned = clean_ingredient_name(raw)
+        norm = cleaned[0] if cleaned else raw.lower()
+        assert not is_staple_ingredient(norm, raw), f"Expected NOT staple for {raw!r}"
+
+
+def test_clean_ingredient_units_ordinals_and_junk():
+    test_cases = [
+        # Standalone units without numbers
+        ("Lb Ground Pork", "ground pork", "Ground Pork"),
+        ("Lb Lamb Mince", "lamb mince", "Lamb Mince"),
+        ("Lbs 16-20 Black Tiger Shrimp", "black tiger shrimp", "Black Tiger Shrimp"),
+        ("Oz Chicken Breast", "chicken breast", "Chicken Breast"),
+        ("Pound Boneless, Skinless Chicken Thighs", "chicken thighs", "Chicken Thighs"),
+        ("Pound Ground Chicken", "ground chicken", "Ground Chicken"),
+        ("Pounds Boneless, Skinless Chicken Breast", "chicken breast", "Chicken Breast"),
+        ("Lb. Carrots", "carrot", "Carrots"),
+        ("Pound Potatoes", "potato", "Potatoes"),
+        ("Oz Carrot", "carrot", "Carrot"),
+        ("Oz / 400G Can Crushed Tomatoes", "tomato", "Crushed Tomatoes"),
+        ("Oz/ 1 Large Or 4 Medium Onions", "onion", "Onions"),
+        ("Stick Butter, Melted", "butter", "Butter"),
+        ("Bunch Mint", "mint", "Mint"),
+        ("Bunch Scallions", "scallions", "Scallions"),
+        ("Quarts Vegetable Oil", "vegetable oil", "Vegetable Oil"),
+        ("Ounce Can Black Beans", "black beans", "Black Beans"),
+        ("Inch Fresh Ginger", "ginger", "Ginger"),
+        ("Tiny Pinch Garlic Powder", "garlic powder", "Garlic Powder"),
+        # Ordinals & fractions
+        ("Th Cup Heavy Cream", "heavy cream", "Heavy Cream"),
+        ("Th Cup Plain Unflavored Yogurt", "plain unflavored yogurt", "Plain Unflavored Yogurt"),
+        ("Rd Cup Frozen/Fresh Green Peas", "frozen green peas", "Frozen/Fresh Green Peas"),
+        ("Th Teaspoon Ground Mace Or Nutmeg", "ground mace or nutmeg", "Ground Mace Or Nutmeg"),
+        # Connectors & symbols
+        ("& 1/2 Inch Cinnamon Stick", "cinnamon stick", "Cinnamon Stick"),
+        ("And 1/2 Cups Graham Cracker Crumbs", "graham cracker crumbs", "Graham Cracker Crumbs"),
+        ("Plus 2 Tablespoons Olive Oil", "olive oil", "Olive Oil"),
+        ("T Rice Vinegar", "rice vinegar", "Rice Vinegar"),
+        ("T Sriracha Sauce", "sriracha sauce", "Sriracha Sauce"),
+        ("Sharp White Cheddar |", "sharp white cheddar", "Sharp White Cheddar"),
+        # Prefixes & mangling
+        ("-Squeezed Lime Juice", "lime juice", "Lime Juice"),
+        ("Fresh-Squeezed Lime Juice", "lime juice", "Lime Juice"),
+        ("Ly Chopped Parsley Or Chives For Garnish", "parsley or chives", "Parsley Or Chives"),
+        ("Freshly Chopped Parsley Or Chives For Garnish", "parsley or chives", "Parsley Or Chives"),
+    ]
+
+    for raw, exp_norm, exp_disp in test_cases:
+        res = clean_ingredient_name(raw)
+        assert res is not None, f"Expected clean result for {raw!r}"
+        norm, disp = res
+        assert norm == exp_norm, f"Norm mismatch for {raw!r}: got {norm!r}, expected {exp_norm!r}"
+        assert disp == exp_disp, f"Display mismatch for {raw!r}: got {disp!r}, expected {exp_disp!r}"
+
+    # Instructional / serving junk discarded
+    discard_cases = [
+        "For Greasing The Skillet",
+        "Recipe Guacamole, For Serving, If Desired",
+        "Vegetables Of Choice",
+        "Skewers",
+        "Pound Peeled, I Use 31-40 Count Size",
+    ]
+    for junk in discard_cases:
+        res = clean_ingredient_name(junk)
+        assert res is None, f"Expected {junk!r} to be discarded, got {res!r}"
+
+
+def test_categorization_improvements():
+    checks = [
+        ("Graham Cracker Crumbs", "grains & bakery"),
+        ("Ham", "protein"),
+        ("Pound Breakfast Sausage", "protein"),
+        ("Eggs", "dairy"),
+        ("Eggplant", "produce"),
+        ("Peppercorns", "spices & herbs"),
+        ("Sweet Corn", "produce"),
+        ("Green Peas", "produce"),
+        ("Bunch Scallions", "produce"),
+        ("Bunch Mint", "produce"),
+        ("Celery", "produce"),
+        ("Mushrooms", "produce"),
+    ]
+    for item, expected in checks:
+        cat = categorize_ingredient(item)
+        assert cat == expected, f"{item}: got {cat}, expected {expected}"
+
+
+def test_cleanup_existing_items_in_place_migration(tmp_path):
+    db_file = tmp_path / "migration_pantry.db"
+    pm = PantryManager(db_path=str(db_file))
+
+    # Insert messy rows directly
+    with pm._get_connection() as conn:
+        conn.execute(
+            "INSERT INTO pantry_items (name, display_name, category, in_stock) VALUES (?, ?, ?, ?)",
+            ("lb ground pork", "Lb Ground Pork", "protein", 1),
+        )
+        conn.execute(
+            "INSERT INTO pantry_items (name, display_name, category, in_stock) VALUES (?, ?, ?, ?)",
+            ("pound ground chicken", "Pound Ground Chicken", "protein", 1),
+        )
+        conn.execute(
+            "INSERT INTO pantry_items (name, display_name, category, in_stock) VALUES (?, ?, ?, ?)",
+            ("salt and pepper", "Salt & Pepper", "pantry", 1),
+        )
+        conn.execute(
+            "INSERT INTO pantry_items (name, display_name, category, in_stock) VALUES (?, ?, ?, ?)",
+            ("for greasing the skillet", "For Greasing The Skillet", "pantry", 1),
+        )
+        conn.execute(
+            "INSERT INTO pantry_items (name, display_name, category, in_stock) VALUES (?, ?, ?, ?)",
+            ("bunch scallions", "Bunch Scallions", "grains & bakery", 1),
+        )
+        conn.execute(
+            "INSERT INTO pantry_items (name, display_name, category, in_stock) VALUES (?, ?, ?, ?)",
+            ("sharp white cheddar |", "Sharp White Cheddar |", "dairy", 1),
+        )
+        conn.commit()
+
+    # Run in-place cleanup
+    cleaned = pm.cleanup_existing_items()
+    assert cleaned >= 6
+
+    items = pm.get_all_items()
+    item_map = {i["name"]: i for i in items}
+
+    # Staples and junk should be removed
+    assert "salt and pepper" not in item_map
+    assert "for greasing the skillet" not in item_map
+
+    # Messy items should be migrated to clean names & categories
+    assert "ground pork" in item_map
+    assert item_map["ground pork"]["display_name"] == "Ground Pork"
+    assert item_map["ground pork"]["category"] == "protein"
+
+    assert "ground chicken" in item_map
+    assert item_map["ground chicken"]["display_name"] == "Ground Chicken"
+    assert item_map["ground chicken"]["category"] == "protein"
+
+    assert "scallions" in item_map
+    assert item_map["scallions"]["display_name"] == "Scallions"
+    assert item_map["scallions"]["category"] == "produce"
+
+    assert "sharp white cheddar" in item_map
+    assert item_map["sharp white cheddar"]["display_name"] == "Sharp White Cheddar"
+    assert item_map["sharp white cheddar"]["category"] == "dairy"
+
 
