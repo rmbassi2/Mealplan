@@ -101,6 +101,10 @@ DISCARD_PATTERNS = [
     re.compile(r"^lemon\s+wedges,?\s*(?:fresh\s+)?oregano.*", re.I),
     re.compile(r"^peas\s+and\s+carrots\b", re.I),
     re.compile(r"^broccoli\s+and\s+cauliflower\b", re.I),
+    re.compile(r"^length\s+ginger\b", re.I),
+    re.compile(r"^to\s+15\s+green\s+beans?\b", re.I),
+    re.compile(r"^pecans?\s+or\s+walnuts?\b", re.I),
+    re.compile(r"^cheese$", re.I),
 ]
 
 PREP_WORDS_PATTERN = (
@@ -211,6 +215,7 @@ PLURAL_MAP: Dict[str, str] = {
     "cashews": "cashew",
     "pistachios": "pistachio",
     "oils": "oil",
+    "chips": "chip",
 }
 
 HERB_LEAF_PATTERNS = re.compile(
@@ -286,9 +291,31 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "serrano or jalapeno pepper": ("serrano", "Serrano"),
     "slaw mix or thin cabbage": ("cabbage", "Cabbage"),
     "slaw mix or thin sliced cabbage": ("cabbage", "Cabbage"),
-    "scotch bonnet peppers or habanero chile": ("scotch bonnet pepper", "Scotch Bonnet Pepper"),
-    "scotch bonnet peppers or habanero chiles": ("scotch bonnet pepper", "Scotch Bonnet Pepper"),
-    "to 2 scotch bonnet peppers or habanero chiles": ("scotch bonnet pepper", "Scotch Bonnet Pepper"),
+    "scotch bonnet peppers or habanero chile": ("scotch bonnet habanero", "Scotch Bonnet / Habanero"),
+    "scotch bonnet peppers or habanero chiles": ("scotch bonnet habanero", "Scotch Bonnet / Habanero"),
+    "to 2 scotch bonnet peppers or habanero chiles": ("scotch bonnet habanero", "Scotch Bonnet / Habanero"),
+    "green cabbage": ("cabbage", "Cabbage"),
+    "english cucumber": ("cucumber", "Cucumbers"),
+    "persian cucumber": ("cucumber", "Cucumbers"),
+    "persian cucumbers": ("cucumber", "Cucumbers"),
+    "cucumber": ("cucumber", "Cucumbers"),
+    "chilli peppers": ("chili pepper", "Chili Peppers"),
+    "chilli pepper": ("chili pepper", "Chili Peppers"),
+    "chili pepper": ("chili pepper", "Chili Peppers"),
+    "chili peppers": ("chili pepper", "Chili Peppers"),
+    "green chillies": ("green chile", "Green Chiles"),
+    "green chilli": ("green chile", "Green Chiles"),
+    "red chillies": ("red chile", "Red Chiles"),
+    "red chilli": ("red chile", "Red Chiles"),
+    "frozen peas": ("pea", "Peas (Frozen)"),
+    "frozen pea": ("pea", "Peas (Frozen)"),
+    "frozen/fresh green peas": ("pea", "Peas (Frozen)"),
+    "frozen green peas": ("pea", "Peas (Frozen)"),
+    "frozen green pea": ("pea", "Peas (Frozen)"),
+    "green peas": ("pea", "Peas (Frozen)"),
+    "green pea": ("pea", "Peas (Frozen)"),
+    "peas": ("pea", "Peas (Frozen)"),
+    "pea": ("pea", "Peas (Frozen)"),
 
     # Dairy & Eggs
     "danish creamery butter": ("butter", "Butter"),
@@ -309,15 +336,27 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "heavy cream or coconut milk": ("heavy cream", "Heavy Cream"),
     "oat milk or milk of choice": ("oat milk", "Oat Milk"),
     "ciliegine or bocconcini": ("ciliegine", "Ciliegine"),
+    "to 7 tbsp buttermilk": ("buttermilk", "Buttermilk"),
 
     # Grains & Bakery
     "caputo 00 americana flour": ("flour", "Flour"),
     "king arthur bread flour": ("bread flour", "Bread Flour"),
     "all purpose or bread flour": ("bread flour", "Bread Flour"),
     "chang s pad thai dried rice sticks": ("rice noodles", "Rice Noodles"),
+    "chang s pad thai dried rice stick": ("rice noodles", "Rice Noodles"),
+    "chang s pad thai rice sticks": ("rice noodles", "Rice Noodles"),
+    "chang s pad thai rice stick": ("rice noodles", "Rice Noodles"),
     "panko breadcrumbs": ("panko", "Panko"),
+    "panko breadcrumb": ("panko", "Panko"),
+    "panko": ("panko", "Panko"),
+    "regular breadcrumbs": ("breadcrumb", "Breadcrumbs"),
+    "regular breadcrumb": ("breadcrumb", "Breadcrumbs"),
+    "breadcrumbs": ("breadcrumb", "Breadcrumbs"),
+    "breadcrumb": ("breadcrumb", "Breadcrumbs"),
     "crushed ritz crackers": ("ritz crackers", "Ritz Crackers"),
     "carnaroli risotto rice": ("risotto rice", "Risotto Rice"),
+    "rice": ("white rice", "White Rice"),
+    "white rice": ("white rice", "White Rice"),
     "long grain white rice": ("white rice", "White Rice"),
     "short grain rice": ("white rice", "White Rice"),
     "risoni orzo": ("orzo", "Orzo"),
@@ -358,10 +397,16 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "sweet white miso": ("miso paste", "Miso Paste"),
     "sriracha sauce": ("sriracha", "Sriracha"),
     "white wine vinegar or champagne vinegar": ("white wine vinegar", "White Wine Vinegar"),
+    "to 2 tablespoons olive oil": ("olive oil", "Olive Oil"),
+    "to 3 tbsp ketchup": ("ketchup", "Ketchup"),
+    "to 3 tbsp. ketchup": ("ketchup", "Ketchup"),
 
     # Spices & Seasonings
     "barbecue rub or spice mix": ("barbecue rub", "Barbecue Rub"),
     "cayenne": ("cayenne pepper", "Cayenne Pepper"),
+    "coriander": ("cilantro", "Cilantro"),
+    "coriander leaves": ("cilantro", "Cilantro"),
+    "coriander leaf": ("cilantro", "Cilantro"),
     "coriander cilantro": ("cilantro", "Cilantro"),
     "coriander cilantro leaf": ("cilantro", "Cilantro"),
     "coriander powder": ("ground coriander", "Ground Coriander"),
@@ -391,18 +436,25 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "light brown sugar": ("brown sugar", "Brown Sugar"),
     "light or dark brown sugar": ("brown sugar", "Brown Sugar"),
     "chocolate chip": ("chocolate chip", "Chocolate Chips"),
+    "chocolate chips": ("chocolate chip", "Chocolate Chips"),
     "semisweet chocolate chips": ("chocolate chip", "Chocolate Chips"),
     "dark or semisweet chocolate chips": ("chocolate chip", "Chocolate Chips"),
-    "pecans or walnuts": ("pecan", "Pecans"),
     "pure vanilla extract": ("vanilla extract", "Vanilla Extract"),
     "vanilla": ("vanilla extract", "Vanilla Extract"),
+    "almonds": ("almond", "Almonds"),
     "raw almonds": ("almond", "Almonds"),
     "slivered almonds": ("almond", "Almonds"),
+    "raw almond": ("almond", "Almonds"),
+    "slivered almond": ("almond", "Almonds"),
     "walnut piece": ("walnut", "Walnuts"),
     "whole cloves": ("clove", "Cloves"),
     "ground cloves": ("clove", "Cloves"),
     "tamarind puree not concentrate": ("tamarind puree", "Tamarind Puree"),
     "dr pepper or coke": ("cola", "Cola"),
+    "chardonnay": ("white wine", "White Wine"),
+    "chardonnay wine": ("white wine", "White Wine"),
+    "white wine": ("white wine", "White Wine"),
+    "wine": ("white wine", "White Wine"),
 }
 
 
@@ -645,10 +697,39 @@ def categorize_ingredient(name: str) -> str:
     """Smart heuristic categorization for pantry items."""
     n = name.lower()
 
-    # 1. Special Pantry items (canned beans, pulses, sodas, tomato paste/soup, seeds/nuts, wines)
+    # 1. Vinegars MUST be routed to sauces & condiments (avoid false match with "wine" in pantry)
+    if "vinegar" in n:
+        return "sauces & condiments"
+
+    # 2. Pickles / relishes in sauces & condiments (before dill check in spices)
+    if "pickle" in n or "relish" in n:
+        return "sauces & condiments"
+
+    # 3. Chili crisp in sauces & condiments (before chili check in produce)
+    if "chili crisp" in n or "chilli crisp" in n:
+        return "sauces & condiments"
+
+    # 4. Ground ginger / ginger powder in spices (before ginger check in produce)
+    if "ground ginger" in n or "ginger powder" in n:
+        return "spices & herbs"
+
+    # 5. Green beans / snap beans in produce (before bean check in pantry)
+    if "green bean" in n or "string bean" in n or "snap bean" in n:
+        return "produce"
+
+    # 6. Cilantro in produce (before coriander check in spices)
+    if "cilantro" in n:
+        return "produce"
+
+    # 7. Fresh apples in produce (before honey in sauces)
+    if "apple" in n and "applesauce" not in n and "cider" not in n:
+        return "produce"
+
+    # 8. Special Pantry items (canned beans, pulses, sodas, tomato paste/soup, seeds/nuts, wines, canned soups)
     if any(k in n for k in [
         "black bean", "canned black bean", "cannellini", "chickpea",
-        "tomato paste", "tomato soup", "cola", "soda", "wine", "chardonnay",
+        "tomato paste", "tomato soup", "cream of chicken", "cream of mushroom",
+        "canned soup", "cola", "soda", "wine", "chardonnay",
         "tequila", "triple sec", "sugar", "yeast", "cornstarch", "baking soda",
         "chocolate chip", "almond", "pecan", "walnut", "cashew", "peanut",
         "flax seed", "chia seed", "sunflower seed", "msg", "old bay", "tamarind",
@@ -656,19 +737,7 @@ def categorize_ingredient(name: str) -> str:
     ]):
         return "pantry"
 
-    # 2. Pickles / relishes in sauces & condiments (before dill check in spices)
-    if "pickle" in n or "relish" in n:
-        return "sauces & condiments"
-
-    # 3. Cilantro in produce (before coriander check in spices)
-    if "cilantro" in n:
-        return "produce"
-
-    # 4. Fresh apples in produce (before honey in sauces)
-    if "apple" in n and "applesauce" not in n and "cider" not in n:
-        return "produce"
-
-    # 5. Spices & Seasonings
+    # 9. Spices & Seasonings
     if any(k in n for k in [
         "powder", "paprika", "cumin", "oregano", "cinnamon", "spice", "nutmeg",
         "curry", "seasoning", "allspice", "cardamom", "clove", "cloves",
@@ -678,16 +747,16 @@ def categorize_ingredient(name: str) -> str:
     ]) or re.search(r"\b(rubs?|dill|coriander)\b", n):
         return "spices & herbs"
 
-    # 6. Sauces & Condiments (including cooking oils)
+    # 10. Sauces & Condiments (including cooking oils)
     if any(k in n for k in [
-        "broth", "stock", "bouillon", "boulion", "sauce", "vinegar", "hoisin",
+        "broth", "stock", "bouillon", "boulion", "sauce", "hoisin",
         "peanut butter", "miso", "mustard", "mayo", "ketchup",
         "sriracha", "worcestershire", "tahini", "dressing", "syrup",
         "oil", "oils", "anchovy"
     ]) or re.search(r"\bhoney\b", n):
         return "sauces & condiments"
 
-    # 7. Dairy & Eggs
+    # 11. Dairy & Eggs
     if (
         any(k in n for k in [
             "milk", "cream", "cheese", "butter", "yogurt", "mozzarella", "parmesan",
@@ -699,7 +768,7 @@ def categorize_ingredient(name: str) -> str:
     ):
         return "dairy"
 
-    # 8. Grains & Bakery
+    # 12. Grains & Bakery
     if any(k in n for k in [
         "rice", "noodle", "pasta", "bread", "dough", "tortilla", "spaghetti",
         "orzo", "quinoa", "flour", "pita", "starter", "risotto",
@@ -708,7 +777,7 @@ def categorize_ingredient(name: str) -> str:
     ]) or re.search(r"\b(buns?|rolls?|oats?|oatmeal)\b", n):
         return "grains & bakery"
 
-    # 9. Protein
+    # 13. Protein
     if any(k in n for k in [
         "chicken", "beef", "pork", "steak", "turkey", "lamb", "bacon", "salmon",
         "shrimp", "fish", "tuna", "patty", "patties", "meat", "sausage", "chorizo",
@@ -716,7 +785,7 @@ def categorize_ingredient(name: str) -> str:
     ]) or re.search(r"\b(ham|cod)\b", n):
         return "protein"
 
-    # 10. Produce & Fresh
+    # 14. Produce & Fresh
     if any(k in n for k in [
         "tomato", "onion", "garlic", "spinach", "lettuce", "basil", "parsley",
         "lemon", "lime", "potato", "carrot", "broccoli", "zucchini", "cucumber", "cabbage",
@@ -725,7 +794,7 @@ def categorize_ingredient(name: str) -> str:
         "kale", "ginger", "cauliflower", "rhubarb", "edamame", "eggplant",
         "chive", "jalapeno", "serrano", "romaine", "apple", "banana", "berry",
         "berries", "mango", "peach", "fruit", "slaw", "artichoke", "pomegranate", "cranberr",
-        "fig", "raisin", "olive", "brussels"
+        "fig", "raisin", "olive", "brussels", "green bean"
     ]) or re.search(r"\b(peas?|corn|peppers?|chillies?|chillis?)\b", n):
         return "produce"
 
