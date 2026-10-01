@@ -263,10 +263,10 @@ def test_clean_ingredient_name_real_world_messy_strings():
         ("2 X Chicken Thighs (See Notes)", "chicken thighs", "Chicken Thighs"),
         ("3 (5-Oz) Cans Tuna, Drained", "tuna", "Tuna"),
         ("1/2 Red Onion (Finely Sliced - This Is Approximately )", "red onion", "Red Onion"),
-        ("2 Persian Cucumbers (Thinly Sliced)", "persian cucumber", "Persian Cucumbers"),
+        ("2 Persian Cucumbers (Thinly Sliced)", "cucumber", "Cucumbers"),
         ("6 Medium-Small Zucchini ( Each)", "zucchini", "Zucchini"),
         ("1 Carrot, Peeled And Shredded Or Grated", "carrot", "Carrot"),
-        ("1 Large Green Cabbage, Stem/Core Removed", "green cabbage", "Green Cabbage"),
+        ("1 Large Green Cabbage, Stem/Core Removed", "cabbage", "Cabbage"),
         ("1 Lime, Juiced", "lime", "Lime"),
         ("Juice From 2 Lemons", "lemon juice", "Lemon Juice"),
     ]
@@ -384,7 +384,7 @@ def test_clean_ingredient_units_ordinals_and_junk():
         # Ordinals & fractions
         ("Th Cup Heavy Cream", "heavy cream", "Heavy Cream"),
         ("Th Cup Plain Unflavored Yogurt", "plain yogurt", "Plain Yogurt"),
-        ("Rd Cup Frozen/Fresh Green Peas", "frozen green pea", "Frozen/Fresh Green Peas"),
+        ("Rd Cup Frozen/Fresh Green Peas", "pea", "Peas (Frozen)"),
         ("Th Teaspoon Ground Mace Or Nutmeg", "nutmeg", "Nutmeg"),
         # Connectors & symbols
         ("& 1/2 Inch Cinnamon Stick", "cinnamon stick", "Cinnamon Stick"),
@@ -414,6 +414,10 @@ def test_clean_ingredient_units_ordinals_and_junk():
         "Vegetables Of Choice",
         "Skewers",
         "Pound Peeled, I Use 31-40 Count Size",
+        "Length Ginger",
+        "To 15 Green Beans",
+        "Pecans Or Walnuts",
+        "Cheese",
     ]
     for junk in discard_cases:
         res = clean_ingredient_name(junk)
@@ -499,5 +503,56 @@ def test_cleanup_existing_items_in_place_migration(tmp_path):
     assert "cheddar" in item_map
     assert item_map["cheddar"]["display_name"] == "Cheddar"
     assert item_map["cheddar"]["category"] == "dairy"
+
+
+def test_pantry_refinements_and_misplacements():
+    # 1. Measurement strings & scrape glitches
+    assert clean_ingredient_name("To 2 Scotch Bonnet Peppers Or Habanero Chiles") == ("scotch bonnet habanero", "Scotch Bonnet / Habanero")
+    assert clean_ingredient_name("Length Ginger") is None
+    assert clean_ingredient_name("To 7 Tbsp Buttermilk") == ("buttermilk", "Buttermilk")
+    assert clean_ingredient_name("To 2 Tablespoons Olive Oil") == ("olive oil", "Olive Oil")
+    assert clean_ingredient_name("To 3 Tbsp. Ketchup") == ("ketchup", "Ketchup")
+    assert clean_ingredient_name("To 15 Green Beans") is None
+
+    # 2. Category deduplications and overlaps
+    assert clean_ingredient_name("Chocolate Chips") == ("chocolate chip", "Chocolate Chips")
+    assert clean_ingredient_name("Chocolate Chip") == ("chocolate chip", "Chocolate Chips")
+    assert clean_ingredient_name("Black Beans") == ("black bean", "Black Beans")
+    assert clean_ingredient_name("Canned Black Beans") == ("black bean", "Black Beans")
+    assert clean_ingredient_name("Almonds") == ("almond", "Almonds")
+    assert clean_ingredient_name("Raw Almonds") == ("almond", "Almonds")
+    assert clean_ingredient_name("Slivered Almonds") == ("almond", "Almonds")
+    assert clean_ingredient_name("Pecans Or Walnuts") is None
+    assert clean_ingredient_name("Walnuts") == ("walnut", "Walnuts")
+    assert clean_ingredient_name("Chardonnay") == ("white wine", "White Wine")
+    assert clean_ingredient_name("Wine") == ("white wine", "White Wine")
+
+    # Produce
+    assert clean_ingredient_name("Peas") == ("pea", "Peas (Frozen)")
+    assert clean_ingredient_name("Frozen Peas") == ("pea", "Peas (Frozen)")
+    assert clean_ingredient_name("Cilantro") == ("cilantro", "Cilantro")
+    assert clean_ingredient_name("Coriander Leaves") == ("cilantro", "Cilantro")
+    assert clean_ingredient_name("Green Cabbage") == ("cabbage", "Cabbage")
+    assert clean_ingredient_name("Persian Cucumbers") == ("cucumber", "Cucumbers")
+
+    # Grains & Bakery
+    assert clean_ingredient_name("Breadcrumbs") == ("breadcrumb", "Breadcrumbs")
+    assert clean_ingredient_name("Regular Breadcrumbs") == ("breadcrumb", "Breadcrumbs")
+    assert clean_ingredient_name("Panko Breadcrumbs") == ("panko", "Panko")
+    assert clean_ingredient_name("Rice") == ("white rice", "White Rice")
+    assert clean_ingredient_name("Chang'S Pad Thai Dried Rice Sticks") == ("rice noodles", "Rice Noodles")
+
+    # Dairy generic discard
+    assert clean_ingredient_name("Cheese") is None
+
+    # 3. Categorization routing
+    assert categorize_ingredient("Green Beans") == "produce"
+    assert categorize_ingredient("Red Wine Vinegar") == "sauces & condiments"
+    assert categorize_ingredient("Seasoned Rice Wine Vinegar") == "sauces & condiments"
+    assert categorize_ingredient("White Wine Vinegar") == "sauces & condiments"
+    assert categorize_ingredient("Chili Crisp") == "sauces & condiments"
+    assert categorize_ingredient("Ground Ginger") == "spices & herbs"
+    assert categorize_ingredient("Cream Of Chicken") == "pantry"
+
 
 
