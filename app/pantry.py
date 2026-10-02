@@ -45,6 +45,95 @@ DEFAULT_STAPLES: Set[str] = {
     "all-purpose flour",
 }
 
+# Baseline pantry staples permanently considered in stock so recipes are not blocked by a pinch of spice
+ALWAYS_ON_STAPLES: Set[str] = {
+    # Baseline fats & oils
+    "bacon fat",
+    "butter",
+    "cooking oil",
+    "neutral oil",
+    "vegetable oil",
+    "canola oil",
+    "olive oil",
+    "extra virgin olive oil",
+    "sesame oil",
+    # Baking basics
+    "flour",
+    "all purpose flour",
+    "all-purpose flour",
+    "bread flour",
+    "sugar",
+    "brown sugar",
+    "granulated sugar",
+    "baking soda",
+    "baking powder",
+    "cornstarch",
+    "vanilla extract",
+    "instant yeast",
+    "active dry yeast",
+    "yeast",
+    # Basic vinegars & liquids
+    "apple cider vinegar",
+    "balsamic vinegar",
+    "red wine vinegar",
+    "rice vinegar",
+    "white vinegar",
+    "shaoxing wine",
+    "soy sauce",
+    "low sodium soy sauce",
+    "fish sauce",
+    "worcestershire",
+    "honey",
+    "tomato paste",
+    # Dry spices & seasonings
+    "allspice",
+    "bay leaf",
+    "black pepper",
+    "cardamom",
+    "cayenne pepper",
+    "chili flake",
+    "chili powder",
+    "cinnamon",
+    "clove",
+    "coriander",
+    "ground coriander",
+    "cumin",
+    "curry powder",
+    "garlic powder",
+    "ground ginger",
+    "italian seasoning",
+    "kashmiri chilli powder",
+    "kasoori methi",
+    "msg",
+    "mustard powder",
+    "nutmeg",
+    "onion powder",
+    "oregano",
+    "paprika",
+    "smoked paprika",
+    "salt",
+    "star anise",
+    "thyme",
+    "turmeric",
+    # Grains & long-life staples
+    "white rice",
+    "rolled oats",
+    "breadcrumb",
+    "panko",
+    "dried pasta",
+    "pasta",
+    "black bean",
+    "cannellini",
+    "chickpea",
+    "canned tomato",
+    "crushed tomato",
+    "diced tomato",
+    "whole peeled tomato",
+    # Fresh essentials
+    "garlic",
+    "egg",
+}
+
 # Measurement words and culinary stop words to strip during string cleaning
 MEASUREMENT_WORDS = re.compile(
     r"\b(\d+([./]\d+)?|\d+-\d+)\s*"
@@ -103,6 +192,12 @@ DISCARD_PATTERNS = [
     re.compile(r"^broccoli\s+and\s+cauliflower\b", re.I),
     re.compile(r"^length\s+ginger\b", re.I),
     re.compile(r"^to\s+15\s+green\s+beans?\b", re.I),
+    re.compile(r"^to\s+2\s+scotch\s+bonnet\b", re.I),
+    re.compile(r"^scotch\s+bonnet\s+peppers?\s+or\s+habanero\b", re.I),
+    re.compile(r"^ginger\s+chill?i\s+garlic\b", re.I),
+    re.compile(r"^pickled\s+jalapeno\s+juice\b", re.I),
+    re.compile(r"^(?:bone\s+)?broth$", re.I),
+    re.compile(r"^(?:bone\s+)?stock$", re.I),
     re.compile(r"^pecans?\s+or\s+walnuts?\b", re.I),
     re.compile(r"^cheese$", re.I),
 ]
@@ -241,6 +336,12 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "active sourdough starter": ("sourdough starter", "Sourdough Starter"),
     "unfed sourdough starter": ("sourdough starter", "Sourdough Starter"),
     "sourdough starter ripe": ("sourdough starter", "Sourdough Starter"),
+    "sourdough discard": ("sourdough starter", "Sourdough Starter"),
+    "levain": ("sourdough starter", "Sourdough Starter"),
+    "sourdough starter": ("sourdough starter", "Sourdough Starter"),
+    "black bean": ("black bean", "Black Beans"),
+    "black beans": ("black bean", "Black Beans"),
+    "canned black bean": ("black bean", "Black Beans"),
     "canned black beans": ("black bean", "Black Beans"),
     "canned chickpeas": ("chickpea", "Chickpeas"),
     "canned black olives": ("black olive", "Black Olives"),
@@ -248,7 +349,14 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     # Meat & Seafood consolidations
     "beef chuck or brisket": ("beef chuck roast", "Beef Chuck Roast"),
     "guanciale or smoked pancetta": ("pancetta", "Pancetta"),
-    "firm tofu or paneer": ("firm tofu", "Firm Tofu"),
+    "firm tofu or paneer": ("tofu", "Tofu"),
+    "firm tofu": ("tofu", "Tofu"),
+    "extra firm tofu": ("tofu", "Tofu"),
+    "extra-firm tofu": ("tofu", "Tofu"),
+    "tofu": ("tofu", "Tofu"),
+    "black tiger shrimp": ("shrimp", "Shrimp"),
+    "shrimps": ("shrimp", "Shrimp"),
+    "shrimp": ("shrimp", "Shrimp"),
     "lean ground meat like ground beef or ground turkey": ("ground beef", "Ground Beef"),
     "ground beef chuck": ("ground beef", "Ground Beef"),
     "lean ground beef": ("ground beef", "Ground Beef"),
@@ -284,7 +392,30 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "red pepper": ("red bell pepper", "Red Bell Pepper"),
     "red or green bell pepper": ("red bell pepper", "Red Bell Pepper"),
     "green chile peppers": ("green chile", "Green Chiles"),
+    "green chile pepper": ("green chile", "Green Chiles"),
+    "green chile": ("green chile", "Green Chiles"),
+    "green chiles": ("green chile", "Green Chiles"),
+    "green chillies": ("green chile", "Green Chiles"),
+    "green chilli": ("green chile", "Green Chiles"),
+    "green chili": ("green chile", "Green Chiles"),
+    "green chilis": ("green chile", "Green Chiles"),
     "lime wedges": ("lime", "Lime"),
+    "lemon juice": ("lemon", "Lemon"),
+    "lemon zest": ("lemon", "Lemon"),
+    "zest of lemon": ("lemon", "Lemon"),
+    "juice of lemon": ("lemon", "Lemon"),
+    "fresh lemon juice": ("lemon", "Lemon"),
+    "fresh squeezed lemon juice": ("lemon", "Lemon"),
+    "lemon": ("lemon", "Lemon"),
+    "lemons": ("lemon", "Lemon"),
+    "lime juice": ("lime", "Lime"),
+    "lime zest": ("lime", "Lime"),
+    "zest of lime": ("lime", "Lime"),
+    "juice of lime": ("lime", "Lime"),
+    "fresh lime juice": ("lime", "Lime"),
+    "fresh squeezed lime juice": ("lime", "Lime"),
+    "lime": ("lime", "Lime"),
+    "limes": ("lime", "Lime"),
     "pomegranate arils": ("pomegranate", "Pomegranate"),
     "sliced peaches": ("peach", "Peaches"),
     "parsley or chives": ("parsley", "Parsley"),
@@ -293,7 +424,6 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "slaw mix or thin sliced cabbage": ("cabbage", "Cabbage"),
     "scotch bonnet peppers or habanero chile": ("scotch bonnet habanero", "Scotch Bonnet / Habanero"),
     "scotch bonnet peppers or habanero chiles": ("scotch bonnet habanero", "Scotch Bonnet / Habanero"),
-    "to 2 scotch bonnet peppers or habanero chiles": ("scotch bonnet habanero", "Scotch Bonnet / Habanero"),
     "green cabbage": ("cabbage", "Cabbage"),
     "english cucumber": ("cucumber", "Cucumbers"),
     "persian cucumber": ("cucumber", "Cucumbers"),
@@ -303,8 +433,6 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "chilli pepper": ("chili pepper", "Chili Peppers"),
     "chili pepper": ("chili pepper", "Chili Peppers"),
     "chili peppers": ("chili pepper", "Chili Peppers"),
-    "green chillies": ("green chile", "Green Chiles"),
-    "green chilli": ("green chile", "Green Chiles"),
     "red chillies": ("red chile", "Red Chiles"),
     "red chilli": ("red chile", "Red Chiles"),
     "frozen peas": ("pea", "Peas (Frozen)"),
@@ -323,6 +451,17 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "sharp yellow cheddar": ("cheddar", "Cheddar"),
     "white or yellow sharp cheddar": ("cheddar", "Cheddar"),
     "mozzarella ball": ("mozzarella", "Mozzarella"),
+    "ciliegine": ("mozzarella", "Mozzarella"),
+    "bocconcini": ("mozzarella", "Mozzarella"),
+    "ciliegine or bocconcini": ("mozzarella", "Mozzarella"),
+    "egg yolk": ("egg", "Eggs"),
+    "egg yolks": ("egg", "Eggs"),
+    "egg white": ("egg", "Eggs"),
+    "egg whites": ("egg", "Eggs"),
+    "yolk": ("egg", "Eggs"),
+    "yolks": ("egg", "Eggs"),
+    "egg": ("egg", "Eggs"),
+    "eggs": ("egg", "Eggs"),
     "shaved parmesan": ("parmesan", "Parmesan"),
     "whole milk": ("milk", "Milk"),
     "full fat brick cream cheese": ("cream cheese", "Cream Cheese"),
@@ -335,17 +474,22 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "yogurt": ("plain yogurt", "Plain Yogurt"),
     "heavy cream or coconut milk": ("heavy cream", "Heavy Cream"),
     "oat milk or milk of choice": ("oat milk", "Oat Milk"),
-    "ciliegine or bocconcini": ("ciliegine", "Ciliegine"),
     "to 7 tbsp buttermilk": ("buttermilk", "Buttermilk"),
 
     # Grains & Bakery
     "caputo 00 americana flour": ("flour", "Flour"),
     "king arthur bread flour": ("bread flour", "Bread Flour"),
     "all purpose or bread flour": ("bread flour", "Bread Flour"),
-    "chang s pad thai dried rice sticks": ("rice noodles", "Rice Noodles"),
-    "chang s pad thai dried rice stick": ("rice noodles", "Rice Noodles"),
-    "chang s pad thai rice sticks": ("rice noodles", "Rice Noodles"),
-    "chang s pad thai rice stick": ("rice noodles", "Rice Noodles"),
+    "chang s pad thai dried rice sticks": ("rice noodle", "Rice Noodles"),
+    "chang s pad thai dried rice stick": ("rice noodle", "Rice Noodles"),
+    "chang s pad thai rice sticks": ("rice noodle", "Rice Noodles"),
+    "chang s pad thai rice stick": ("rice noodle", "Rice Noodles"),
+    "rice noodles": ("rice noodle", "Rice Noodles"),
+    "rice noodle": ("rice noodle", "Rice Noodles"),
+    "pad thai rice sticks": ("rice noodle", "Rice Noodles"),
+    "pad thai rice stick": ("rice noodle", "Rice Noodles"),
+    "pad thai noodles": ("rice noodle", "Rice Noodles"),
+    "pad thai noodle": ("rice noodle", "Rice Noodles"),
     "panko breadcrumbs": ("panko", "Panko"),
     "panko breadcrumb": ("panko", "Panko"),
     "panko": ("panko", "Panko"),
@@ -404,6 +548,12 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     # Spices & Seasonings
     "barbecue rub or spice mix": ("barbecue rub", "Barbecue Rub"),
     "cayenne": ("cayenne pepper", "Cayenne Pepper"),
+    "chili flakes": ("chili flake", "Chili Flakes / Red Pepper Flakes"),
+    "chili flake": ("chili flake", "Chili Flakes / Red Pepper Flakes"),
+    "red pepper flakes": ("chili flake", "Chili Flakes / Red Pepper Flakes"),
+    "red pepper flake": ("chili flake", "Chili Flakes / Red Pepper Flakes"),
+    "crushed red pepper": ("chili flake", "Chili Flakes / Red Pepper Flakes"),
+    "crushed red pepper flakes": ("chili flake", "Chili Flakes / Red Pepper Flakes"),
     "coriander": ("cilantro", "Cilantro"),
     "coriander leaves": ("cilantro", "Cilantro"),
     "coriander leaf": ("cilantro", "Cilantro"),
@@ -438,7 +588,11 @@ SYNONYMS: Dict[str, Tuple[str, str]] = {
     "chocolate chip": ("chocolate chip", "Chocolate Chips"),
     "chocolate chips": ("chocolate chip", "Chocolate Chips"),
     "semisweet chocolate chips": ("chocolate chip", "Chocolate Chips"),
+    "semisweet chocolate chip": ("chocolate chip", "Chocolate Chips"),
     "dark or semisweet chocolate chips": ("chocolate chip", "Chocolate Chips"),
+    "dark or semisweet chocolate chip": ("chocolate chip", "Chocolate Chips"),
+    "dark chocolate chips": ("chocolate chip", "Chocolate Chips"),
+    "dark chocolate chip": ("chocolate chip", "Chocolate Chips"),
     "pure vanilla extract": ("vanilla extract", "Vanilla Extract"),
     "vanilla": ("vanilla extract", "Vanilla Extract"),
     "almonds": ("almond", "Almonds"),
@@ -560,9 +714,11 @@ def clean_ingredient_name(raw: str) -> Optional[Tuple[str, str]]:
     text = re.sub(r"^\s*mashed\s+(?=ripe\s+)?(?=bananas?\b)", "", text, flags=re.I)
     text = re.sub(r"^\s*ripe\s+(?=bananas?\b)", "", text, flags=re.I)
 
-    # Normalize "juice from 2 lemons" -> "lemon juice"
-    text = re.sub(r"^juice\s+(of|from)\s+(\d+\s*)?lemons?", "lemon juice", text, flags=re.I)
-    text = re.sub(r"^juice\s+(of|from)\s+(\d+\s*)?limes?", "lime juice", text, flags=re.I)
+    # Normalize citrus juice and zest -> root fruit (Lemon / Lime)
+    text = re.sub(r"^(?:juice|zest)\s+(?:of|from)\s+(\d+\s*)?lemons?", "lemon", text, flags=re.I)
+    text = re.sub(r"^(?:juice|zest)\s+(?:of|from)\s+(\d+\s*)?limes?", "lime", text, flags=re.I)
+    text = re.sub(r"^\s*(?:fresh\s+|freshly\s+)?lemon\s+(?:juice|zest)\b", "lemon", text, flags=re.I)
+    text = re.sub(r"^\s*(?:fresh\s+|freshly\s+)?lime\s+(?:juice|zest)\b", "lime", text, flags=re.I)
 
     # 6. Strip trailing prep and instructions after commas from the right
     parts = [p.strip() for p in text.split(",") if p.strip()]
@@ -709,41 +865,49 @@ def categorize_ingredient(name: str) -> str:
     if "chili crisp" in n or "chilli crisp" in n:
         return "sauces & condiments"
 
-    # 4. Ground ginger / ginger powder in spices (before ginger check in produce)
+    # 4. Curry paste in sauces & condiments (before curry powder in spices)
+    if "curry paste" in n:
+        return "sauces & condiments"
+
+    # 5. Baking soda & baking powder in spices & herbs (before drink soda check in pantry)
+    if "baking soda" in n or "baking powder" in n:
+        return "spices & herbs"
+
+    # 6. Ground ginger / ginger powder in spices (before ginger check in produce)
     if "ground ginger" in n or "ginger powder" in n:
         return "spices & herbs"
 
-    # 5. Green beans / snap beans in produce (before bean check in pantry)
+    # 7. Green beans / snap beans in produce (before bean check in pantry)
     if "green bean" in n or "string bean" in n or "snap bean" in n:
         return "produce"
 
-    # 6. Cilantro in produce (before coriander check in spices)
+    # 8. Cilantro in produce (before coriander check in spices)
     if "cilantro" in n:
         return "produce"
 
-    # 7. Fresh apples in produce (before honey in sauces)
+    # 9. Fresh apples in produce (before honey in sauces)
     if "apple" in n and "applesauce" not in n and "cider" not in n:
         return "produce"
 
-    # 8. Special Pantry items (canned beans, pulses, sodas, tomato paste/soup, seeds/nuts, wines, canned soups)
+    # 10. Special Pantry items (canned beans, pulses, sodas, tomato paste/soup, seeds/nuts, wines, canned soups)
     if any(k in n for k in [
         "black bean", "canned black bean", "cannellini", "chickpea",
         "tomato paste", "tomato soup", "cream of chicken", "cream of mushroom",
-        "canned soup", "cola", "soda", "wine", "chardonnay",
-        "tequila", "triple sec", "sugar", "yeast", "cornstarch", "baking soda",
+        "canned soup", "cola", "club soda", "wine", "chardonnay",
+        "tequila", "triple sec", "sugar", "yeast", "cornstarch",
         "chocolate chip", "almond", "pecan", "walnut", "cashew", "peanut",
         "flax seed", "chia seed", "sunflower seed", "msg", "old bay", "tamarind",
-        "shortening", "levain"
+        "shortening"
     ]):
         return "pantry"
 
-    # 9. Spices & Seasonings
+    # 10. Spices & Seasonings
     if any(k in n for k in [
         "powder", "paprika", "cumin", "oregano", "cinnamon", "spice", "nutmeg",
         "curry", "seasoning", "allspice", "cardamom", "clove", "cloves",
         "turmeric", "cayenne", "chili flake", "red pepper flake", "mace", "peppercorn",
         "bay leaf", "bay leaves", "kasoori methi", "marjoram", "thyme", "star anise",
-        "fennel seed"
+        "fennel seed", "baking soda", "baking powder"
     ]) or re.search(r"\b(rubs?|dill|coriander)\b", n):
         return "spices & herbs"
 
@@ -884,30 +1048,35 @@ class PantryManager:
                         (clean_norm, row["id"]),
                     )
                     existing = cursor.fetchone()
+                    is_staple_val = 1 if clean_norm in ALWAYS_ON_STAPLES else 0
+                    in_stock_val = 1 if clean_norm in ALWAYS_ON_STAPLES else row["in_stock"]
                     if existing:
                         # Merge stock status
-                        if row["in_stock"] == 1 and existing["in_stock"] == 0:
-                            conn.execute("UPDATE pantry_items SET in_stock = 1 WHERE id = ?", (existing["id"],))
+                        merged_stock = 1 if (row["in_stock"] == 1 or existing["in_stock"] == 1 or clean_norm in ALWAYS_ON_STAPLES) else 0
+                        merged_staple = 1 if (is_staple_val or existing.get("is_staple") == 1) else 0
+                        conn.execute("UPDATE pantry_items SET in_stock = ?, is_staple = ? WHERE id = ?", (merged_stock, merged_staple, existing["id"]))
                         conn.execute("DELETE FROM pantry_items WHERE id = ?", (row["id"],))
                         cleaned_count += 1
                     else:
                         conn.execute(
                             """
                             UPDATE pantry_items 
-                            SET name = ?, display_name = ?, category = ?, updated_at = CURRENT_TIMESTAMP 
+                            SET name = ?, display_name = ?, category = ?, in_stock = ?, is_staple = ?, updated_at = CURRENT_TIMESTAMP 
                             WHERE id = ?
                             """,
-                            (clean_norm, clean_disp, clean_cat, row["id"]),
+                            (clean_norm, clean_disp, clean_cat, in_stock_val, is_staple_val, row["id"]),
                         )
                         cleaned_count += 1
                 elif clean_disp != row["display_name"] or clean_cat != row["category"]:
+                    is_staple_val = 1 if clean_norm in ALWAYS_ON_STAPLES else 0
+                    in_stock_val = 1 if clean_norm in ALWAYS_ON_STAPLES else row["in_stock"]
                     conn.execute(
                         """
                         UPDATE pantry_items 
-                        SET display_name = ?, category = ?, updated_at = CURRENT_TIMESTAMP 
+                        SET display_name = ?, category = ?, in_stock = ?, is_staple = ?, updated_at = CURRENT_TIMESTAMP 
                         WHERE id = ?
                         """,
-                        (clean_disp, clean_cat, row["id"]),
+                        (clean_disp, clean_cat, in_stock_val, is_staple_val, row["id"]),
                     )
                     cleaned_count += 1
 
@@ -932,8 +1101,9 @@ class PantryManager:
             )
             in_stock = {row["name"].lower() for row in cursor.fetchall()}
 
-        # Merge with built-in default staples
+        # Merge with built-in default staples and Always-On staples
         in_stock.update(DEFAULT_STAPLES)
+        in_stock.update(ALWAYS_ON_STAPLES)
 
         self._in_stock_cache = in_stock
         self._cache_timestamp = now
@@ -1133,12 +1303,14 @@ class PantryManager:
                     )
                     row = cursor.fetchone()
                     if not row:
+                        is_staple_val = 1 if norm in ALWAYS_ON_STAPLES else 0
+                        in_stock_val = 1 if (mark_in_stock or is_staple_val) else 0
                         conn.execute(
                             """
                             INSERT INTO pantry_items (name, display_name, category, in_stock, is_staple, updated_at)
-                            VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+                            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                             """,
-                            (norm, clean_display, cat, 1 if mark_in_stock else 0),
+                            (norm, clean_display, cat, in_stock_val, is_staple_val),
                         )
                         conn.commit()
                         added_count += 1
@@ -1273,8 +1445,8 @@ class PantryManager:
             if not norm:
                 continue
 
-            # Always treat built-in staples (salt, pepper, water, oil, AP flour, sugar, pan spray) as in stock
-            if norm in DEFAULT_STAPLES or is_staple_ingredient(norm, raw_name):
+            # Always treat built-in staples and baseline Always-On staples as in stock
+            if norm in DEFAULT_STAPLES or norm in ALWAYS_ON_STAPLES or is_staple_ingredient(norm, raw_name):
                 continue
 
             # Check if ingredient matches in-stock set

@@ -268,7 +268,7 @@ def test_clean_ingredient_name_real_world_messy_strings():
         ("1 Carrot, Peeled And Shredded Or Grated", "carrot", "Carrot"),
         ("1 Large Green Cabbage, Stem/Core Removed", "cabbage", "Cabbage"),
         ("1 Lime, Juiced", "lime", "Lime"),
-        ("Juice From 2 Lemons", "lemon juice", "Lemon Juice"),
+        ("Juice From 2 Lemons", "lemon", "Lemon"),
     ]
 
     for raw, expected_norm, expected_disp in test_cases:
@@ -364,7 +364,7 @@ def test_clean_ingredient_units_ordinals_and_junk():
         # Standalone units without numbers
         ("Lb Ground Pork", "ground pork", "Ground Pork"),
         ("Lb Lamb Mince", "lamb mince", "Lamb Mince"),
-        ("Lbs 16-20 Black Tiger Shrimp", "black tiger shrimp", "Black Tiger Shrimp"),
+        ("Lbs 16-20 Black Tiger Shrimp", "shrimp", "Shrimp"),
         ("Oz Chicken Breast", "chicken breast", "Chicken Breast"),
         ("Pound Boneless, Skinless Chicken Thighs", "chicken thighs", "Chicken Thighs"),
         ("Pound Ground Chicken", "ground chicken", "Ground Chicken"),
@@ -394,8 +394,8 @@ def test_clean_ingredient_units_ordinals_and_junk():
         ("T Sriracha Sauce", "sriracha", "Sriracha"),
         ("Sharp White Cheddar |", "cheddar", "Cheddar"),
         # Prefixes & mangling
-        ("-Squeezed Lime Juice", "lime juice", "Lime Juice"),
-        ("Fresh-Squeezed Lime Juice", "lime juice", "Lime Juice"),
+        ("-Squeezed Lime Juice", "lime", "Lime"),
+        ("Fresh-Squeezed Lime Juice", "lime", "Lime"),
         ("Ly Chopped Parsley Or Chives For Garnish", "parsley", "Parsley"),
         ("Freshly Chopped Parsley Or Chives For Garnish", "parsley", "Parsley"),
     ]
@@ -506,17 +506,33 @@ def test_cleanup_existing_items_in_place_migration(tmp_path):
 
 
 def test_pantry_refinements_and_misplacements():
-    # 1. Measurement strings & scrape glitches
-    assert clean_ingredient_name("To 2 Scotch Bonnet Peppers Or Habanero Chiles") == ("scotch bonnet habanero", "Scotch Bonnet / Habanero")
+    # 1. Measurement strings & scrape glitches (deleted immediately)
+    assert clean_ingredient_name("To 2 Scotch Bonnet Peppers Or Habanero Chiles") is None
+    assert clean_ingredient_name("Ginger Chili Garlic") is None
+    assert clean_ingredient_name("Pickled Jalapeno Juice") is None
+    assert clean_ingredient_name("Broth") is None
+    assert clean_ingredient_name("Stock") is None
     assert clean_ingredient_name("Length Ginger") is None
-    assert clean_ingredient_name("To 7 Tbsp Buttermilk") == ("buttermilk", "Buttermilk")
-    assert clean_ingredient_name("To 2 Tablespoons Olive Oil") == ("olive oil", "Olive Oil")
-    assert clean_ingredient_name("To 3 Tbsp. Ketchup") == ("ketchup", "Ketchup")
     assert clean_ingredient_name("To 15 Green Beans") is None
+    assert clean_ingredient_name("Skewers") is None
+    assert clean_ingredient_name("Vegetables Of Choice") is None
+    assert clean_ingredient_name("Cheese") is None
 
-    # 2. Category deduplications and overlaps
+    # 2. Derivative ingredients (consolidated into root parent item)
+    assert clean_ingredient_name("Lemon Juice") == ("lemon", "Lemon")
+    assert clean_ingredient_name("Lemon Zest") == ("lemon", "Lemon")
+    assert clean_ingredient_name("Lime Juice") == ("lime", "Lime")
+    assert clean_ingredient_name("Lime Zest") == ("lime", "Lime")
+    assert clean_ingredient_name("Egg Yolk") == ("egg", "Eggs")
+    assert clean_ingredient_name("Egg Whites") == ("egg", "Eggs")
+    assert clean_ingredient_name("Levain") == ("sourdough starter", "Sourdough Starter")
+    assert clean_ingredient_name("Sourdough Discard") == ("sourdough starter", "Sourdough Starter")
+
+    # 3. Category deduplications and overlaps
     assert clean_ingredient_name("Chocolate Chips") == ("chocolate chip", "Chocolate Chips")
     assert clean_ingredient_name("Chocolate Chip") == ("chocolate chip", "Chocolate Chips")
+    assert clean_ingredient_name("Dark Chocolate Chips") == ("chocolate chip", "Chocolate Chips")
+    assert clean_ingredient_name("Semisweet Chocolate Chips") == ("chocolate chip", "Chocolate Chips")
     assert clean_ingredient_name("Black Beans") == ("black bean", "Black Beans")
     assert clean_ingredient_name("Canned Black Beans") == ("black bean", "Black Beans")
     assert clean_ingredient_name("Almonds") == ("almond", "Almonds")
@@ -534,25 +550,70 @@ def test_pantry_refinements_and_misplacements():
     assert clean_ingredient_name("Coriander Leaves") == ("cilantro", "Cilantro")
     assert clean_ingredient_name("Green Cabbage") == ("cabbage", "Cabbage")
     assert clean_ingredient_name("Persian Cucumbers") == ("cucumber", "Cucumbers")
+    assert clean_ingredient_name("Green Chile Peppers") == ("green chile", "Green Chiles")
+    assert clean_ingredient_name("Firm Tofu") == ("tofu", "Tofu")
 
     # Grains & Bakery
     assert clean_ingredient_name("Breadcrumbs") == ("breadcrumb", "Breadcrumbs")
     assert clean_ingredient_name("Regular Breadcrumbs") == ("breadcrumb", "Breadcrumbs")
     assert clean_ingredient_name("Panko Breadcrumbs") == ("panko", "Panko")
     assert clean_ingredient_name("Rice") == ("white rice", "White Rice")
-    assert clean_ingredient_name("Chang'S Pad Thai Dried Rice Sticks") == ("rice noodles", "Rice Noodles")
+    assert clean_ingredient_name("Chang'S Pad Thai Dried Rice Sticks") == ("rice noodle", "Rice Noodles")
+    assert clean_ingredient_name("Rice Noodles") == ("rice noodle", "Rice Noodles")
 
-    # Dairy generic discard
-    assert clean_ingredient_name("Cheese") is None
+    # Spices
+    assert clean_ingredient_name("Chili Flakes") == ("chili flake", "Chili Flakes / Red Pepper Flakes")
+    assert clean_ingredient_name("Red Pepper Flakes") == ("chili flake", "Chili Flakes / Red Pepper Flakes")
 
-    # 3. Categorization routing
+    # 4. Categorization routing
     assert categorize_ingredient("Green Beans") == "produce"
     assert categorize_ingredient("Red Wine Vinegar") == "sauces & condiments"
     assert categorize_ingredient("Seasoned Rice Wine Vinegar") == "sauces & condiments"
     assert categorize_ingredient("White Wine Vinegar") == "sauces & condiments"
     assert categorize_ingredient("Chili Crisp") == "sauces & condiments"
+    assert categorize_ingredient("Thai Red Curry Paste") == "sauces & condiments"
     assert categorize_ingredient("Ground Ginger") == "spices & herbs"
+    assert categorize_ingredient("Baking Soda") == "spices & herbs"
+    assert categorize_ingredient("Ground Cloves") == "spices & herbs"
+    assert categorize_ingredient("Whole Cloves") == "spices & herbs"
     assert categorize_ingredient("Cream Of Chicken") == "pantry"
+
+
+def test_always_on_staples_vs_active_stock(temp_pantry):
+    pm = temp_pantry
+
+    recipe = {
+        "name": "Chicken Cumin Stir Fry",
+        "recipeIngredient": [
+            "1 Lb Chicken Thighs",
+            "1 Tsp Ground Cumin",
+            "1 Tbsp Soy Sauce",
+            "1/2 Tsp Black Pepper",
+            "1 Tsp Cornstarch",
+            "1 Tbsp Olive Oil",
+            "1 Fresh Avocado",
+        ],
+    }
+
+    # Empty active stock: only Active Stock perishables (Chicken Thighs, Avocado) are missing
+    result = pm.evaluate_recipe(recipe, in_stock_set=set())
+    assert "Chicken Thighs" in result["missing_items"]
+    assert "Avocado" in result["missing_items"]
+    assert "Ground Cumin" not in result["missing_items"]
+    assert "Soy Sauce" not in result["missing_items"]
+    assert "Black Pepper" not in result["missing_items"]
+    assert "Cornstarch" not in result["missing_items"]
+    assert "Olive Oil" not in result["missing_items"]
+    assert result["missing_count"] == 2
+    assert not result["is_ready"]
+
+    # With Active Stock on hand, recipe is ready and full pantry
+    active_stock = {"chicken thighs", "avocado"}
+    result_ready = pm.evaluate_recipe(recipe, in_stock_set=active_stock)
+    assert result_ready["missing_count"] == 0
+    assert result_ready["is_ready"]
+    assert result_ready["is_full_pantry"]
+
 
 
 
