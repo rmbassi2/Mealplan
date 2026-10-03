@@ -10,6 +10,7 @@ from app.pantry import (
     categorize_ingredient,
     clean_ingredient_name,
     is_staple_ingredient,
+    get_ingredient_tier,
 )
 
 
@@ -109,6 +110,11 @@ async def test_api_pantry_endpoints():
         data = resp.json()
         assert "items" in data
         assert "stats" in data
+        assert "tiers" in data
+        assert "tier_stats" in data
+        assert "anchors" in data["tiers"]
+        assert "perishables" in data["tiers"]
+        assert "staples" in data["tiers"]
         assert data["stats"]["total"] > 0
 
         # Pick first item to toggle
@@ -147,6 +153,15 @@ async def test_api_pantry_endpoints():
         del_resp = await client.delete(f"/api/pantry/item/{new_item['id']}")
         assert del_resp.status_code == 200
 
+        # 5. Bulk stock endpoints (body and query param)
+        bulk_resp1 = await client.post("/api/pantry/bulk-stock", json={"in_stock": True})
+        assert bulk_resp1.status_code == 200
+        assert bulk_resp1.json()["status"] == "success"
+
+        bulk_resp2 = await client.post("/api/pantry/bulk-stock?in_stock=true")
+        assert bulk_resp2.status_code == 200
+        assert bulk_resp2.json()["status"] == "success"
+
 
 @pytest.mark.anyio
 async def test_options_with_pantry_filter():
@@ -159,12 +174,13 @@ async def test_options_with_pantry_filter():
 
         for opt in data["options"]:
             assert "pantry" in opt
-            # Every option in pantry mood must be ready (missing_count <= 1)
+            # Every option in pantry mood must be ready (status ready or almost_ready with missing_perishables <= 2)
             assert opt["pantry"]["is_ready"] is True
-            assert opt["pantry"]["missing_count"] <= 1
+            assert opt["pantry"]["status"] in ("ready", "almost_ready")
+            assert opt["pantry"]["missing_count"] <= 2
             # Check badge present
             badges = [b["label"] for b in opt["badges"]]
-            assert any("Pantry" in b or "Need:" in b for b in badges)
+            assert any("Ready" in b or "Pantry" in b or "Need:" in b for b in badges)
 
 
 @pytest.mark.anyio
@@ -613,6 +629,133 @@ def test_always_on_staples_vs_active_stock(temp_pantry):
     assert result_ready["missing_count"] == 0
     assert result_ready["is_ready"]
     assert result_ready["is_full_pantry"]
+
+
+def test_tiered_classification():
+    """Verify ingredients are categorized into the three Dinner Availability tiers correctly."""
+    # Tier 1: Anchors
+    assert get_ingredient_tier("chicken breast") == "anchor"
+    assert get_ingredient_tier("beef chuck roast") == "anchor"
+    assert get_ingredient_tier("ground pork") == "anchor"
+    assert get_ingredient_tier("salmon fillet") == "anchor"
+    assert get_ingredient_tier("cod fillets") == "anchor"
+    assert get_ingredient_tier("black tiger shrimp") == "anchor"
+    assert get_ingredient_tier("extra-firm tofu") == "anchor"
+    assert get_ingredient_tier("italian sausage") == "anchor"
+
+    # Excluded from anchors -> staple
+    assert get_ingredient_tier("bacon fat") == "staple"
+    assert get_ingredient_tier("chicken broth") == "staple"
+    assert get_ingredient_tier("beef stock") == "staple"
+    assert get_ingredient_tier("fish sauce") == "staple"
+
+    # Tier 2: Perishables
+    assert get_ingredient_tier("baby spinach") == "perishable"
+    assert get_ingredient_tier("cilantro") == "perishable"
+    assert get_ingredient_tier("heavy cream") == "perishable"
+    assert get_ingredient_tier("sour cream") == "perishable"
+    assert get_ingredient_tier("avocado") == "perishable"
+    assert get_ingredient_tier("garlic") == "perishable"
+    assert get_ingredient_tier("fresh ginger") == "perishable"
+    assert get_ingredient_tier("fresh lime") == "perishable"
+    assert get_ingredient_tier("scallions") == "perishable"
+    assert get_ingredient_tier("mozzarella") == "perishable"
+
+    # Tier 3: Staples
+    assert get_ingredient_tier("garlic powder") == "staple"
+    assert get_ingredient_tier("onion powder") == "staple"
+    assert get_ingredient_tier("ground ginger") == "staple"
+    assert get_ingredient_tier("canned black beans") == "staple"
+    assert get_ingredient_tier("tomato paste") == "staple"
+    assert get_ingredient_tier("olive oil") == "staple"
+    assert get_ingredient_tier("smoked paprika") == "staple"
+    assert get_ingredient_tier("all purpose flour") == "staple"
+    assert get_ingredient_tier("white rice") == "staple"
+    assert get_ingredient_tier("butter") == "staple"
+
+
+def test_tiered_dinner_availability_evaluation(temp_pantry):
+    """Test weighted Dinner Availability states: ready, almost_ready, unavailable."""
+    pm = temp_pantry
+
+    recipe = {
+        "name": "Chicken Tikka Skillet",
+        "recipeIngredient": [
+            "1.5 lbs Boneless Chicken Thighs",  # Anchor
+            "1 cup Heavy Cream",                # Perishable 1
+            "1/4 cup Chopped Cilantro",         # Perishable 2
+            "1 Fresh Lime",                     # Perishable 3
+            "2 tbsp Olive Oil",                 # Staple
+            "1 tsp Cumin",                      # Staple
+            "1 tsp Garam Masala",               # Staple
+            "1 tsp Salt",                       # Staple
+        ],
+    }
+
+    # 1. Anchor missing -> Unavailable (Hard Blocker) even if perishables are present
+    stock_no_protein = {"heavy cream", "cilantro", "lime"}
+    res_no_protein = pm.evaluate_recipe(recipe, in_stock_set=stock_no_protein)
+    assert res_no_protein["status"] == "unavailable"
+    assert not res_no_protein["is_ready"]
+    assert not res_no_protein["anchor_satisfied"]
+    assert "Chicken Thighs" in res_no_protein["missing_anchor"]
+
+    # 2. Anchor in stock + 0 missing perishables -> Ready to Cook
+    stock_all_fresh = {"chicken thighs", "heavy cream", "cilantro", "lime"}
+    res_ready = pm.evaluate_recipe(recipe, in_stock_set=stock_all_fresh)
+    assert res_ready["status"] == "ready"
+    assert res_ready["is_ready"]
+    assert res_ready["is_full_pantry"]
+    assert res_ready["missing_count"] == 0
+
+    # 3. Anchor in stock + 1 missing perishable -> Almost Ready
+    stock_missing_one = {"chicken thighs", "heavy cream", "cilantro"}
+    res_one_off = pm.evaluate_recipe(recipe, in_stock_set=stock_missing_one)
+    assert res_one_off["status"] == "almost_ready"
+    assert res_one_off["is_ready"]
+    assert not res_one_off["is_full_pantry"]
+    assert len(res_one_off["missing_perishables"]) == 1
+    assert "Lime" in res_one_off["missing_perishables"][0]
+
+    # 4. Anchor in stock + 2 missing perishables -> Almost Ready (Soft Tolerance)
+    stock_missing_two = {"chicken thighs", "heavy cream"}
+    res_two_off = pm.evaluate_recipe(recipe, in_stock_set=stock_missing_two)
+    assert res_two_off["status"] == "almost_ready"
+    assert res_two_off["is_ready"]
+    assert len(res_two_off["missing_perishables"]) == 2
+
+    # 5. Anchor in stock + 3 missing perishables -> Unavailable (> 2 fresh missing)
+    stock_missing_three = {"chicken thighs"}
+    res_three_off = pm.evaluate_recipe(recipe, in_stock_set=stock_missing_three)
+    assert res_three_off["status"] == "unavailable"
+    assert not res_three_off["is_ready"]
+    assert len(res_three_off["missing_perishables"]) == 3
+
+
+def test_get_tiered_dashboard(temp_pantry):
+    """Verify get_tiered_dashboard returns items cleanly separated into 3 tiers."""
+    pm = temp_pantry
+    pm.upsert_item("chicken breast", in_stock=True)
+    pm.upsert_item("baby spinach", in_stock=False)
+    pm.upsert_item("olive oil", in_stock=True)
+
+    dashboard = pm.get_tiered_dashboard()
+    assert "anchors" in dashboard
+    assert "perishables" in dashboard
+    assert "staples" in dashboard
+    assert len(dashboard["anchors"]) == 1
+    assert dashboard["anchors"][0]["name"] == "chicken breast"
+    assert len(dashboard["perishables"]) == 1
+    assert dashboard["perishables"][0]["name"] == "baby spinach"
+    assert len(dashboard["staples"]) == 1
+    assert dashboard["staples"][0]["name"] == "olive oil"
+
+    assert dashboard["tier_stats"]["anchors_total"] == 1
+    assert dashboard["tier_stats"]["anchors_in_stock"] == 1
+    assert dashboard["tier_stats"]["perishables_total"] == 1
+    assert dashboard["tier_stats"]["perishables_in_stock"] == 0
+    assert dashboard["tier_stats"]["staples_total"] == 1
+
 
 
 

@@ -545,8 +545,8 @@
         <!-- Filter tabs & bulk actions -->
         <div class="flex items-center justify-between text-xs">
           <div class="flex items-center space-x-1" id="pantryFilterTabs">
-            <button onclick="setPantryTab('all')" id="pantryTab-all" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-600 text-white shadow-sm transition-all">All</button>
-            <button onclick="setPantryTab('in_stock')" id="pantryTab-in_stock" class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-stone-100 hover:bg-stone-200 text-stone-600 transition-all">In Stock</button>
+            <button onclick="setPantryTab('board')" id="pantryTab-board" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-600 text-white shadow-sm transition-all">🍽️ Dinner Board</button>
+            <button onclick="setPantryTab('all')" id="pantryTab-all" class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-stone-100 hover:bg-stone-200 text-stone-600 transition-all">All Items</button>
             <button onclick="setPantryTab('missing')" id="pantryTab-missing" class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-stone-100 hover:bg-stone-200 text-stone-600 transition-all">Missing</button>
           </div>
 
@@ -776,7 +776,7 @@
       } else if (badge.type === 'pantry') {
         colorClass = badge.icon === '🟢' 
           ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold' 
-          : (badge.icon === '⚠️' ? 'bg-amber-50 text-amber-900 border-amber-300 font-bold' : 'bg-stone-100 text-stone-600 border-stone-200');
+          : ((badge.icon === '🟡' || badge.icon === '⚠️') ? 'bg-amber-50 text-amber-900 border-amber-300 font-bold' : 'bg-stone-100 text-stone-600 border-stone-200');
       }
       return `
         <span class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${colorClass}">
@@ -851,11 +851,28 @@
             <p class="text-xs text-stone-500 mt-1 line-clamp-2 leading-relaxed">
               ${escapeHtml(recipe.description || 'A delicious, hearty home-cooked meal ready for tonight.')}
             </p>
-            ${recipe.pantry && recipe.pantry.missing_count === 1 ? `
-              <div class="mt-2 text-[11px] text-amber-800 bg-amber-50/90 border border-amber-200/80 rounded-lg px-2.5 py-1 flex items-center justify-between">
-                <span>⚠️ <strong>Missing 1 item:</strong> ${escapeHtml(recipe.pantry.missing_items[0] || '1 ingredient')}</span>
-                <span class="text-[10px] text-amber-700 font-semibold uppercase tracking-wider">1 off</span>
-              </div>
+            ${recipe.pantry ? `
+              ${recipe.pantry.status === 'almost_ready' ? `
+                <div class="mt-2 text-[11px] text-amber-800 bg-amber-50/90 border border-amber-200/80 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+                  <span class="truncate pr-1">🟡 <strong>Need:</strong> ${escapeHtml((recipe.pantry.missing_perishables || recipe.pantry.missing_items || []).join(', ') || '1-2 items')}</span>
+                  <span class="text-[10px] text-amber-700 font-semibold uppercase tracking-wider flex-shrink-0">almost ready</span>
+                </div>
+              ` : (recipe.pantry.status === 'ready' ? `
+                <div class="mt-2 text-[11px] text-emerald-800 bg-emerald-50/90 border border-emerald-200/80 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+                  <span>🟢 <strong>Dinner Ready:</strong> All anchor &amp; fresh items in stock!</span>
+                  <span class="text-[10px] text-emerald-700 font-semibold uppercase tracking-wider flex-shrink-0">Ready</span>
+                </div>
+              ` : (recipe.pantry.missing_anchor ? `
+                <div class="mt-2 text-[11px] text-stone-600 bg-stone-100 border border-stone-200 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+                  <span class="truncate pr-1">⚪ <strong>Missing Protein:</strong> ${escapeHtml(recipe.pantry.missing_anchor)}</span>
+                  <span class="text-[10px] text-stone-500 font-semibold uppercase tracking-wider flex-shrink-0">out</span>
+                </div>
+              ` : (recipe.pantry.missing_count > 0 ? `
+                <div class="mt-2 text-[11px] text-stone-600 bg-stone-100 border border-stone-200 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+                  <span>⚪ <strong>Missing:</strong> ${recipe.pantry.missing_count} fresh items</span>
+                  <span class="text-[10px] text-stone-500 font-semibold uppercase tracking-wider flex-shrink-0">out</span>
+                </div>
+              ` : '')))}
             ` : ''}
           </div>
         `;
@@ -1050,6 +1067,11 @@
               <p class="text-xs text-stone-500 mt-0.5 line-clamp-1">
                 ${escapeHtml(side.description || "A tasty pairing for tonight's dinner.")}
               </p>
+              ${side.pantry && side.pantry.status === 'almost_ready' ? `
+                <p class="text-[10px] text-amber-700 font-semibold mt-1">
+                  🟡 Need: ${escapeHtml((side.pantry.missing_perishables || side.pantry.missing_items || []).join(', '))}
+                </p>
+              ` : ''}
             </div>
           </div>
         `;
@@ -1470,8 +1492,10 @@
       // Missing Ingredient Shopping Card
       const confirmMissingShoppingCard = document.getElementById('confirmMissingShoppingCard');
       const chosenRecipe = currentOptions.find(o => o.id === selectedRecipeId);
-      if (chosenRecipe && chosenRecipe.pantry && chosenRecipe.pantry.missing_count === 1 && chosenRecipe.pantry.missing_items && chosenRecipe.pantry.missing_items.length > 0) {
-        missingIngredientForShopping = chosenRecipe.pantry.missing_items[0];
+      if (chosenRecipe && chosenRecipe.pantry && (chosenRecipe.pantry.status === 'almost_ready' || chosenRecipe.pantry.missing_count === 1) && chosenRecipe.pantry.missing_items && chosenRecipe.pantry.missing_items.length > 0) {
+        missingIngredientForShopping = chosenRecipe.pantry.missing_perishables && chosenRecipe.pantry.missing_perishables.length > 0
+          ? chosenRecipe.pantry.missing_perishables[0]
+          : chosenRecipe.pantry.missing_items[0];
         document.getElementById('confirmMissingItemName').textContent = missingIngredientForShopping;
         const addBtn = document.getElementById('confirmAddToShoppingBtn');
         const addBtnText = document.getElementById('confirmAddToShoppingBtnText');
@@ -1494,9 +1518,16 @@
     // ==========================================
     let pantryItems = [];
     let pantryStats = { total: 0, in_stock: 0, out_of_stock: 0 };
-    let currentPantryTab = 'all';
+    let pantryTiers = { anchors: [], perishables: [], staples: [] };
+    let tierStats = {
+      anchors_total: 0, anchors_in_stock: 0,
+      perishables_total: 0, perishables_in_stock: 0,
+      staples_total: 0, staples_in_stock: 0
+    };
+    let currentPantryTab = 'board';
     let pantrySearchTerm = '';
     let missingIngredientForShopping = null;
+    let mealieStatus = null;
 
     async function openPantryModal() {
       const modal = document.getElementById('pantryModal');
@@ -1512,8 +1543,6 @@
       }
     }
 
-    let mealieStatus = null;
-
     async function loadPantry() {
       try {
         const [pRes, mRes] = await Promise.all([
@@ -1524,6 +1553,12 @@
         const data = await pRes.json();
         pantryItems = data.items || [];
         pantryStats = data.stats || { total: 0, in_stock: 0, out_of_stock: 0 };
+        pantryTiers = data.tiers || { anchors: [], perishables: [], staples: [] };
+        tierStats = data.tier_stats || {
+          anchors_total: 0, anchors_in_stock: 0,
+          perishables_total: 0, perishables_in_stock: 0,
+          staples_total: 0, staples_in_stock: 0
+        };
         if (mRes && mRes.ok) {
           mealieStatus = await mRes.json();
         }
@@ -1537,9 +1572,9 @@
     function updatePantryHeaderBadge() {
       const badge = document.getElementById('pantryInStockBadge');
       const subtitle = document.getElementById('pantryStatsSubtitle');
-      if (pantryStats.total > 0) {
+      if (tierStats && tierStats.anchors_total > 0) {
         if (badge) {
-          badge.textContent = `${pantryStats.in_stock}/${pantryStats.total}`;
+          badge.textContent = `${tierStats.anchors_in_stock}🥩 • ${tierStats.perishables_in_stock}🥦`;
           badge.classList.remove('hidden');
         }
         if (subtitle) {
@@ -1553,14 +1588,22 @@
               sourceText = ` • ⚠️ Mealie Disconnected`;
             }
           }
-          subtitle.textContent = `${pantryStats.in_stock} in stock • ${pantryStats.out_of_stock} out${sourceText}`;
+          subtitle.textContent = `${tierStats.anchors_in_stock}/${tierStats.anchors_total} Proteins • ${tierStats.perishables_in_stock}/${tierStats.perishables_total} Fresh • Staples Ready${sourceText}`;
+        }
+      } else if (pantryStats.total > 0) {
+        if (badge) {
+          badge.textContent = `${pantryStats.in_stock}/${pantryStats.total}`;
+          badge.classList.remove('hidden');
+        }
+        if (subtitle) {
+          subtitle.textContent = `${pantryStats.in_stock} in stock • ${pantryStats.out_of_stock} out`;
         }
       }
     }
 
     function setPantryTab(tab) {
       currentPantryTab = tab;
-      ['all', 'in_stock', 'missing'].forEach(t => {
+      ['board', 'all', 'missing'].forEach(t => {
         const btn = document.getElementById(`pantryTab-${t}`);
         if (!btn) return;
         if (t === tab) {
@@ -1577,21 +1620,248 @@
       renderPantryList();
     }
 
+    function createPantryItemEl(item) {
+      const isInStock = item.in_stock === 1 || item.is_staple === 1;
+      const isAnchor = (item.tier === 'anchor');
+      const itemEl = document.createElement('div');
+      itemEl.className = `flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${
+        isInStock 
+          ? 'bg-white border-stone-200/90 hover:border-emerald-300 shadow-xs' 
+          : 'bg-stone-50/90 border-stone-200/70 hover:border-stone-300'
+      }`;
+      itemEl.onclick = () => togglePantryItem(item.id, isInStock);
+
+      itemEl.innerHTML = `
+        <div class="flex items-center space-x-2.5 min-w-0 flex-1 pr-2">
+          <span class="text-base flex-shrink-0">${isInStock ? '🟢' : '⚪'}</span>
+          <div class="min-w-0 flex-1">
+            <span class="text-sm leading-snug break-words ${
+              isInStock 
+                ? 'font-semibold text-stone-900' 
+                : 'font-medium text-stone-500'
+            }">
+              ${escapeHtml(item.display_name)}
+            </span>
+            ${!isInStock && isAnchor ? '<span class="ml-1.5 inline-block text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1.5 py-0.2">Blocks Recipes</span>' : ''}
+          </div>
+        </div>
+        <div class="flex items-center space-x-2 flex-shrink-0">
+          <button 
+            type="button"
+            onclick="event.stopPropagation(); togglePantryItem(${item.id}, ${isInStock});"
+            class="px-2.5 py-1 text-xs font-bold rounded-full transition-all flex items-center space-x-1 border ${
+              isInStock 
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100' 
+                : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+            }">
+            <span>${isInStock ? '✓' : '✕'}</span>
+            <span>${isInStock ? 'In Stock' : 'Out'}</span>
+          </button>
+          <button 
+            type="button" 
+            onclick="event.stopPropagation(); deletePantryItem(${item.id});" 
+            title="Remove item" 
+            class="w-7 h-7 rounded-lg hover:bg-rose-50 hover:text-rose-600 text-stone-300 hover:border hover:border-rose-200 flex items-center justify-center text-xs transition-colors">
+            ✕
+          </button>
+        </div>
+      `;
+      return itemEl;
+    }
+
     function renderPantryList() {
       const container = document.getElementById('pantryItemsContainer');
       if (!container) return;
       container.innerHTML = '';
 
-      let filtered = pantryItems.filter(item => {
-        if (pantrySearchTerm) {
-          const match = item.name.toLowerCase().includes(pantrySearchTerm) || item.display_name.toLowerCase().includes(pantrySearchTerm);
-          if (!match) return false;
-        }
-        if (currentPantryTab === 'in_stock') return item.in_stock === 1 || item.is_staple === 1;
-        if (currentPantryTab === 'missing') return item.in_stock === 0 && item.is_staple === 0;
-        return true;
-      });
+      const term = (pantrySearchTerm || '').trim().toLowerCase();
+      const matchesSearch = (item) => {
+        if (!term) return true;
+        return (item.name && item.name.toLowerCase().includes(term)) || 
+               (item.display_name && item.display_name.toLowerCase().includes(term));
+      };
 
+      if (currentPantryTab === 'board') {
+        const anchors = pantryItems.filter(i => (i.tier === 'anchor') && matchesSearch(i));
+        const perishables = pantryItems.filter(i => (i.tier === 'perishable') && matchesSearch(i));
+        const staples = pantryItems.filter(i => (i.tier === 'staple' || (!i.tier && i.is_staple)) && matchesSearch(i));
+
+        if (anchors.length === 0 && perishables.length === 0 && staples.length === 0) {
+          container.innerHTML = `
+            <div class="text-center py-8 text-stone-400">
+              <span class="text-3xl">🔍</span>
+              <p class="text-xs font-semibold text-stone-500 mt-2">No matching ingredients</p>
+              <p class="text-[11px] text-stone-400 mt-0.5">Try a different search term or add an item below.</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Section 1: Tier 1 Centerpiece Proteins
+        if (anchors.length > 0) {
+          const inStockCount = anchors.filter(a => a.in_stock === 1).length;
+          const groupWrapper = document.createElement('div');
+          groupWrapper.className = 'space-y-2';
+
+          const groupTitle = document.createElement('div');
+          groupTitle.className = 'flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-900 bg-amber-50/90 px-3 py-2 rounded-xl border border-amber-200/80';
+          groupTitle.innerHTML = `
+            <span class="flex items-center space-x-1.5">
+              <span>🥩</span>
+              <span>Centerpiece Proteins</span>
+            </span>
+            <span class="text-[11px] font-semibold text-amber-800 normal-case tracking-normal">
+              ${inStockCount} / ${anchors.length} in stock • Hard Blocker
+            </span>
+          `;
+          groupWrapper.appendChild(groupTitle);
+
+          const listDiv = document.createElement('div');
+          listDiv.className = 'space-y-1.5';
+          anchors.forEach(item => listDiv.appendChild(createPantryItemEl(item)));
+          groupWrapper.appendChild(listDiv);
+          container.appendChild(groupWrapper);
+        }
+
+        // Section 2: Tier 2 Fresh Crisper & Herbs
+        if (perishables.length > 0) {
+          const inStockCount = perishables.filter(p => p.in_stock === 1).length;
+          const groupWrapper = document.createElement('div');
+          groupWrapper.className = 'space-y-2 pt-2';
+
+          const groupTitle = document.createElement('div');
+          groupTitle.className = 'flex items-center justify-between text-xs font-bold uppercase tracking-wider text-emerald-900 bg-emerald-50/90 px-3 py-2 rounded-xl border border-emerald-200/80';
+          groupTitle.innerHTML = `
+            <span class="flex items-center space-x-1.5">
+              <span>🥦</span>
+              <span>Fresh Crisper &amp; Dairy</span>
+            </span>
+            <span class="text-[11px] font-semibold text-emerald-800 normal-case tracking-normal">
+              ${inStockCount} / ${perishables.length} in stock • 1–2 Tolerated
+            </span>
+          `;
+          groupWrapper.appendChild(groupTitle);
+
+          const listDiv = document.createElement('div');
+          listDiv.className = 'space-y-1.5';
+          perishables.forEach(item => listDiv.appendChild(createPantryItemEl(item)));
+          groupWrapper.appendChild(listDiv);
+          container.appendChild(groupWrapper);
+        }
+
+        // Section 3: Tier 3 Ambient Staples (Always Assumed In Stock - Collapsible)
+        if (staples.length > 0) {
+          const detailsEl = document.createElement('details');
+          detailsEl.className = 'bg-stone-50/90 rounded-2xl border border-stone-200/80 p-3 group space-y-2 mt-2';
+          if (term) detailsEl.open = true;
+
+          const summaryEl = document.createElement('summary');
+          summaryEl.className = 'cursor-pointer text-xs font-bold text-stone-700 flex items-center justify-between select-none';
+          summaryEl.innerHTML = `
+            <span class="flex items-center space-x-1.5">
+              <span>🥫</span>
+              <span>Ambient Staples (${staples.length} items — Assumed In Stock)</span>
+            </span>
+            <span class="text-stone-400 group-open:rotate-180 transition-transform text-xs">▼</span>
+          `;
+          detailsEl.appendChild(summaryEl);
+
+          const descP = document.createElement('p');
+          descP.className = 'text-[11px] text-stone-500 mt-1 mb-2 leading-relaxed';
+          descP.textContent = 'Spices, oils, flours, sugars, vinegars, canned tomatoes & beans, and broths are assumed always ready and never gatekeep dinner.';
+          detailsEl.appendChild(descP);
+
+          const listDiv = document.createElement('div');
+          listDiv.className = 'space-y-1.5 pt-1';
+          staples.forEach(item => listDiv.appendChild(createPantryItemEl(item)));
+          detailsEl.appendChild(listDiv);
+
+          container.appendChild(detailsEl);
+        }
+
+        return;
+      }
+
+      if (currentPantryTab === 'missing') {
+        const missing = pantryItems.filter(item => item.in_stock === 0 && matchesSearch(item));
+        if (missing.length === 0) {
+          container.innerHTML = `
+            <div class="text-center py-10 text-stone-400">
+              <span class="text-4xl">🎉</span>
+              <p class="text-sm font-bold text-emerald-800 mt-2">All pantry items are in stock!</p>
+              <p class="text-xs text-stone-500 mt-1">Every recipe in your cookbook has full pantry coverage.</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Group missing by Tier: Anchors (Blockers) vs Perishables vs Staples
+        const missingAnchors = missing.filter(i => i.tier === 'anchor');
+        const missingPerishables = missing.filter(i => i.tier === 'perishable');
+        const missingStaples = missing.filter(i => i.tier === 'staple' || (!i.tier && i.is_staple));
+
+        if (missingAnchors.length > 0) {
+          const groupWrapper = document.createElement('div');
+          groupWrapper.className = 'space-y-2';
+          groupWrapper.innerHTML = `
+            <div class="text-xs font-bold uppercase tracking-wider text-rose-800 bg-rose-50 px-3 py-2 rounded-xl border border-rose-200 flex items-center justify-between">
+              <span class="flex items-center space-x-1.5">
+                <span>🥩</span>
+                <span>Missing Centerpieces (${missingAnchors.length})</span>
+              </span>
+              <span class="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full">Blocks Recipes</span>
+            </div>
+          `;
+          const listDiv = document.createElement('div');
+          listDiv.className = 'space-y-1.5';
+          missingAnchors.forEach(item => listDiv.appendChild(createPantryItemEl(item)));
+          groupWrapper.appendChild(listDiv);
+          container.appendChild(groupWrapper);
+        }
+
+        if (missingPerishables.length > 0) {
+          const groupWrapper = document.createElement('div');
+          groupWrapper.className = 'space-y-2 pt-2';
+          groupWrapper.innerHTML = `
+            <div class="text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-3 py-2 rounded-xl border border-amber-200 flex items-center justify-between">
+              <span class="flex items-center space-x-1.5">
+                <span>🥦</span>
+                <span>Missing Fresh Items (${missingPerishables.length})</span>
+              </span>
+              <span class="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">1–2 Tolerated</span>
+            </div>
+          `;
+          const listDiv = document.createElement('div');
+          listDiv.className = 'space-y-1.5';
+          missingPerishables.forEach(item => listDiv.appendChild(createPantryItemEl(item)));
+          groupWrapper.appendChild(listDiv);
+          container.appendChild(groupWrapper);
+        }
+
+        if (missingStaples.length > 0) {
+          const groupWrapper = document.createElement('div');
+          groupWrapper.className = 'space-y-2 pt-2';
+          groupWrapper.innerHTML = `
+            <div class="text-xs font-bold uppercase tracking-wider text-stone-700 bg-stone-100 px-3 py-2 rounded-xl border border-stone-200 flex items-center justify-between">
+              <span class="flex items-center space-x-1.5">
+                <span>🥫</span>
+                <span>Missing Staples (${missingStaples.length})</span>
+              </span>
+              <span class="text-[10px] font-medium text-stone-500">Won't block dinner</span>
+            </div>
+          `;
+          const listDiv = document.createElement('div');
+          listDiv.className = 'space-y-1.5';
+          missingStaples.forEach(item => listDiv.appendChild(createPantryItemEl(item)));
+          groupWrapper.appendChild(listDiv);
+          container.appendChild(groupWrapper);
+        }
+
+        return;
+      }
+
+      // Tab 'all'
+      let filtered = pantryItems.filter(matchesSearch);
       if (filtered.length === 0) {
         container.innerHTML = `
           <div class="text-center py-8 text-stone-400">
@@ -1603,7 +1873,6 @@
         return;
       }
 
-      // Group by category
       const categories = {};
       filtered.forEach(it => {
         const cat = it.category || 'pantry';
@@ -1653,52 +1922,7 @@
 
         const listDiv = document.createElement('div');
         listDiv.className = 'space-y-1.5';
-
-        categories[cat].forEach(item => {
-          const isInStock = item.in_stock === 1 || item.is_staple === 1;
-          const itemEl = document.createElement('div');
-          itemEl.className = `flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${
-            isInStock 
-              ? 'bg-white border-stone-200/90 hover:border-emerald-300 shadow-xs' 
-              : 'bg-stone-50/90 border-stone-200/70 hover:border-stone-300'
-          }`;
-          itemEl.onclick = () => togglePantryItem(item.id, isInStock);
-
-          itemEl.innerHTML = `
-            <div class="flex items-center space-x-2.5 min-w-0 flex-1 pr-2">
-              <span class="text-base flex-shrink-0">${isInStock ? '🟢' : '⚪'}</span>
-              <span class="text-sm leading-snug break-words ${
-                isInStock 
-                  ? 'font-semibold text-stone-900' 
-                  : 'font-medium text-stone-500'
-              }">
-                ${escapeHtml(item.display_name)}
-              </span>
-            </div>
-            <div class="flex items-center space-x-2 flex-shrink-0">
-              <button 
-                type="button"
-                onclick="event.stopPropagation(); togglePantryItem(${item.id}, ${isInStock});"
-                class="px-2.5 py-1 text-xs font-bold rounded-full transition-all flex items-center space-x-1 border ${
-                  isInStock 
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100' 
-                    : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                }">
-                <span>${isInStock ? '✓' : '✕'}</span>
-                <span>${isInStock ? 'In Stock' : 'Out'}</span>
-              </button>
-              <button 
-                type="button" 
-                onclick="event.stopPropagation(); deletePantryItem(${item.id});" 
-                title="Remove item" 
-                class="w-7 h-7 rounded-lg hover:bg-rose-50 hover:text-rose-600 text-stone-300 hover:border hover:border-rose-200 flex items-center justify-center text-xs transition-colors">
-                ✕
-              </button>
-            </div>
-          `;
-          listDiv.appendChild(itemEl);
-        });
-
+        categories[cat].forEach(item => listDiv.appendChild(createPantryItemEl(item)));
         groupWrapper.appendChild(listDiv);
         container.appendChild(groupWrapper);
       });
@@ -1710,6 +1934,16 @@
         item.in_stock = currentStatus ? 0 : 1;
         pantryStats.in_stock += currentStatus ? -1 : 1;
         pantryStats.out_of_stock += currentStatus ? 1 : -1;
+        if (tierStats) {
+          const t = item.tier || 'staple';
+          if (t === 'anchor') {
+            tierStats.anchors_in_stock += currentStatus ? -1 : 1;
+          } else if (t === 'perishable') {
+            tierStats.perishables_in_stock += currentStatus ? -1 : 1;
+          } else {
+            tierStats.staples_in_stock += currentStatus ? -1 : 1;
+          }
+        }
         updatePantryHeaderBadge();
         renderPantryList();
       }

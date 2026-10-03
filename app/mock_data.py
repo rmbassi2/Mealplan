@@ -3,9 +3,14 @@
 Used when Mealie is unreachable, not yet configured, or when MOCK_MODE is enabled.
 """
 
+import json
+import logging
+import os
 from typing import List, Dict, Any
 
-MOCK_RECIPES: List[Dict[str, Any]] = [
+logger = logging.getLogger("mock_data")
+
+FALLBACK_RECIPES: List[Dict[str, Any]] = [
     {
         "id": "e4b1a8d0-2f9b-4b11-9e73-1a2b3c4d5e01",
         "name": "Crispy Honey Garlic Salmon",
@@ -274,7 +279,7 @@ MOCK_RECIPES: List[Dict[str, Any]] = [
     },
 ]
 
-MOCK_SIDES: List[Dict[str, Any]] = [
+FALLBACK_SIDES: List[Dict[str, Any]] = [
     {
         "id": "side-e4b1-001",
         "name": "Garlic Butter Baby Potatoes",
@@ -520,6 +525,37 @@ MOCK_SIDES: List[Dict[str, Any]] = [
         ],
     },
 ]
+
+# Real cached recipes loader from Mealie
+_REAL_CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "mock_recipes_real.json")
+_real_dinners: List[Dict[str, Any]] = []
+_real_sides: List[Dict[str, Any]] = []
+
+if os.path.exists(_REAL_CACHE_PATH):
+    try:
+        with open(_REAL_CACHE_PATH, "r", encoding="utf-8") as _f:
+            _real_data = json.load(_f)
+            for _r in _real_data:
+                _cats = [str(c.get("name") if isinstance(c, dict) else c).lower() for c in _r.get("recipeCategory", [])]
+                if any("side" in c for c in _cats):
+                    _real_sides.append(_r)
+                else:
+                    _real_dinners.append(_r)
+            logger.info(f"Loaded {len(_real_dinners)} real dinner recipes and {len(_real_sides)} sides from Mealie cache.")
+    except Exception as _e:
+        logger.warning(f"Could not load real recipes cache: {_e}")
+
+if _real_dinners:
+    _seen_ids = {r["id"] for r in _real_dinners}
+    MOCK_RECIPES: List[Dict[str, Any]] = _real_dinners + [r for r in FALLBACK_RECIPES if r["id"] not in _seen_ids]
+else:
+    MOCK_RECIPES = list(FALLBACK_RECIPES)
+
+if _real_sides:
+    _seen_side_ids = {s["id"] for s in _real_sides}
+    MOCK_SIDES: List[Dict[str, Any]] = _real_sides + [s for s in FALLBACK_SIDES if s["id"] not in _seen_side_ids]
+else:
+    MOCK_SIDES = list(FALLBACK_SIDES)
 
 
 def generate_recipe_svg(title: str, emoji: str = "🍽️", c1: str = "#f59e0b", c2: str = "#b45309") -> str:

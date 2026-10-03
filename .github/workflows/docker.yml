@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
     paths-ignore:
       - "README.md"
       - "screenshots/**"
@@ -50,6 +52,9 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=tag
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
