@@ -64,6 +64,10 @@ class PantryItemCreate(BaseModel):
     is_staple: bool = False
 
 
+class BulkStockRequest(BaseModel):
+    in_stock: bool = True
+
+
 class ShoppingListAddRequest(BaseModel):
     item_name: str
     recipe_id: Optional[str] = None
@@ -237,8 +241,9 @@ async def get_pantry(
     category: Optional[str] = None,
     search: Optional[str] = None,
     in_stock: Optional[bool] = None,
+    tier: Optional[str] = None,
 ):
-    """List pantry inventory items with statistics."""
+    """List pantry inventory items with statistics and Dinner Availability tiers."""
     try:
         # If pantry has zero items yet, auto-seed with recipe ingredients
         stats = pantry_manager.get_stats()
@@ -254,10 +259,17 @@ async def get_pantry(
                     from app.mock_data import MOCK_RECIPES
                     pantry_manager.seed_from_recipes(MOCK_RECIPES, mark_in_stock=True)
 
-        items = pantry_manager.get_all_items(category=category, search=search, in_stock=in_stock)
+        items = pantry_manager.get_all_items(category=category, search=search, in_stock=in_stock, tier=tier)
+        dashboard = pantry_manager.get_tiered_dashboard()
         return {
             "items": items,
             "stats": pantry_manager.get_stats(),
+            "tiers": {
+                "anchors": dashboard["anchors"],
+                "perishables": dashboard["perishables"],
+                "staples": dashboard["staples"],
+            },
+            "tier_stats": dashboard["tier_stats"],
         }
     except Exception as e:
         logger.error(f"Error querying pantry: {e}")
@@ -352,15 +364,24 @@ async def sync_pantry_from_recipes(clear_existing: bool = False):
 
 
 @app.post("/api/pantry/bulk-stock")
-async def bulk_stock_pantry(in_stock: bool = True):
+async def bulk_stock_pantry(
+    in_stock: Optional[bool] = None,
+    req: Optional[BulkStockRequest] = None,
+):
     """Set all pantry items to in-stock or out-of-stock."""
+    val = True
+    if req is not None and hasattr(req, "in_stock"):
+        val = req.in_stock
+    elif in_stock is not None:
+        val = in_stock
+
     try:
         items = pantry_manager.get_all_items()
         for it in items:
-            pantry_manager.toggle_item(item_id=it["id"], in_stock=in_stock)
+            pantry_manager.toggle_item(item_id=it["id"], in_stock=val)
         return {
             "status": "success",
-            "message": f"Updated {len(items)} items to {'in-stock' if in_stock else 'out-of-stock'}",
+            "message": f"Updated {len(items)} items to {'in-stock' if val else 'out-of-stock'}",
             "stats": pantry_manager.get_stats(),
         }
     except Exception as e:

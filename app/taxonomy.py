@@ -259,16 +259,24 @@ def extract_recipe_taxonomy(recipe: Dict[str, Any]) -> Dict[str, Any]:
     # Pantry stock badge (if _pantry metadata is attached)
     pantry_info = recipe.get("_pantry")
     if pantry_info:
+        status = pantry_info.get("status")
         missing_count = pantry_info.get("missing_count", 0)
         missing_items = pantry_info.get("missing_items", [])
-        if missing_count == 0:
-            badges.insert(0, {"icon": "🟢", "label": "Pantry Ready", "type": "pantry"})
-        elif missing_count == 1:
-            item_lbl = missing_items[0] if missing_items else "1 item"
-            short_lbl = item_lbl if len(item_lbl) <= 16 else item_lbl[:15] + "…"
-            badges.insert(0, {"icon": "⚠️", "label": f"Need: {short_lbl}", "type": "pantry"})
+        missing_perishables = pantry_info.get("missing_perishables", [])
+        missing_anchor = pantry_info.get("missing_anchor")
+
+        if status == "ready" or (status is None and missing_count == 0):
+            badges.insert(0, {"icon": "🟢", "label": "Ready to Cook", "type": "pantry"})
+        elif status == "almost_ready" or (status is None and missing_count in (1, 2)):
+            target_item = missing_perishables[0] if missing_perishables else (missing_items[0] if missing_items else "1 item")
+            short_lbl = target_item if len(target_item) <= 16 else target_item[:15] + "…"
+            badges.insert(0, {"icon": "🟡", "label": f"Need: {short_lbl}", "type": "pantry"})
         else:
-            badges.insert(0, {"icon": "⚪", "label": f"{missing_count} Missing", "type": "pantry"})
+            if missing_anchor:
+                short_anchor = missing_anchor if len(missing_anchor) <= 14 else missing_anchor[:13] + "…"
+                badges.insert(0, {"icon": "⚪", "label": f"No {short_anchor}", "type": "pantry"})
+            else:
+                badges.insert(0, {"icon": "⚪", "label": f"{missing_count} Missing", "type": "pantry"})
 
     return {
         "categories": categories,

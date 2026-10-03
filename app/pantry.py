@@ -129,9 +129,6 @@ ALWAYS_ON_STAPLES: Set[str] = {
     "crushed tomato",
     "diced tomato",
     "whole peeled tomato",
-    # Fresh essentials
-    "garlic",
-    "egg",
 }
 
 # Measurement words and culinary stop words to strip during string cleaning
@@ -965,6 +962,94 @@ def categorize_ingredient(name: str) -> str:
     return "pantry"
 
 
+# Three-tier ingredient classification keywords for Dinner Availability
+ANCHOR_PROTEIN_KEYWORDS: Set[str] = {
+    "chicken", "beef", "pork", "lamb", "turkey", "salmon", "cod", "tuna",
+    "shrimp", "fish", "sausage", "chorizo", "steak", "bacon", "pancetta",
+    "guanciale", "prosciutto", "ham", "tofu", "paneer", "meatball", "mince",
+    "duck", "scallop", "lobster", "crab", "ground meat", "flank steak",
+    "chuck roast", "tenderloin", "cutlet", "thigh", "breast", "ribeye", "sirloin"
+}
+
+ANCHOR_REGEX = re.compile(
+    r"\b(" + "|".join(ANCHOR_PROTEIN_KEYWORDS) + r")\b",
+    re.IGNORECASE,
+)
+
+ANCHOR_EXCLUDE_KEYWORDS: Set[str] = {
+    "broth", "stock", "bouillon", "boulion", "fat", "sauce", "powder", "seasoning",
+    "dripping", "drippings", "cream of", "soup", "crumb", "cracker", "graham"
+}
+
+PERISHABLE_EXCLUDE_KEYWORDS: Set[str] = {
+    "powder", "dried", "dry", "canned", "paste", "puree", "sauce", "soup",
+    "seed", "seeds", "nut", "nuts", "oil", "extract", "flake", "flakes",
+    "ground", "chip", "chips", "butter", "cooking spray", "raisin", "fig",
+    "cranberr", "prune", "date", "sun-dried", "candied", "olive", "artichoke heart",
+    "condensed milk", "evaporated milk", "whole peeled tomato", "san marzano",
+    "crushed tomato", "diced tomato", "guajillo", "ancho", "dr pepper", "soda", "cola"
+}
+
+PERISHABLE_PRODUCE_KEYWORDS: Set[str] = {
+    "onion", "garlic", "shallot", "scallion", "green onion", "leek", "ginger",
+    "celery", "carrot", "spinach", "kale", "lettuce", "cabbage", "broccoli",
+    "cauliflower", "zucchini", "cucumber", "bell pepper", "jalapeno", "serrano", "habanero", "scotch bonnet",
+    "poblano", "mushroom", "asparagus", "green bean", "snap bean", "string bean",
+    "corn", "sprout", "sprouts", "edamame", "eggplant", "artichoke",
+    "brussels", "fennel", "radish", "beet", "avocado", "tomato", "cherry tomato",
+    "cilantro", "basil", "parsley", "mint", "dill", "rosemary", "thyme", "sage",
+    "chive", "chives", "tarragon", "lemon", "lime", "apple", "banana", "berry",
+    "berries", "strawberry", "blueberry", "raspberry", "blackberry", "peach",
+    "mango", "pomegranate", "slaw", "potato", "baby potato", "sweet potato"
+}
+
+PERISHABLE_DAIRY_KEYWORDS: Set[str] = {
+    "heavy cream", "sour cream", "cream cheese", "ricotta", "buttermilk", "yogurt",
+    "greek yogurt", "plain yogurt", "half and half", "milk", "mozzarella", "feta",
+    "boursin", "burrata", "goat cheese", "egg", "eggs", "yolk", "yolks"
+}
+
+
+def get_ingredient_tier(norm: str, category: Optional[str] = None) -> str:
+    """Classify an ingredient into one of three Dinner Availability tiers:
+    - 'anchor': Centerpiece protein (Chicken, Beef, Pork, Salmon, Tofu, Shrimp, etc.)
+    - 'perishable': Crisper produce, fresh herbs, short-shelf dairy
+    - 'staple': Dry spices, oils, vinegars, baking goods, canned beans, grains, pasta, broths
+    """
+    n = norm.lower().strip()
+    cat = (category or categorize_ingredient(n)).lower()
+
+    # 1. Check for Anchor Proteins
+    if not any(ex in n for ex in ANCHOR_EXCLUDE_KEYWORDS):
+        if ANCHOR_REGEX.search(n) or (cat == "protein" and not any(ex in n for ex in ("fat", "broth", "stock"))):
+            return "anchor"
+
+    # 2. Check for Ambient Staples
+    if n in ALWAYS_ON_STAPLES or n in DEFAULT_STAPLES or is_staple_ingredient(n):
+        return "staple"
+
+    if any(ex in n for ex in PERISHABLE_EXCLUDE_KEYWORDS):
+        return "staple"
+
+    if cat in ("spices & herbs", "sauces & condiments", "grains & bakery", "pantry"):
+        # Fresh herbs might occasionally be placed in spices & herbs
+        if any(h in n for h in ("cilantro", "fresh basil", "fresh parsley", "fresh mint", "fresh rosemary", "fresh thyme")):
+            return "perishable"
+        return "staple"
+
+    # 3. Check for Fresh Perishables (Produce & Short-shelf Dairy)
+    if any(p in n for p in PERISHABLE_PRODUCE_KEYWORDS):
+        return "perishable"
+
+    if any(d in n for d in PERISHABLE_DAIRY_KEYWORDS):
+        return "perishable"
+
+    if cat in ("produce", "dairy"):
+        return "perishable"
+
+    return "staple"
+
+
 class PantryManager:
     """Manages pantry item persistence and recipe matching logic."""
 
@@ -995,14 +1080,24 @@ class PantryManager:
                     name TEXT UNIQUE NOT NULL,
                     display_name TEXT NOT NULL,
                     category TEXT NOT NULL DEFAULT 'pantry',
+                    tier TEXT NOT NULL DEFAULT 'staple',
                     in_stock INTEGER NOT NULL DEFAULT 1,
                     is_staple INTEGER NOT NULL DEFAULT 0,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
+            try:
+                conn.execute("ALTER TABLE pantry_items ADD COLUMN tier TEXT NOT NULL DEFAULT 'staple'")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_pantry_name ON pantry_items (name)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pantry_tier ON pantry_items (tier)"
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_pantry_in_stock ON pantry_items (in_stock)"
@@ -1012,7 +1107,7 @@ class PantryManager:
         self.cleanup_existing_items()
 
     def cleanup_existing_items(self) -> int:
-        """Sanitize, deduplicate, and remove staples/junk from existing SQLite rows in-place."""
+        """Sanitize, deduplicate, assign tiers, and remove staples/junk from existing SQLite rows in-place."""
         self._invalidate_cache()
         cleaned_count = 0
         with self._get_connection() as conn:
@@ -1040,6 +1135,9 @@ class PantryManager:
                     continue
 
                 clean_cat = categorize_ingredient(clean_norm)
+                clean_tier = get_ingredient_tier(clean_norm, clean_cat)
+                is_staple_val = 1 if (clean_tier == "staple" or clean_norm in ALWAYS_ON_STAPLES) else 0
+                in_stock_val = 1 if clean_tier == "staple" else row["in_stock"]
 
                 if clean_norm != row["name"]:
                     # Check if another row already exists with clean_norm
@@ -1048,35 +1146,34 @@ class PantryManager:
                         (clean_norm, row["id"]),
                     )
                     existing = cursor.fetchone()
-                    is_staple_val = 1 if clean_norm in ALWAYS_ON_STAPLES else 0
-                    in_stock_val = 1 if clean_norm in ALWAYS_ON_STAPLES else row["in_stock"]
                     if existing:
                         # Merge stock status
-                        merged_stock = 1 if (row["in_stock"] == 1 or existing["in_stock"] == 1 or clean_norm in ALWAYS_ON_STAPLES) else 0
-                        merged_staple = 1 if (is_staple_val or existing.get("is_staple") == 1) else 0
-                        conn.execute("UPDATE pantry_items SET in_stock = ?, is_staple = ? WHERE id = ?", (merged_stock, merged_staple, existing["id"]))
+                        merged_stock = 1 if (in_stock_val == 1 or existing["in_stock"] == 1 or clean_tier == "staple" or clean_norm in ALWAYS_ON_STAPLES) else 0
+                        merged_staple = 1 if (is_staple_val or clean_tier == "staple") else 0
+                        conn.execute(
+                            "UPDATE pantry_items SET in_stock = ?, is_staple = ?, tier = ? WHERE id = ?",
+                            (merged_stock, merged_staple, clean_tier, existing["id"]),
+                        )
                         conn.execute("DELETE FROM pantry_items WHERE id = ?", (row["id"],))
                         cleaned_count += 1
                     else:
                         conn.execute(
                             """
                             UPDATE pantry_items 
-                            SET name = ?, display_name = ?, category = ?, in_stock = ?, is_staple = ?, updated_at = CURRENT_TIMESTAMP 
+                            SET name = ?, display_name = ?, category = ?, tier = ?, in_stock = ?, is_staple = ?, updated_at = CURRENT_TIMESTAMP 
                             WHERE id = ?
                             """,
-                            (clean_norm, clean_disp, clean_cat, in_stock_val, is_staple_val, row["id"]),
+                            (clean_norm, clean_disp, clean_cat, clean_tier, in_stock_val, is_staple_val, row["id"]),
                         )
                         cleaned_count += 1
-                elif clean_disp != row["display_name"] or clean_cat != row["category"]:
-                    is_staple_val = 1 if clean_norm in ALWAYS_ON_STAPLES else 0
-                    in_stock_val = 1 if clean_norm in ALWAYS_ON_STAPLES else row["in_stock"]
+                else:
                     conn.execute(
                         """
                         UPDATE pantry_items 
-                        SET display_name = ?, category = ?, in_stock = ?, is_staple = ?, updated_at = CURRENT_TIMESTAMP 
+                        SET display_name = ?, category = ?, tier = ?, in_stock = ?, is_staple = ?, updated_at = CURRENT_TIMESTAMP 
                         WHERE id = ?
                         """,
-                        (clean_disp, clean_cat, in_stock_val, is_staple_val, row["id"]),
+                        (clean_disp, clean_cat, clean_tier, in_stock_val, is_staple_val, row["id"]),
                     )
                     cleaned_count += 1
 
@@ -1114,14 +1211,18 @@ class PantryManager:
         category: Optional[str] = None,
         search: Optional[str] = None,
         in_stock: Optional[bool] = None,
+        tier: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """List pantry items with optional filtering."""
-        query = "SELECT id, name, display_name, category, in_stock, is_staple, updated_at FROM pantry_items WHERE 1=1"
+        query = "SELECT id, name, display_name, category, tier, in_stock, is_staple, updated_at FROM pantry_items WHERE 1=1"
         params: List[Any] = []
 
         if category:
             query += " AND category = ?"
             params.append(category.lower())
+        if tier:
+            query += " AND tier = ?"
+            params.append(tier.lower())
         if in_stock is not None:
             query += " AND in_stock = ?"
             params.append(1 if in_stock else 0)
@@ -1137,15 +1238,19 @@ class PantryManager:
             return [dict(row) for row in cursor.fetchall()]
 
     def get_stats(self) -> Dict[str, int]:
-        """Return counts of total, in_stock, out_of_stock, and staple items."""
+        """Return counts of total, in_stock, out_of_stock, staple, and tiered items."""
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
                 SELECT 
                     COUNT(*) as total,
                     SUM(CASE WHEN in_stock = 1 THEN 1 ELSE 0 END) as in_stock,
-                    SUM(CASE WHEN in_stock = 0 AND is_staple = 0 THEN 1 ELSE 0 END) as out_of_stock,
-                    SUM(CASE WHEN is_staple = 1 THEN 1 ELSE 0 END) as staples
+                    SUM(CASE WHEN in_stock = 0 AND is_staple = 0 AND tier != 'staple' THEN 1 ELSE 0 END) as out_of_stock,
+                    SUM(CASE WHEN is_staple = 1 OR tier = 'staple' THEN 1 ELSE 0 END) as staples,
+                    SUM(CASE WHEN tier = 'anchor' THEN 1 ELSE 0 END) as anchors_total,
+                    SUM(CASE WHEN tier = 'anchor' AND in_stock = 1 THEN 1 ELSE 0 END) as anchors_in_stock,
+                    SUM(CASE WHEN tier = 'perishable' THEN 1 ELSE 0 END) as perishables_total,
+                    SUM(CASE WHEN tier = 'perishable' AND in_stock = 1 THEN 1 ELSE 0 END) as perishables_in_stock
                 FROM pantry_items
                 """
             )
@@ -1155,6 +1260,10 @@ class PantryManager:
                 "in_stock": row["in_stock"] or 0,
                 "out_of_stock": row["out_of_stock"] or 0,
                 "staples": row["staples"] or 0,
+                "anchors_total": row["anchors_total"] or 0,
+                "anchors_in_stock": row["anchors_in_stock"] or 0,
+                "perishables_total": row["perishables_total"] or 0,
+                "perishables_in_stock": row["perishables_in_stock"] or 0,
             }
 
     def toggle_item(
@@ -1199,7 +1308,7 @@ class PantryManager:
             conn.commit()
 
             cursor = conn.execute(
-                "SELECT id, name, display_name, category, in_stock, is_staple FROM pantry_items WHERE id = ?",
+                "SELECT id, name, display_name, category, tier, in_stock, is_staple FROM pantry_items WHERE id = ?",
                 (row["id"],),
             )
             return dict(cursor.fetchone())
@@ -1209,6 +1318,7 @@ class PantryManager:
         name: str,
         display_name: Optional[str] = None,
         category: Optional[str] = None,
+        tier: Optional[str] = None,
         in_stock: bool = True,
         is_staple: bool = False,
     ) -> Dict[str, Any]:
@@ -1226,25 +1336,30 @@ class PantryManager:
             norm_name = name.strip().lower()
 
         cat = category or categorize_ingredient(norm_name)
+        tier_val = tier or get_ingredient_tier(norm_name, cat)
+        if tier_val == "staple":
+            is_staple = True
+            in_stock = True
 
         with self._get_connection() as conn:
             conn.execute(
                 """
-                INSERT INTO pantry_items (name, display_name, category, in_stock, is_staple, updated_at)
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO pantry_items (name, display_name, category, tier, in_stock, is_staple, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(name) DO UPDATE SET
                     display_name = excluded.display_name,
                     category = excluded.category,
+                    tier = excluded.tier,
                     in_stock = excluded.in_stock,
                     is_staple = excluded.is_staple,
                     updated_at = CURRENT_TIMESTAMP
                 """,
-                (norm_name, clean_display, cat, 1 if in_stock else 0, 1 if is_staple else 0),
+                (norm_name, clean_display, cat, tier_val, 1 if in_stock else 0, 1 if is_staple else 0),
             )
             conn.commit()
 
             cursor = conn.execute(
-                "SELECT id, name, display_name, category, in_stock, is_staple FROM pantry_items WHERE name = ?",
+                "SELECT id, name, display_name, category, tier, in_stock, is_staple FROM pantry_items WHERE name = ?",
                 (norm_name,),
             )
             return dict(cursor.fetchone())
@@ -1296,6 +1411,7 @@ class PantryManager:
                     continue
 
                 cat = categorize_ingredient(norm)
+                tier_val = get_ingredient_tier(norm, cat)
 
                 with self._get_connection() as conn:
                     cursor = conn.execute(
@@ -1303,14 +1419,14 @@ class PantryManager:
                     )
                     row = cursor.fetchone()
                     if not row:
-                        is_staple_val = 1 if norm in ALWAYS_ON_STAPLES else 0
+                        is_staple_val = 1 if (tier_val == "staple" or norm in ALWAYS_ON_STAPLES) else 0
                         in_stock_val = 1 if (mark_in_stock or is_staple_val) else 0
                         conn.execute(
                             """
-                            INSERT INTO pantry_items (name, display_name, category, in_stock, is_staple, updated_at)
-                            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                            INSERT INTO pantry_items (name, display_name, category, tier, in_stock, is_staple, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                             """,
-                            (norm, clean_display, cat, in_stock_val, is_staple_val),
+                            (norm, clean_display, cat, tier_val, in_stock_val, is_staple_val),
                         )
                         conn.commit()
                         added_count += 1
@@ -1319,8 +1435,8 @@ class PantryManager:
                         old_disp = row["display_name"]
                         if len(clean_display) < len(old_disp) and not re.search(r"[\(\)\[\]\/]", clean_display):
                             conn.execute(
-                                "UPDATE pantry_items SET display_name = ? WHERE id = ?",
-                                (clean_display, row["id"]),
+                                "UPDATE pantry_items SET display_name = ?, tier = ? WHERE id = ?",
+                                (clean_display, tier_val, row["id"]),
                             )
                             conn.commit()
 
@@ -1363,6 +1479,8 @@ class PantryManager:
                 continue
 
             cat = categorize_ingredient(norm)
+            tier_val = get_ingredient_tier(norm, cat)
+            is_staple_val = 1 if (tier_val == "staple" or norm in ALWAYS_ON_STAPLES) else 0
 
             with self._get_connection() as conn:
                 cursor = conn.execute(
@@ -1372,35 +1490,82 @@ class PantryManager:
                 if not row:
                     conn.execute(
                         """
-                        INSERT INTO pantry_items (name, display_name, category, in_stock, is_staple, updated_at)
-                        VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+                        INSERT INTO pantry_items (name, display_name, category, tier, in_stock, is_staple, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                         """,
-                        (norm, clean_display, cat, 1 if mark_in_stock else 0),
+                        (norm, clean_display, cat, tier_val, 1 if mark_in_stock else 0, is_staple_val),
                     )
                     conn.commit()
                     added_count += 1
                 elif len(clean_display) < len(row["display_name"]):
                     conn.execute(
-                        "UPDATE pantry_items SET display_name = ? WHERE id = ?",
-                        (clean_display, row["id"]),
+                        "UPDATE pantry_items SET display_name = ?, tier = ? WHERE id = ?",
+                        (clean_display, tier_val, row["id"]),
                     )
                     conn.commit()
 
         logger.info(f"Seeded {added_count} new foods into pantry database.")
         return added_count
 
+    def get_tiered_dashboard(self) -> Dict[str, Any]:
+        """Return categorized items grouped into the three Dinner Availability tiers."""
+        all_items = self.get_all_items()
+        anchors = []
+        perishables = []
+        staples = []
+
+        for it in all_items:
+            tier = it.get("tier") or get_ingredient_tier(it["name"], it.get("category"))
+            if tier == "anchor":
+                anchors.append(it)
+            elif tier == "perishable":
+                perishables.append(it)
+            else:
+                staples.append(it)
+
+        anchors.sort(key=lambda x: (-x["in_stock"], x["display_name"]))
+        perishables.sort(key=lambda x: (-x["in_stock"], x["display_name"]))
+        staples.sort(key=lambda x: (-x["in_stock"], x["display_name"]))
+
+        return {
+            "anchors": anchors,
+            "perishables": perishables,
+            "staples": staples,
+            "tier_stats": {
+                "anchors_total": len(anchors),
+                "anchors_in_stock": sum(1 for a in anchors if a["in_stock"] == 1),
+                "perishables_total": len(perishables),
+                "perishables_in_stock": sum(1 for p in perishables if p["in_stock"] == 1),
+                "staples_total": len(staples),
+                "staples_in_stock": sum(1 for s in staples if s["in_stock"] == 1),
+            },
+        }
+
     def evaluate_recipe(
         self, recipe: Dict[str, Any], in_stock_set: Optional[Set[str]] = None
     ) -> Dict[str, Any]:
-        """Evaluate whether a recipe can be made given current in-stock pantry items.
+        """Evaluate recipe dinner availability against Tier 1 (anchors), Tier 2 (perishables), and Tier 3 (staples).
+
+        Availability model:
+        - Tier 1: Centerpiece proteins. Hard blocker: if present and missing, recipe is unavailable.
+        - Tier 2: Fresh perishables. Soft tolerance: 0 missing -> ready, 1-2 missing -> almost_ready, >2 missing -> unavailable.
+        - Tier 3: Ambient staples. Never gatekeeps; always assumed in stock.
 
         Returns:
             Dict containing:
+                status: 'ready' | 'almost_ready' | 'unavailable'
+                is_ready: bool (status in ('ready', 'almost_ready'))
+                is_full_pantry: bool (status == 'ready')
+                anchor_protein: Optional[str]
+                anchor_satisfied: bool
+                missing_anchor: Optional[str]
+                missing_perishables: List[str]
+                missing_perishables_count: int
+                missing_items: List[str] (missing_anchor + missing_perishables)
                 missing_count: int
-                missing_items: List of missing ingredient display strings
-                in_stock_items: List of available ingredient display strings
+                in_stock_items: List[str]
                 total_ingredients: int
-                is_ready: bool (missing_count <= 1)
+                reason: str
         """
         if in_stock_set is None:
             in_stock_set = self.get_in_stock_set()
@@ -1409,8 +1574,12 @@ class PantryManager:
             recipe.get("recipeIngredient") or recipe.get("ingredients") or []
         )
 
-        missing_items: List[str] = []
+        anchor_proteins: List[str] = []
+        missing_anchors: List[str] = []
+        perishables: List[str] = []
+        missing_perishables: List[str] = []
         in_stock_items: List[str] = []
+        total_count = 0
 
         for item in raw_ingredients:
             raw_name = ""
@@ -1445,39 +1614,77 @@ class PantryManager:
             if not norm:
                 continue
 
-            # Always treat built-in staples and baseline Always-On staples as in stock
-            if norm in DEFAULT_STAPLES or norm in ALWAYS_ON_STAPLES or is_staple_ingredient(norm, raw_name):
-                continue
+            total_count += 1
+            tier = get_ingredient_tier(norm)
 
-            # Check if ingredient matches in-stock set
-            # 1. Direct match
-            has_match = norm in in_stock_set
+            # Check matching in in_stock_set
+            has_match = (
+                norm in in_stock_set
+                or any(s in norm or norm in s for s in in_stock_set)
+                or norm in ALWAYS_ON_STAPLES
+                or norm in DEFAULT_STAPLES
+                or is_staple_ingredient(norm, raw_name)
+            )
 
-            # 2. Substring or token match
-            if not has_match:
-                for stock_item in in_stock_set:
-                    if stock_item in norm or norm in stock_item:
-                        has_match = True
-                        break
-
-            clean_label = clean_display
-
-            if has_match:
-                in_stock_items.append(clean_label)
+            if tier == "anchor":
+                anchor_proteins.append(clean_display)
+                if has_match:
+                    in_stock_items.append(clean_display)
+                else:
+                    missing_anchors.append(clean_display)
+            elif tier == "perishable":
+                perishables.append(clean_display)
+                if has_match:
+                    in_stock_items.append(clean_display)
+                else:
+                    missing_perishables.append(clean_display)
             else:
-                missing_items.append(clean_label)
+                # Ambient staple: always treated as in-stock!
+                in_stock_items.append(clean_display)
 
-        missing_count = len(missing_items)
-        # Deduplicate missing items
-        unique_missing = list(dict.fromkeys(missing_items))
+        # Deduplicate
+        unique_missing_anchors = list(dict.fromkeys(missing_anchors))
+        unique_missing_perishables = list(dict.fromkeys(missing_perishables))
+        primary_anchor = anchor_proteins[0] if anchor_proteins else None
+
+        # Anchor evaluation:
+        # If the recipe specifies centerpiece protein(s), any missing anchor is a hard blocker
+        if unique_missing_anchors:
+            anchor_satisfied = False
+            missing_anchor = unique_missing_anchors[0]
+            status = "unavailable"
+            reason = f"Missing {missing_anchor}"
+        else:
+            anchor_satisfied = True
+            missing_anchor = None
+            if len(unique_missing_perishables) == 0:
+                status = "ready"
+                reason = "Ready to cook"
+            elif len(unique_missing_perishables) <= 2:
+                status = "almost_ready"
+                reason = f"Need: {unique_missing_perishables[0]}"
+            else:
+                status = "unavailable"
+                reason = f"Missing {len(unique_missing_perishables)} fresh items"
+
+        all_missing = unique_missing_anchors + unique_missing_perishables
+        is_ready = (status in ("ready", "almost_ready"))
+        is_full_pantry = (status == "ready")
 
         return {
-            "missing_count": missing_count,
-            "missing_items": unique_missing,
+            "status": status,
+            "is_ready": is_ready,
+            "is_full_pantry": is_full_pantry,
+            "anchor_protein": primary_anchor,
+            "anchor_satisfied": anchor_satisfied,
+            "missing_anchor": missing_anchor,
+            "missing_perishables": unique_missing_perishables,
+            "missing_perishables_count": len(unique_missing_perishables),
+            "missing_items": all_missing,
+            "missing_count": len(all_missing),
             "in_stock_items": list(dict.fromkeys(in_stock_items)),
-            "total_ingredients": missing_count + len(in_stock_items),
-            "is_ready": missing_count <= 1,
-            "is_full_pantry": missing_count == 0,
+            "total_ingredients": total_count,
+            "reason": reason,
         }
 
 

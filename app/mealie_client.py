@@ -589,7 +589,11 @@ class MealieClient:
                                 for r in items:
                                     r["_pantry"] = pantry_manager.evaluate_recipe(r, in_stock_set)
                                 ready_pool = [r for r in items if r["_pantry"]["is_ready"]]
-                                candidate_items = ready_pool if ready_pool else items
+                                if ready_pool:
+                                    ready_pool.sort(key=lambda r: 0 if r["_pantry"].get("status") == "ready" else 1)
+                                    candidate_items = ready_pool
+                                else:
+                                    candidate_items = items
                             else:
                                 candidate_items = items
 
@@ -662,6 +666,7 @@ class MealieClient:
         if pantry_only or mood in ("pantry", "pantry-ready"):
             ready_mocks = [m for m in MOCK_RECIPES if m["_pantry"]["is_ready"]]
             if ready_mocks:
+                ready_mocks.sort(key=lambda m: 0 if m["_pantry"].get("status") == "ready" else 1)
                 mock_candidates = ready_mocks
 
         selected_mocks = select_balanced_recipes(
