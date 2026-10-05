@@ -338,13 +338,14 @@ async def delete_pantry_item(item_id: int):
 async def sync_pantry_from_recipes(clear_existing: bool = False):
     """Auto-discover and populate pantry ingredients only from recipes in the cookbook."""
     try:
+        mealie_client.invalidate_recipes_cache()
         if clear_existing:
             pantry_manager.clear_all_items()
 
         added = 0
         recipe_count = 0
         if not mealie_client.mock_mode:
-            recipes = await mealie_client.get_all_cookbook_recipes()
+            recipes = await mealie_client.get_all_cookbook_recipes(force_refresh=True)
             recipe_count = len(recipes)
             added = pantry_manager.seed_from_recipes(recipes, mark_in_stock=True)
         else:
