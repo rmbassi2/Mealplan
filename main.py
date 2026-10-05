@@ -1,6 +1,6 @@
 import logging
 from datetime import date
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException, Response, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -40,6 +40,7 @@ class DinnerChoice(BaseModel):
     custom_note: Optional[str] = None
     side_recipe_id: Optional[str] = None
     side_custom_note: Optional[str] = None
+    target_date: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_choice(self):
@@ -48,6 +49,10 @@ class DinnerChoice(BaseModel):
         if not has_recipe and not has_custom:
             raise ValueError("Either recipe_id or custom_note must be provided.")
         return self
+
+
+class PlanResetRequest(BaseModel):
+    date: Optional[str] = None
 
 
 class PantryToggleRequest(BaseModel):
@@ -105,42 +110,88 @@ async def get_mealie_status():
     }
 
 
+def attach_plan_urls(plan: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Enrich a meal plan dict with direct Mealie links for recipe and side."""
+    if not plan:
+        return None
+    res = dict(plan)
+    group = settings.mealie_group_slug or "home"
+    if settings.mealie_base_url:
+        recipe_slug = res.get("recipe_slug")
+        res["mealie_url"] = (
+            f"{settings.mealie_base_url}/g/{group}/r/{recipe_slug}"
+            if recipe_slug
+            else f"{settings.mealie_base_url}/g/{group}/planner"
+        )
+        side_slug = res.get("side_slug")
+        if res.get("side_name"):
+            res["side_mealie_url"] = (
+                f"{settings.mealie_base_url}/g/{group}/r/{side_slug}"
+                if side_slug
+                else f"{settings.mealie_base_url}/g/{group}/planner"
+            )
+        else:
+            res["side_mealie_url"] = None
+    else:
+        res["mealie_url"] = None
+        res["side_mealie_url"] = None
+    return res
+
+
 @app.get("/api/today")
 async def get_today_dinner():
     """Check if dinner has already been selected for today."""
     try:
         plan = await mealie_client.get_today_plan()
-        today_str = date.today().isoformat()
-        if plan and plan.get("date") == today_str:
-            recipe_slug = plan.get("recipe_slug")
-            group = settings.mealie_group_slug or "home"
-            link = None
-            if settings.mealie_base_url:
-                if recipe_slug:
-                    link = f"{settings.mealie_base_url}/g/{group}/r/{recipe_slug}"
-                else:
-                    link = f"{settings.mealie_base_url}/g/{group}/planner"
-
-            side_slug = plan.get("side_slug")
-            side_link = None
-            if settings.mealie_base_url and plan.get("side_name"):
-                if side_slug:
-                    side_link = f"{settings.mealie_base_url}/g/{group}/r/{side_slug}"
-                else:
-                    side_link = f"{settings.mealie_base_url}/g/{group}/planner"
-
+        if plan:
             return {
                 "has_plan": True,
-                "plan": {
-                    **plan,
-                    "mealie_url": link,
-                    "side_mealie_url": side_link,
-                },
+                "plan": attach_plan_urls(plan),
             }
         return {"has_plan": False, "plan": None}
     except Exception as e:
         logger.error(f"Error checking today's dinner plan: {e}")
         return {"has_plan": False, "plan": None}
+
+
+@app.get("/api/plan/date/{date_str}")
+async def get_date_dinner(date_str: str):
+    """Check if dinner has been selected for a specific date (YYYY-MM-DD)."""
+    try:
+        plan = await mealie_client.get_date_plan(date_str)
+        return {
+            "date": date_str,
+            "has_plan": plan is not None,
+            "plan": attach_plan_urls(plan),
+        }
+    except Exception as e:
+        logger.error(f"Error checking dinner plan for {date_str}: {e}")
+        return {"date": date_str, "has_plan": False, "plan": None}
+
+
+@app.get("/api/plan/week")
+async def get_week_dinner(start_date: Optional[str] = None, days: int = 7):
+    """Get the 7-day rolling meal plan from Mealie."""
+    try:
+        days_data = await mealie_client.get_week_plan(start_date_str=start_date, days=days)
+        decorated_days = []
+        for d in days_data:
+            d_copy = dict(d)
+            if d_copy.get("plan"):
+                d_copy["plan"] = attach_plan_urls(d_copy["plan"])
+            decorated_days.append(d_copy)
+
+        planned_count = sum(1 for d in decorated_days if d.get("has_plan"))
+        return {
+            "start_date": decorated_days[0]["date"] if decorated_days else date.today().isoformat(),
+            "end_date": decorated_days[-1]["date"] if decorated_days else date.today().isoformat(),
+            "days": decorated_days,
+            "total_days": len(decorated_days),
+            "planned_count": planned_count,
+        }
+    except Exception as e:
+        logger.error(f"Error fetching week meal plan: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch week meal plan")
 
 
 @app.post("/api/cleanup-today")
@@ -151,7 +202,7 @@ async def cleanup_today_dinner():
         return {
             "status": "success",
             "message": "Cleaned up duplicate dinner entries for today in Mealie",
-            "active_plan": plan,
+            "active_plan": attach_plan_urls(plan),
         }
     except Exception as e:
         logger.error(f"Error during dinner cleanup: {e}")
@@ -170,6 +221,23 @@ async def reset_today_dinner():
         }
     except Exception as e:
         logger.error(f"Error resetting today's dinner: {e}")
+        return {"status": "success", "deleted_count": 0}
+
+
+@app.post("/api/plan/reset")
+async def reset_plan(req: Optional[PlanResetRequest] = None):
+    """Reset the planned dinner for a specific date (defaults to today)."""
+    try:
+        target = req.date.strip() if req and req.date and req.date.strip() else date.today().isoformat()
+        deleted = await mealie_client.reset_date_plan(target)
+        return {
+            "status": "success",
+            "date": target,
+            "message": f"Meal plan for {target} has been reset",
+            "deleted_count": deleted,
+        }
+    except Exception as e:
+        logger.error(f"Error resetting plan for {req}: {e}")
         return {"status": "success", "deleted_count": 0}
 
 
@@ -464,6 +532,7 @@ async def choose_dinner(choice: DinnerChoice, background_tasks: BackgroundTasks)
             custom_note=choice.custom_note.strip() if choice.custom_note else None,
             side_recipe_id=choice.side_recipe_id.strip() if choice.side_recipe_id else None,
             side_custom_note=choice.side_custom_note.strip() if choice.side_custom_note else None,
+            target_date=choice.target_date.strip() if choice.target_date else None,
         )
 
         # Trigger push notification in background so UI confirmation never waits
@@ -478,6 +547,7 @@ async def choose_dinner(choice: DinnerChoice, background_tasks: BackgroundTasks)
             side_time=result.get("side_time"),
             side_slug=result.get("side_slug"),
             side_external_url=result.get("side_external_url"),
+            target_date=result.get("date"),
         )
 
         # Attach direct Mealie URLs if configured

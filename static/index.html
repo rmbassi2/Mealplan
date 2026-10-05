@@ -105,23 +105,29 @@
   <!-- Main Container (optimized for mobile 390px-480px, centered on desktop) -->
   <main class="w-full max-w-md mx-auto px-4 pt-6 pb-28 flex-1">
 
-    <!-- View: Voting Form -->
-    <div id="votingView" class="space-y-5">
-      
-      <!-- Top Header -->
-      <header class="flex items-start justify-between pb-2 border-b border-stone-200/80">
+    <!-- Top Persistent Header & 7-Day Planning Strip -->
+    <div class="space-y-3 pb-3 border-b border-stone-200/80 mb-4">
+      <header class="flex items-start justify-between">
         <div>
           <div class="flex items-center space-x-1.5 text-xs font-semibold uppercase tracking-wider text-amber-700/90 mb-0.5">
             <span>🍲</span>
             <span id="dateSubtitle">Dinner Decider</span>
           </div>
-          <h1 class="text-2xl font-bold font-serif-title text-stone-900 tracking-tight">
+          <h1 id="mainHeaderTitle" class="text-2xl font-bold font-serif-title text-stone-900 tracking-tight">
             Tonight's Dinner
           </h1>
-          <p class="text-xs text-stone-500 mt-0.5">What are you in the mood for?</p>
+          <p id="mainHeaderSubtitle" class="text-xs text-stone-500 mt-0.5">What are you in the mood for?</p>
         </div>
-        <!-- Header Actions: Pantry & Shuffle -->
+        <!-- Header Actions: Week, Pantry & Shuffle -->
         <div class="flex items-center space-x-1.5">
+          <button id="weekOverviewBtn" 
+                  onclick="openWeekModal()" 
+                  title="View rolling 7-day dinner plan"
+                  class="flex items-center space-x-1 px-2.5 py-2 text-xs font-semibold text-stone-700 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all focus:outline-none">
+            <span>📅</span>
+            <span class="hidden sm:inline">Week</span>
+            <span id="weekPlanBadge" class="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full">0/7</span>
+          </button>
           <button id="pantryBtn" 
                   onclick="openPantryModal()" 
                   title="View and update pantry inventory"
@@ -141,6 +147,26 @@
           </button>
         </div>
       </header>
+
+      <!-- 7-Day Rolling Selector Strip -->
+      <div class="space-y-1 pt-1">
+        <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-stone-400 px-0.5">
+          <span>7-Day Schedule</span>
+          <button onclick="openWeekModal()" class="text-amber-700 font-semibold normal-case hover:underline flex items-center space-x-1">
+            <span id="weekStripSummaryText">0 of 7 planned</span>
+            <span>→</span>
+          </button>
+        </div>
+        <div class="relative -mx-4 px-4 overflow-x-auto no-scrollbar py-0.5">
+          <div id="daySelectorStrip" class="flex items-center space-x-1.5 w-max pb-0.5">
+            <!-- Day pills rendered by JavaScript -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View: Voting Form -->
+    <div id="votingView" class="space-y-5">
 
       <!-- Mood & Style Filter Pills Bar -->
       <div class="space-y-1.5 pt-1">
@@ -464,13 +490,29 @@
         </button>
       </div>
 
-      <!-- Action: Reset / Change Mind -->
-      <div class="pt-4">
+      <!-- Action: Reset / Change Mind / Clear Day -->
+      <div class="pt-4 space-y-2">
         <button 
-          onclick="resetVoting()" 
+          id="confirmChangeDinnerBtn"
+          onclick="resetCurrentDateVoting()" 
           class="w-full py-3.5 px-4 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200/80 active:bg-stone-200 rounded-xl transition-all shadow-sm border border-stone-200">
-          🔄 Change your mind? Pick again
+          🔄 Change your mind? Pick a different dinner
         </button>
+        <div class="flex items-center space-x-2">
+          <button 
+            id="confirmClearDateBtn"
+            onclick="clearCurrentDatePlan()" 
+            class="flex-1 py-2.5 px-3 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors border border-rose-200/80">
+            ✕ Clear this dinner
+          </button>
+          <button 
+            id="confirmNextDayBtn"
+            onclick="planNextOpenDay()" 
+            class="flex-1 py-2.5 px-3 text-xs font-semibold text-amber-800 bg-amber-100/80 hover:bg-amber-200/80 rounded-xl transition-colors border border-amber-300/80 flex items-center justify-center space-x-1">
+            <span>Next open day</span>
+            <span>→</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -509,6 +551,52 @@
       </div>
     </div>
   </footer>
+
+  <!-- Week Overview Modal Drawer -->
+  <div id="weekModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-warm-50 w-full max-w-md sm:max-w-lg rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[90vh]">
+      
+      <!-- Modal Header -->
+      <div class="p-4 border-b border-stone-200 bg-white flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <span class="text-2xl">📅</span>
+          <div>
+            <h3 class="text-lg font-bold font-serif-title text-stone-900 leading-tight">Rolling 7-Day Plan</h3>
+            <p id="weekModalSubtitle" class="text-[11px] text-stone-500 font-medium">Checking scheduled meals...</p>
+          </div>
+        </div>
+        <button id="closeWeekModalBtn" onclick="closeWeekModal()" class="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 active:bg-stone-300 text-stone-600 flex items-center justify-center font-bold text-sm transition-colors focus:outline-none">
+          ✕
+        </button>
+      </div>
+
+      <!-- Quick Summary Bar -->
+      <div class="p-3.5 bg-white/70 border-b border-stone-200/80 flex items-center justify-between text-xs">
+        <span id="weekPlanProgressBar" class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">
+          0 of 7 Days Planned
+        </span>
+        <button onclick="planNextOpenDay()" class="px-2.5 py-1 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 flex items-center space-x-1 transition-colors">
+          <span>⚡ Plan Next Open Day</span>
+        </button>
+      </div>
+
+      <!-- Scrollable 7-Day List Container -->
+      <div id="weekDaysContainer" class="flex-1 overflow-y-auto p-3.5 space-y-2.5">
+        <!-- Rendered 7 day cards: Monday through Sunday -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-3 bg-white border-t border-stone-200 flex items-center justify-between">
+        <p class="text-[11px] text-stone-500">Tap any day to choose or change its dinner.</p>
+        <button 
+          onclick="closeWeekModal()" 
+          class="px-4 py-2 rounded-xl text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 transition-colors">
+          Done
+        </button>
+      </div>
+
+    </div>
+  </div>
 
   <!-- Pantry Inventory Modal Drawer -->
   <div id="pantryModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
@@ -613,6 +701,10 @@
     ];
 
     // State
+    let selectedDate = new Date().toISOString().split('T')[0];
+    let weekDays = [];
+    let weekStats = { total_days: 7, planned_count: 0 };
+
     let currentStep = 1; // 1: Main Course, 2: Side Dish
     let activeFilterId = 'surprise';
     let currentOptions = [];
@@ -675,12 +767,379 @@
     const errorBanner = document.getElementById('errorBanner');
     const errorMessage = document.getElementById('errorMessage');
     const dateSubtitle = document.getElementById('dateSubtitle');
+    const mainHeaderTitle = document.getElementById('mainHeaderTitle');
+    const mainHeaderSubtitle = document.getElementById('mainHeaderSubtitle');
 
-    // Initialize Date Header
+    // Helper: format Day Name from YYYY-MM-DD
+    function getDayName(isoDate) {
+      if (!isoDate) return 'Tonight';
+      const todayIso = new Date().toISOString().split('T')[0];
+      if (isoDate === todayIso) return 'Tonight';
+      const [y, m, d] = isoDate.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      return dt.toLocaleDateString(undefined, { weekday: 'short' });
+    }
+
+    // Initialize & Update Date Header based on selectedDate
+    function updateHeaderTexts() {
+      const todayIso = new Date().toISOString().split('T')[0];
+      const isToday = (selectedDate === todayIso);
+      const [y, m, d] = selectedDate.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+
+      if (isToday) {
+        if (mainHeaderTitle) mainHeaderTitle.textContent = "Tonight's Dinner";
+        if (mainHeaderSubtitle) mainHeaderSubtitle.textContent = "What are you in the mood for?";
+        if (dateSubtitle) dateSubtitle.textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+      } else {
+        const dayLong = dt.toLocaleDateString(undefined, { weekday: 'long' });
+        const fullDate = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        if (mainHeaderTitle) mainHeaderTitle.textContent = `${dayLong}'s Dinner`;
+        if (mainHeaderSubtitle) mainHeaderSubtitle.textContent = `Planning ahead for ${dayLong}, ${fullDate}`;
+        if (dateSubtitle) dateSubtitle.textContent = dt.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+      }
+    }
+
     function initDate() {
-      const now = new Date();
-      const options = { weekday: 'long', month: 'short', day: 'numeric' };
-      dateSubtitle.textContent = now.toLocaleDateString(undefined, options);
+      updateHeaderTexts();
+    }
+
+    // Render 7-Day Rolling Selector Strip
+    function renderDayStrip() {
+      const container = document.getElementById('daySelectorStrip');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const todayIso = new Date().toISOString().split('T')[0];
+
+      // If weekDays is empty, build a temporary 7-day fallback
+      const days = (weekDays && weekDays.length === 7) ? weekDays : Array.from({ length: 7 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() + i);
+        const iso = d.toISOString().split('T')[0];
+        return {
+          date: iso,
+          is_today: i === 0,
+          day_name: i === 0 ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' }),
+          date_formatted: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+          has_plan: false,
+          plan: null
+        };
+      });
+
+      days.forEach(day => {
+        const isSelected = (day.date === selectedDate);
+        const hasPlan = Boolean(day.has_plan && day.plan);
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.onclick = () => selectDay(day.date);
+
+        let baseStyle = 'flex flex-col items-center justify-center min-w-[56px] py-1.5 px-2 rounded-2xl transition-all border text-center ';
+        if (isSelected) {
+          baseStyle += 'bg-stone-900 text-white border-stone-900 shadow-md ring-2 ring-stone-900/20 scale-[1.02]';
+        } else if (hasPlan) {
+          baseStyle += 'bg-emerald-50 text-emerald-950 border-emerald-300/80 hover:bg-emerald-100/70';
+        } else {
+          baseStyle += 'bg-white text-stone-700 border-stone-200/90 hover:bg-stone-50';
+        }
+
+        const planIndicator = hasPlan 
+          ? `<span class="text-[11px] leading-none mt-0.5">${day.plan.emoji || '🍽️'}</span>`
+          : `<span class="w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-amber-400' : 'bg-stone-200'} mt-1"></span>`;
+
+        const dayNumberStr = day.date_formatted ? (day.date_formatted.split(' ')[1] || day.date_formatted) : '';
+
+        pill.className = baseStyle;
+        pill.innerHTML = `
+          <span class="text-[10px] font-bold uppercase tracking-wider ${isSelected ? 'text-amber-400' : (day.is_today ? 'text-amber-700 font-extrabold' : 'text-stone-500')}">
+            ${day.is_today ? 'Today' : escapeHtml(day.day_name)}
+          </span>
+          <span class="text-[11px] font-semibold leading-tight mt-0.5 ${isSelected ? 'text-stone-100' : 'text-stone-800'}">
+            ${escapeHtml(dayNumberStr)}
+          </span>
+          ${planIndicator}
+        `;
+        container.appendChild(pill);
+      });
+
+      const badge = document.getElementById('weekPlanBadge');
+      if (badge) {
+        badge.textContent = `${weekStats.planned_count}/${weekStats.total_days}`;
+        badge.className = weekStats.planned_count > 0 
+          ? 'px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full'
+          : 'px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full';
+      }
+
+      const summaryText = document.getElementById('weekStripSummaryText');
+      if (summaryText) {
+        summaryText.textContent = `${weekStats.planned_count} of ${weekStats.total_days} planned`;
+      }
+    }
+
+    // Select a date from strip or modal
+    async function selectDay(dateStr) {
+      if (isSubmitting) return;
+      selectedDate = dateStr;
+      updateHeaderTexts();
+      renderDayStrip();
+
+      // Check if day already has a plan
+      const day = weekDays.find(d => d.date === dateStr);
+      if (day && day.has_plan && day.plan) {
+        showConfirmation(day.plan);
+      } else {
+        // No plan yet: switch to voting view
+        confirmationView.classList.add('hidden');
+        sideView.classList.add('hidden');
+        votingView.classList.remove('hidden');
+        bottomBar.classList.remove('hidden');
+
+        currentStep = 1;
+        selectedRecipeId = null;
+        customNote = '';
+        if (customNoteInput) customNoteInput.value = '';
+        clearCustomInput();
+
+        selectedSideId = null;
+        customSideNote = '';
+        if (customSideInput) customSideInput.value = '';
+        clearCustomSideInput();
+        sideSkipped = false;
+
+        renderFilterPills();
+        if (!currentOptions || currentOptions.length === 0) {
+          loadOptions();
+        } else {
+          renderCards(currentOptions);
+          updateBottomBar();
+        }
+      }
+    }
+
+    // Load rolling 7-day schedule from backend
+    async function loadWeekPlan() {
+      try {
+        const res = await fetch('/api/plan/week');
+        if (res.ok) {
+          const data = await res.json();
+          weekDays = data.days || [];
+          weekStats = {
+            total_days: data.total_days || 7,
+            planned_count: data.planned_count || 0,
+            start_date: data.start_date,
+            end_date: data.end_date,
+          };
+          renderDayStrip();
+          const modal = document.getElementById('weekModal');
+          if (modal && !modal.classList.contains('hidden')) {
+            renderWeekModal();
+          }
+          return data;
+        }
+      } catch (err) {
+        console.error('Failed to load weekly meal plan:', err);
+      }
+      return null;
+    }
+
+    // Week Overview Modal Open & Close
+    function openWeekModal() {
+      const modal = document.getElementById('weekModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        renderWeekModal();
+      }
+    }
+
+    function closeWeekModal() {
+      const modal = document.getElementById('weekModal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    // Render Week Modal Content
+    function renderWeekModal() {
+      const container = document.getElementById('weekDaysContainer');
+      const subtitle = document.getElementById('weekModalSubtitle');
+      const progressBar = document.getElementById('weekPlanProgressBar');
+      if (!container) return;
+
+      if (weekDays && weekDays.length > 0) {
+        const start = weekDays[0].date_formatted || weekDays[0].date;
+        const end = weekDays[weekDays.length - 1].date_formatted || weekDays[weekDays.length - 1].date;
+        if (subtitle) subtitle.textContent = `${start} – ${end} • Rolling 7-day schedule`;
+      }
+      if (progressBar) {
+        progressBar.textContent = `${weekStats.planned_count} of ${weekStats.total_days} Days Planned`;
+        progressBar.className = weekStats.planned_count >= 5 
+          ? 'inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800'
+          : 'inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800';
+      }
+
+      container.innerHTML = '';
+
+      if (!weekDays || weekDays.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-stone-500">
+            <p class="text-xs">Loading weekly meal plan...</p>
+          </div>
+        `;
+        return;
+      }
+
+      weekDays.forEach(day => {
+        const isSelected = (day.date === selectedDate);
+        const hasPlan = Boolean(day.has_plan && day.plan);
+        const card = document.createElement('div');
+        card.className = `p-3 rounded-2xl border transition-all ${
+          isSelected 
+            ? 'border-amber-500 bg-amber-50/40 ring-2 ring-amber-400/30' 
+            : (hasPlan ? 'bg-white border-stone-200/90 shadow-sm' : 'bg-stone-50/80 border-dashed border-stone-300')
+        }`;
+
+        let contentHtml = '';
+        if (hasPlan) {
+          const plan = day.plan;
+          const dishEmoji = plan.emoji || (plan.external_url ? '🌐' : '🥘');
+          const sideText = plan.side_name ? `+ ${plan.side_name}` : '';
+          contentHtml = `
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2.5 min-w-0">
+                <span class="text-2xl flex-shrink-0">${dishEmoji}</span>
+                <div class="min-w-0">
+                  <div class="flex items-center space-x-1.5">
+                    <span class="text-xs font-bold text-stone-900 truncate">${escapeHtml(day.day_name)}, ${escapeHtml(day.date_formatted)}</span>
+                    ${day.is_today ? '<span class="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800">Today</span>' : ''}
+                  </div>
+                  <h4 class="text-sm font-semibold text-stone-900 leading-snug truncate">${escapeHtml(plan.dish_name)}</h4>
+                  ${sideText ? `<p class="text-[11px] text-emerald-700 truncate">${escapeHtml(sideText)}</p>` : ''}
+                </div>
+              </div>
+              <div class="flex items-center space-x-1.5 ml-2 flex-shrink-0">
+                <button onclick="handleModalSelectDay('${day.date}')" class="px-2.5 py-1 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors">
+                  View
+                </button>
+                <button onclick="clearDatePlanFromModal('${day.date}')" title="Clear this dinner" class="w-7 h-7 flex items-center justify-center text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors">
+                  ✕
+                </button>
+              </div>
+            </div>
+          `;
+        } else {
+          contentHtml = `
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2.5 min-w-0">
+                <div class="w-8 h-8 rounded-xl bg-stone-100 flex items-center justify-center text-sm text-stone-400">
+                  🍽️
+                </div>
+                <div>
+                  <div class="flex items-center space-x-1.5">
+                    <span class="text-xs font-bold text-stone-700">${escapeHtml(day.day_name)}, ${escapeHtml(day.date_formatted)}</span>
+                    ${day.is_today ? '<span class="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800">Today</span>' : ''}
+                  </div>
+                  <p class="text-xs text-stone-400">No dinner planned yet</p>
+                </div>
+              </div>
+              <button onclick="handleModalSelectDay('${day.date}')" class="px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-xl transition-colors shadow-sm">
+                Plan +
+              </button>
+            </div>
+          `;
+        }
+
+        card.innerHTML = contentHtml;
+        container.appendChild(card);
+      });
+    }
+
+    function handleModalSelectDay(dateStr) {
+      closeWeekModal();
+      selectDay(dateStr);
+    }
+
+    function planNextOpenDay() {
+      const openDay = weekDays.find(d => !d.has_plan);
+      if (openDay) {
+        closeWeekModal();
+        selectDay(openDay.date);
+      } else {
+        alert("All 7 days already have dinners planned! Tap any day from the list to view or edit it.");
+      }
+    }
+
+    function resetCurrentDateVoting() {
+      confirmationView.classList.add('hidden');
+      sideView.classList.add('hidden');
+      votingView.classList.remove('hidden');
+      bottomBar.classList.remove('hidden');
+
+      currentStep = 1;
+      selectedRecipeId = null;
+      customNote = '';
+      if (customNoteInput) customNoteInput.value = '';
+      clearCustomInput();
+
+      selectedSideId = null;
+      customSideNote = '';
+      if (customSideInput) customSideInput.value = '';
+      clearCustomSideInput();
+      sideSkipped = false;
+
+      renderFilterPills();
+      if (!currentOptions || currentOptions.length === 0) {
+        loadOptions();
+      } else {
+        renderCards(currentOptions);
+        updateBottomBar();
+      }
+    }
+
+    async function clearCurrentDatePlan() {
+      const dateToClear = selectedDate;
+      const todayIso = new Date().toISOString().split('T')[0];
+      if (dateToClear === todayIso) {
+        try {
+          localStorage.removeItem('dinnerDeciderToday');
+        } catch (e) {}
+      }
+
+      try {
+        await fetch('/api/plan/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_date: dateToClear }),
+        });
+      } catch (err) {
+        console.error('Error resetting date plan:', err);
+      }
+
+      await loadWeekPlan();
+      resetCurrentDateVoting();
+    }
+
+    async function clearDatePlanFromModal(dateStr) {
+      const todayIso = new Date().toISOString().split('T')[0];
+      if (dateStr === todayIso) {
+        try {
+          localStorage.removeItem('dinnerDeciderToday');
+        } catch (e) {}
+      }
+
+      try {
+        await fetch('/api/plan/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_date: dateStr }),
+        });
+      } catch (err) {
+        console.error('Error resetting date plan:', err);
+      }
+
+      await loadWeekPlan();
+      if (selectedDate === dateStr) {
+        resetCurrentDateVoting();
+      }
     }
 
     // Render Mood Filter Pills
@@ -1249,14 +1708,17 @@
 
     // Update Bottom Bar UI
     function updateBottomBar() {
+      const dayLabel = getDayName(selectedDate);
       if (currentStep === 1) {
         const hasMain = (selectedRecipeId !== null) || (customNote.trim().length > 0);
         lockItInBtn.disabled = !hasMain || isSubmitting;
         btnIcon.textContent = '🥗';
-        btnText.textContent = 'Next: Pick a Side';
+        btnText.textContent = dayLabel === 'Tonight' ? 'Next: Pick a Side' : `Next: Pick a Side (${dayLabel})`;
         if (hasMain) {
           secondaryActionRow.classList.remove('hidden');
-          secondaryActionBtn.textContent = 'or Skip Side & Lock In Main Course';
+          secondaryActionBtn.textContent = dayLabel === 'Tonight' 
+            ? 'or Skip Side & Lock In Main Course' 
+            : `or Skip Side & Lock In for ${dayLabel}`;
         } else {
           secondaryActionRow.classList.add('hidden');
         }
@@ -1265,10 +1727,10 @@
         const hasSide = (selectedSideId !== null) || (customSideNote.trim().length > 0);
         if (hasSide) {
           btnIcon.textContent = '🍽️';
-          btnText.textContent = 'Lock In Dinner & Side';
+          btnText.textContent = dayLabel === 'Tonight' ? 'Lock In Dinner & Side' : `Lock In Dinner & Side (${dayLabel})`;
         } else {
           btnIcon.textContent = '🍽️';
-          btnText.textContent = 'Lock In (No Side Tonight)';
+          btnText.textContent = dayLabel === 'Tonight' ? 'Lock In (No Side Tonight)' : `Lock In for ${dayLabel} (No Side)`;
         }
         secondaryActionRow.classList.remove('hidden');
         secondaryActionBtn.textContent = '← Back to Main Course';
@@ -1334,6 +1796,8 @@
         }
       }
 
+      payload.target_date = selectedDate;
+
       // Enter Submitting State
       isSubmitting = true;
       updateBottomBar();
@@ -1361,9 +1825,10 @@
         const chosenDishName = data.dish_name || chosenName;
         const chosenEmoji = data.emoji || (data.external_url ? '🌐' : emoji);
 
-        // Save to localStorage for quick restore
+        // Save to localStorage for quick restore if today
         const planObj = {
-          date: new Date().toISOString().split('T')[0],
+          date: data.date || selectedDate,
+          target_date: data.date || selectedDate,
           dish_name: chosenDishName,
           emoji: chosenEmoji,
           total_time: data.total_time || null,
@@ -1379,9 +1844,15 @@
           side_mealie_url: data.side_mealie_url || null,
         };
 
-        try {
-          localStorage.setItem('dinnerDeciderToday', JSON.stringify(planObj));
-        } catch (e) {}
+        const todayIso = new Date().toISOString().split('T')[0];
+        if (selectedDate === todayIso) {
+          try {
+            localStorage.setItem('dinnerDeciderToday', JSON.stringify(planObj));
+          } catch (e) {}
+        }
+
+        // Refresh rolling 7-day schedule to update week badges & strip
+        await loadWeekPlan();
 
         // Show Confirmation View
         showConfirmation(planObj);
@@ -1403,6 +1874,18 @@
       document.getElementById('confirmDishTitle').textContent = plan.dish_name;
       document.getElementById('confirmDishEmoji').textContent = plan.emoji || (plan.external_url ? '🌐' : (plan.is_custom ? '🍜' : '🥘'));
 
+      const planDate = plan.target_date || plan.date || selectedDate;
+      const todayIso = new Date().toISOString().split('T')[0];
+      const isToday = (planDate === todayIso);
+      let dayName = 'Tonight';
+      let dayLong = 'Tonight';
+      if (!isToday && planDate) {
+        const [y, m, d] = planDate.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        dayName = dt.toLocaleDateString(undefined, { weekday: 'short' });
+        dayLong = dt.toLocaleDateString(undefined, { weekday: 'long' });
+      }
+
       const confirmDateStr = document.getElementById('confirmDateStr');
       const confirmBadge = document.getElementById('confirmBadge');
       const confirmBadgeText = document.getElementById('confirmBadgeText');
@@ -1410,25 +1893,49 @@
       const confirmPillTag = document.getElementById('confirmPillTag');
 
       if (plan.external_url) {
-        confirmDateStr.textContent = `Recipe from ${plan.source_domain || 'web'} • Scheduled for tonight`;
+        confirmDateStr.textContent = isToday 
+          ? `Recipe from ${plan.source_domain || 'web'} • Scheduled for tonight`
+          : `Recipe from ${plan.source_domain || 'web'} • Scheduled for ${dayLong}`;
         confirmBadge.className = 'inline-flex items-center space-x-1 px-3.5 py-1 rounded-full text-xs font-bold bg-sky-600 text-white shadow-sm';
-        confirmBadgeText.textContent = 'TEST RUN LOCKED IN';
-        confirmSubtitle.textContent = "Tonight's chef has been notified with the recipe link. 👨‍🍳";
+        confirmBadgeText.textContent = isToday ? 'TEST RUN LOCKED IN' : `${dayName.toUpperCase()} TEST RUN LOCKED IN`;
+        confirmSubtitle.textContent = isToday 
+          ? "Tonight's chef has been notified with the recipe link. 👨‍🍳" 
+          : `Dinner on ${dayLong} is locked in! 👨‍🍳`;
         confirmPillTag.className = 'text-xs bg-sky-100 text-sky-800 font-semibold px-2 py-0.5 rounded-full';
-        confirmPillTag.textContent = 'Test Run';
+        confirmPillTag.textContent = isToday ? 'Test Run' : `${dayName} Test Run`;
       } else {
         confirmBadge.className = 'inline-flex items-center space-x-1 px-3.5 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm';
-        confirmBadgeText.textContent = 'MEAL PLAN UPDATED';
-        confirmSubtitle.textContent = "Tonight's chef has been notified. 👩‍🍳";
+        confirmBadgeText.textContent = isToday ? 'MEAL PLAN UPDATED' : `${dayName.toUpperCase()} MEAL PLAN UPDATED`;
+        confirmSubtitle.textContent = isToday 
+          ? "Tonight's chef has been notified. 👩‍🍳" 
+          : `Dinner on ${dayLong} is locked in! 👩‍🍳`;
         confirmPillTag.className = 'text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full';
-        confirmPillTag.textContent = 'Tonight';
+        confirmPillTag.textContent = isToday ? 'Tonight' : dayName;
         if (plan.total_time) {
-          confirmDateStr.textContent = `⏱️ ${plan.total_time} • Scheduled for tonight`;
+          confirmDateStr.textContent = isToday 
+            ? `⏱️ ${plan.total_time} • Scheduled for tonight` 
+            : `⏱️ ${plan.total_time} • Scheduled for ${dayLong}`;
         } else if (plan.is_custom) {
-          confirmDateStr.textContent = 'Special Request • Scheduled for tonight';
+          confirmDateStr.textContent = isToday 
+            ? 'Special Request • Scheduled for tonight' 
+            : `Special Request • Scheduled for ${dayLong}`;
         } else {
-          confirmDateStr.textContent = 'Scheduled for tonight';
+          confirmDateStr.textContent = isToday ? 'Scheduled for tonight' : `Scheduled for ${dayLong}`;
         }
+      }
+
+      // Update Confirmation Action Buttons
+      const changeBtn = document.getElementById('confirmChangeDinnerBtn');
+      if (changeBtn) {
+        changeBtn.textContent = isToday 
+          ? '🔄 Change your mind? Pick a different dinner' 
+          : `🔄 Change dinner for ${dayLong}`;
+      }
+      const clearBtn = document.getElementById('confirmClearDateBtn');
+      if (clearBtn) {
+        clearBtn.textContent = isToday 
+          ? '✕ Clear this dinner' 
+          : `✕ Clear ${dayName}'s dinner`;
       }
 
       // External link button for Main
@@ -2102,40 +2609,7 @@
 
     // Reset back to Voting Form
     async function resetVoting() {
-      try {
-        localStorage.removeItem('dinnerDeciderToday');
-      } catch (e) {}
-
-      confirmationView.classList.add('hidden');
-      sideView.classList.add('hidden');
-      votingView.classList.remove('hidden');
-      bottomBar.classList.remove('hidden');
-      
-      currentStep = 1;
-      selectedRecipeId = null;
-      customNote = '';
-      customNoteInput.value = '';
-      clearCustomInput();
-
-      selectedSideId = null;
-      customSideNote = '';
-      customSideInput.value = '';
-      clearCustomSideInput();
-      sideSkipped = false;
-
-      renderFilterPills();
-      
-      // Clean up in Mealie and backend cache as well
-      try {
-        fetch('/api/reset-today', { method: 'POST' }).catch(() => {});
-      } catch (e) {}
-
-      if (!currentOptions || currentOptions.length === 0) {
-        loadOptions();
-      } else {
-        renderCards(currentOptions);
-        updateBottomBar();
-      }
+      await clearCurrentDatePlan();
     }
 
     function showError(msg) {
@@ -2162,9 +2636,20 @@
       initDate();
       renderFilterPills();
       loadPantry();
-      const hasPlan = await checkExistingPlan();
-      if (!hasPlan) {
-        loadOptions();
+      const todayIso = new Date().toISOString().split('T')[0];
+      selectedDate = todayIso;
+      const weekData = await loadWeekPlan();
+      const todayEntry = weekData && weekData.days ? weekData.days.find(d => d.date === todayIso) : null;
+      if (todayEntry && todayEntry.has_plan && todayEntry.plan) {
+        try {
+          localStorage.setItem('dinnerDeciderToday', JSON.stringify(todayEntry.plan));
+        } catch (e) {}
+        showConfirmation(todayEntry.plan);
+      } else {
+        const hasPlan = await checkExistingPlan();
+        if (!hasPlan) {
+          loadOptions();
+        }
       }
     }
 

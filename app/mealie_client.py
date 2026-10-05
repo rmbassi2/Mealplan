@@ -3,7 +3,7 @@ import logging
 import random
 import re
 import time
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -58,6 +58,7 @@ class MealieClient:
         self.token = settings.mealie_api_token
         self.mock_mode = settings.mock_mode or not settings.is_configured
         self._cached_today_plan: Optional[Dict[str, Any]] = None
+        self._cached_date_plans: Dict[str, Dict[str, Any]] = {}
         self._recipe_cache: Dict[str, Dict[str, Any]] = {}
         self._cached_all_recipes: Optional[List[Dict[str, Any]]] = None
         self._cached_all_recipes_time: float = 0.0
@@ -95,18 +96,155 @@ class MealieClient:
                     logger.debug(f"Error deleting entry {entry_id} at {url}: {e}")
         return False
 
-    async def clear_today_dinner_entries(self, today_str: Optional[str] = None) -> int:
-        """Find and remove all existing dinner entries for today from Mealie."""
-        self._cached_today_plan = None
-        if not today_str:
-            today_str = date.today().isoformat()
+    async def _parse_dinner_entries(
+        self,
+        dinner_entries: List[Dict[str, Any]],
+        target_date_str: str,
+        client: Optional[httpx.AsyncClient] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Parse raw dinner entries from Mealie into a structured dinner plan dict."""
+        if not dinner_entries:
+            return None
+
+        # Classify entries into main and side
+        main_entry = None
+        side_entry = None
+        for ent in dinner_entries:
+            t_text = str(ent.get("title") or ent.get("text") or "").lower()
+            rec_c = str(ent.get("recipe", {}).get("recipeCategory") or "").lower()
+            if t_text.startswith("side:") or "side" in rec_c or "side" in t_text:
+                if not side_entry:
+                    side_entry = ent
+                    continue
+            if not main_entry:
+                main_entry = ent
+            elif not side_entry:
+                side_entry = ent
+
+        if not main_entry and dinner_entries:
+            main_entry = dinner_entries[0]
+
+        is_today = (target_date_str == date.today().isoformat())
+        dish_name = "Tonight's Recipe" if is_today else "Planned Recipe"
+        total_time = None
+        recipe_slug = None
+        is_custom = False
+        emoji = "🥘"
+        external_url = None
+        source_domain = None
+
+        if main_entry:
+            recipe_obj = main_entry.get("recipe")
+            title = main_entry.get("title") or main_entry.get("text")
+            recipe_id = main_entry.get("recipeId")
+
+            if recipe_obj and isinstance(recipe_obj, dict):
+                dish_name = recipe_obj.get("name", dish_name)
+                total_time = format_recipe_time(recipe_obj)
+                recipe_slug = recipe_obj.get("slug")
+                emoji = "🥘"
+            elif title:
+                dish_name = title
+                is_custom = True
+                note_text = main_entry.get("text") or ""
+                found_url = extract_url_from_text(note_text) or extract_url_from_text(title)
+                external_url = found_url
+                source_domain = clean_domain(found_url) if found_url else None
+                emoji = "🌐" if external_url else "🍜"
+            elif recipe_id:
+                dish_name = "Tonight's Dinner" if is_today else "Planned Dinner"
+                emoji = "🍽️"
+                if client:
+                    try:
+                        r_res = await client.get(
+                            f"{self.base_url}/api/recipes/{recipe_id}",
+                            headers=self.headers,
+                        )
+                        if r_res.status_code == 200:
+                            rd = r_res.json()
+                            dish_name = rd.get("name", dish_name)
+                            total_time = format_recipe_time(rd)
+                            recipe_slug = rd.get("slug")
+                    except Exception:
+                        pass
+
+        # Parse side entry (if any)
+        side_name = None
+        side_time = None
+        side_slug = None
+        side_emoji = None
+        side_external_url = None
+        side_source_domain = None
+        side_is_custom = False
+
+        if side_entry:
+            s_recipe_obj = side_entry.get("recipe")
+            s_title = side_entry.get("title") or side_entry.get("text")
+            s_recipe_id = side_entry.get("recipeId")
+
+            if s_recipe_obj and isinstance(s_recipe_obj, dict):
+                side_name = s_recipe_obj.get("name", "Side Dish")
+                side_time = format_recipe_time(s_recipe_obj)
+                side_slug = s_recipe_obj.get("slug")
+                side_emoji = "🥗"
+            elif s_title:
+                s_text = side_entry.get("text") or ""
+                s_url = extract_url_from_text(s_text) or extract_url_from_text(s_title)
+                side_name = re.sub(r"^side:\s*", "", s_title, flags=re.IGNORECASE)
+                side_is_custom = True
+                side_external_url = s_url
+                side_source_domain = clean_domain(s_url) if s_url else None
+                side_emoji = "🌐" if s_url else "🥗"
+            elif s_recipe_id:
+                side_name = "Side Dish"
+                side_emoji = "🥗"
+                if client:
+                    try:
+                        r_res = await client.get(
+                            f"{self.base_url}/api/recipes/{s_recipe_id}",
+                            headers=self.headers,
+                        )
+                        if r_res.status_code == 200:
+                            rd = r_res.json()
+                            side_name = rd.get("name", side_name)
+                            side_time = format_recipe_time(rd)
+                            side_slug = rd.get("slug")
+                    except Exception:
+                        pass
+
+        return {
+            "date": target_date_str,
+            "dish_name": dish_name,
+            "total_time": total_time,
+            "recipe_slug": recipe_slug,
+            "is_custom": is_custom,
+            "external_url": external_url,
+            "source_domain": source_domain,
+            "emoji": emoji,
+            "side_name": side_name,
+            "side_time": side_time,
+            "side_slug": side_slug,
+            "side_emoji": side_emoji,
+            "side_external_url": side_external_url,
+            "side_source_domain": side_source_domain,
+            "side_is_custom": side_is_custom,
+        }
+
+    async def clear_date_dinner_entries(self, target_date_str: Optional[str] = None) -> int:
+        """Find and remove all existing dinner entries for target date from Mealie."""
+        if not target_date_str:
+            target_date_str = date.today().isoformat()
+
+        self._cached_date_plans.pop(target_date_str, None)
+        if target_date_str == date.today().isoformat():
+            self._cached_today_plan = None
 
         if self.mock_mode:
             return 0
 
         endpoints = [
-            f"{self.base_url}/api/households/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
-            f"{self.base_url}/api/groups/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
+            f"{self.base_url}/api/households/mealplans?start_date={target_date_str}&end_date={target_date_str}&perPage=100",
+            f"{self.base_url}/api/groups/mealplans?start_date={target_date_str}&end_date={target_date_str}&perPage=100",
         ]
         deleted_count = 0
         async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
@@ -116,9 +254,16 @@ class MealieClient:
                     resp = await client.get(url, headers=self.headers)
                     if resp.status_code == 200:
                         data = resp.json()
-                        items = data.get("items", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                        items = (
+                            data.get("items", [])
+                            if isinstance(data, dict)
+                            else (data if isinstance(data, list) else [])
+                        )
                         for it in items:
-                            if str(it.get("date")) == today_str and str(it.get("entryType", "")).lower() == "dinner":
+                            if (
+                                str(it.get("date")) == target_date_str
+                                and str(it.get("entryType", "")).lower() == "dinner"
+                            ):
                                 if it.get("id"):
                                     entries_to_delete.append(it["id"])
                         if entries_to_delete:
@@ -132,29 +277,40 @@ class MealieClient:
 
         return deleted_count
 
-    async def reset_today_plan(self) -> int:
-        """Reset and remove today's dinner from Mealie and clear cache."""
-        self._cached_today_plan = None
+    clear_today_dinner_entries = clear_date_dinner_entries
+
+    async def reset_date_plan(self, target_date_str: Optional[str] = None) -> int:
+        """Reset and remove dinner for target date from Mealie and clear cache."""
+        if not target_date_str:
+            target_date_str = date.today().isoformat()
+        self._cached_date_plans.pop(target_date_str, None)
+        if target_date_str == date.today().isoformat():
+            self._cached_today_plan = None
         if self.mock_mode:
             return 0
-        return await self.clear_today_dinner_entries()
+        return await self.clear_date_dinner_entries(target_date_str)
 
-    async def get_today_plan(self) -> Optional[Dict[str, Any]]:
-        """Fetch today's already scheduled dinner from Mealie or cache."""
+    reset_today_plan = reset_date_plan
+
+    async def get_date_plan(self, target_date_str: str) -> Optional[Dict[str, Any]]:
+        """Fetch scheduled dinner for a specific date from Mealie or cache."""
         today_str = date.today().isoformat()
-
         if self.mock_mode:
-            if self._cached_today_plan and self._cached_today_plan.get("date") == today_str:
+            if target_date_str in self._cached_date_plans:
+                return self._cached_date_plans[target_date_str]
+            if target_date_str == today_str and self._cached_today_plan:
                 return self._cached_today_plan
             return None
 
         queried_successfully = False
         endpoints = [
-            f"{self.base_url}/api/households/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
-            f"{self.base_url}/api/households/mealplans/today",
-            f"{self.base_url}/api/groups/mealplans?start_date={today_str}&end_date={today_str}&perPage=100",
-            f"{self.base_url}/api/groups/mealplans/today",
+            f"{self.base_url}/api/households/mealplans?start_date={target_date_str}&end_date={target_date_str}&perPage=100",
+            f"{self.base_url}/api/groups/mealplans?start_date={target_date_str}&end_date={target_date_str}&perPage=100",
         ]
+        if target_date_str == today_str:
+            endpoints.insert(1, f"{self.base_url}/api/households/mealplans/today")
+            endpoints.append(f"{self.base_url}/api/groups/mealplans/today")
+
         async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
             for url in endpoints:
                 try:
@@ -171,151 +327,134 @@ class MealieClient:
                         elif isinstance(data, list):
                             items = data
 
-                        # Find all dinner entries for today
                         dinner_entries = [
-                            it for it in items
-                            if str(it.get("date")) == today_str and str(it.get("entryType", "")).lower() == "dinner"
+                            it
+                            for it in items
+                            if str(it.get("date")) == target_date_str
+                            and str(it.get("entryType", "")).lower() == "dinner"
                         ]
                         if not dinner_entries and items:
-                            dinner_entries = [it for it in items if str(it.get("date")) == today_str]
+                            dinner_entries = [
+                                it for it in items if str(it.get("date")) == target_date_str
+                            ]
 
                         if dinner_entries:
-                            # Classify entries into main and side
-                            main_entry = None
-                            side_entry = None
-                            for ent in dinner_entries:
-                                t_text = str(ent.get("title") or ent.get("text") or "").lower()
-                                rec_c = str(ent.get("recipe", {}).get("recipeCategory") or "").lower()
-                                if t_text.startswith("side:") or "side" in rec_c or "side" in t_text:
-                                    if not side_entry:
-                                        side_entry = ent
-                                        continue
-                                if not main_entry:
-                                    main_entry = ent
-                                elif not side_entry:
-                                    side_entry = ent
-
-                            if not main_entry and dinner_entries:
-                                main_entry = dinner_entries[0]
-
-                            # Parse main entry
-                            dish_name = "Tonight's Recipe"
-                            total_time = None
-                            recipe_slug = None
-                            is_custom = False
-                            emoji = "🥘"
-                            external_url = None
-                            source_domain = None
-
-                            if main_entry:
-                                recipe_obj = main_entry.get("recipe")
-                                title = main_entry.get("title") or main_entry.get("text")
-                                recipe_id = main_entry.get("recipeId")
-
-                                if recipe_obj and isinstance(recipe_obj, dict):
-                                    dish_name = recipe_obj.get("name", "Tonight's Recipe")
-                                    total_time = format_recipe_time(recipe_obj)
-                                    recipe_slug = recipe_obj.get("slug")
-                                    emoji = "🥘"
-                                elif title:
-                                    dish_name = title
-                                    is_custom = True
-                                    note_text = main_entry.get("text") or ""
-                                    found_url = extract_url_from_text(note_text) or extract_url_from_text(title)
-                                    external_url = found_url
-                                    source_domain = clean_domain(found_url) if found_url else None
-                                    emoji = "🌐" if external_url else "🍜"
-                                elif recipe_id:
-                                    dish_name = "Tonight's Dinner"
-                                    emoji = "🍽️"
-                                    try:
-                                        r_res = await client.get(
-                                            f"{self.base_url}/api/recipes/{recipe_id}",
-                                            headers=self.headers,
-                                        )
-                                        if r_res.status_code == 200:
-                                            rd = r_res.json()
-                                            dish_name = rd.get("name", dish_name)
-                                            total_time = format_recipe_time(rd)
-                                            recipe_slug = rd.get("slug")
-                                    except Exception:
-                                        pass
-
-                            # Parse side entry (if any)
-                            side_name = None
-                            side_time = None
-                            side_slug = None
-                            side_emoji = None
-                            side_external_url = None
-                            side_source_domain = None
-                            side_is_custom = False
-
-                            if side_entry:
-                                s_recipe_obj = side_entry.get("recipe")
-                                s_title = side_entry.get("title") or side_entry.get("text")
-                                s_recipe_id = side_entry.get("recipeId")
-
-                                if s_recipe_obj and isinstance(s_recipe_obj, dict):
-                                    side_name = s_recipe_obj.get("name", "Side Dish")
-                                    side_time = format_recipe_time(s_recipe_obj)
-                                    side_slug = s_recipe_obj.get("slug")
-                                    side_emoji = "🥗"
-                                elif s_title:
-                                    s_text = side_entry.get("text") or ""
-                                    s_url = extract_url_from_text(s_text) or extract_url_from_text(s_title)
-                                    side_name = re.sub(r"^side:\s*", "", s_title, flags=re.IGNORECASE)
-                                    side_is_custom = True
-                                    side_external_url = s_url
-                                    side_source_domain = clean_domain(s_url) if s_url else None
-                                    side_emoji = "🌐" if s_url else "🥗"
-                                elif s_recipe_id:
-                                    side_name = "Side Dish"
-                                    side_emoji = "🥗"
-                                    try:
-                                        r_res = await client.get(
-                                            f"{self.base_url}/api/recipes/{s_recipe_id}",
-                                            headers=self.headers,
-                                        )
-                                        if r_res.status_code == 200:
-                                            rd = r_res.json()
-                                            side_name = rd.get("name", side_name)
-                                            side_time = format_recipe_time(rd)
-                                            side_slug = rd.get("slug")
-                                    except Exception:
-                                        pass
-
-                            plan = {
-                                "date": today_str,
-                                "dish_name": dish_name,
-                                "total_time": total_time,
-                                "recipe_slug": recipe_slug,
-                                "is_custom": is_custom,
-                                "external_url": external_url,
-                                "source_domain": source_domain,
-                                "emoji": emoji,
-                                "side_name": side_name,
-                                "side_time": side_time,
-                                "side_slug": side_slug,
-                                "side_emoji": side_emoji,
-                                "side_external_url": side_external_url,
-                                "side_source_domain": side_source_domain,
-                                "side_is_custom": side_is_custom,
-                            }
-                            self._cached_today_plan = plan
-                            return plan
+                            plan = await self._parse_dinner_entries(dinner_entries, target_date_str, client=client)
+                            if plan:
+                                self._cached_date_plans[target_date_str] = plan
+                                if target_date_str == today_str:
+                                    self._cached_today_plan = plan
+                                return plan
                 except Exception as e:
-                    logger.debug(f"Error checking existing meal plan at {url}: {e}")
+                    logger.debug(f"Error checking meal plan at {url}: {e}")
                     continue
 
         if queried_successfully:
-            # Mealie explicitly confirmed no dinner planned for today
-            self._cached_today_plan = None
+            self._cached_date_plans.pop(target_date_str, None)
+            if target_date_str == today_str:
+                self._cached_today_plan = None
             return None
 
-        # Fallback to cache only if Mealie was completely unreachable
-        if self._cached_today_plan and self._cached_today_plan.get("date") == today_str:
+        # Fallback to cache if Mealie was completely unreachable
+        if target_date_str in self._cached_date_plans:
+            return self._cached_date_plans[target_date_str]
+        if target_date_str == today_str and self._cached_today_plan:
             return self._cached_today_plan
         return None
+
+    async def get_today_plan(self) -> Optional[Dict[str, Any]]:
+        """Fetch today's already scheduled dinner from Mealie or cache."""
+        return await self.get_date_plan(date.today().isoformat())
+
+    async def get_week_plan(
+        self,
+        start_date_str: Optional[str] = None,
+        days: int = 7,
+    ) -> List[Dict[str, Any]]:
+        """Fetch meal plan entries for a rolling range of days starting from start_date_str."""
+        if not start_date_str:
+            start_date = date.today()
+        else:
+            try:
+                start_date = date.fromisoformat(start_date_str)
+            except ValueError:
+                start_date = date.today()
+
+        date_list = [start_date + timedelta(days=i) for i in range(days)]
+        start_iso = date_list[0].isoformat()
+        end_iso = date_list[-1].isoformat()
+        today_iso = date.today().isoformat()
+
+        if self.mock_mode:
+            results = []
+            for d in date_list:
+                d_str = d.isoformat()
+                p = self._cached_date_plans.get(d_str)
+                if not p and d_str == today_iso and self._cached_today_plan:
+                    p = self._cached_today_plan
+                results.append({
+                    "date": d_str,
+                    "day_name": d.strftime("%A"),
+                    "day_short": d.strftime("%a"),
+                    "day_num": str(d.day),
+                    "month_short": d.strftime("%b"),
+                    "is_today": (d_str == today_iso),
+                    "has_plan": bool(p),
+                    "plan": p,
+                })
+            return results
+
+        endpoints = [
+            f"{self.base_url}/api/households/mealplans?start_date={start_iso}&end_date={end_iso}&perPage=100",
+            f"{self.base_url}/api/groups/mealplans?start_date={start_iso}&end_date={end_iso}&perPage=100",
+        ]
+        items_by_date: Dict[str, List[Dict[str, Any]]] = {d.isoformat(): [] for d in date_list}
+
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+            for url in endpoints:
+                try:
+                    resp = await client.get(url, headers=self.headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        items = (
+                            data.get("items", [])
+                            if isinstance(data, dict)
+                            else (data if isinstance(data, list) else [])
+                        )
+                        for it in items:
+                            d_str = str(it.get("date", ""))
+                            if d_str in items_by_date:
+                                e_type = str(it.get("entryType", "")).lower()
+                                if e_type == "dinner" or not e_type:
+                                    items_by_date[d_str].append(it)
+                        break
+                except Exception as e:
+                    logger.debug(f"Error querying week meal plans at {url}: {e}")
+
+            results = []
+            for d in date_list:
+                d_str = d.isoformat()
+                day_entries = items_by_date.get(d_str, [])
+                plan = await self._parse_dinner_entries(day_entries, d_str, client=client)
+                if plan:
+                    self._cached_date_plans[d_str] = plan
+                else:
+                    self._cached_date_plans.pop(d_str, None)
+
+                if d_str == today_iso:
+                    self._cached_today_plan = plan
+
+                results.append({
+                    "date": d_str,
+                    "day_name": d.strftime("%A"),
+                    "day_short": d.strftime("%a"),
+                    "day_num": str(d.day),
+                    "month_short": d.strftime("%b"),
+                    "is_today": (d_str == today_iso),
+                    "has_plan": bool(plan),
+                    "plan": plan,
+                })
+            return results
 
     async def add_to_shopping_list(self, item_name: str, note: Optional[str] = None) -> Dict[str, Any]:
         """Add an item (e.g. missing ingredient) to Mealie's shopping list."""
@@ -816,9 +955,10 @@ class MealieClient:
         custom_note: Optional[str] = None,
         side_recipe_id: Optional[str] = None,
         side_custom_note: Optional[str] = None,
+        target_date: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Submit the selected recipe or custom craving, plus optional side dish to Mealie."""
-        today_str = date.today().isoformat()
+        today_str = target_date.strip() if target_date and target_date.strip() else date.today().isoformat()
         dish_name = "Dinner"
         total_time = None
         recipe_slug = None
@@ -990,7 +1130,9 @@ class MealieClient:
 
         if self.mock_mode:
             logger.info(f"[Mock Mode] Submitted dinner choice for {today_str}: {payload}, side: {side_payload}")
-            self._cached_today_plan = plan
+            self._cached_date_plans[today_str] = plan
+            if today_str == date.today().isoformat():
+                self._cached_today_plan = plan
             return {
                 "status": "success",
                 "message": "Meal plan updated (Mock mode)",
@@ -999,9 +1141,9 @@ class MealieClient:
                 "side_entry": side_payload,
             }
 
-        # Clear any existing dinner entries for today in Mealie so exactly tonight's meal and side exist
+        # Clear any existing dinner entries for target date in Mealie so exactly that day's meal and side exist
         try:
-            await self.clear_today_dinner_entries(today_str)
+            await self.clear_date_dinner_entries(today_str)
         except Exception as e:
             logger.warning(f"Could not clear prior dinner entries for {today_str}: {e}")
 
@@ -1044,7 +1186,9 @@ class MealieClient:
                             except Exception as side_err:
                                 logger.warning(f"Could not post side dish entry: {side_err}")
 
-                        self._cached_today_plan = plan
+                        self._cached_date_plans[today_str] = plan
+                        if today_str == date.today().isoformat():
+                            self._cached_today_plan = plan
                         return {
                             "status": "success",
                             "message": "Meal plan updated",

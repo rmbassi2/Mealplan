@@ -1,3 +1,4 @@
+from datetime import date
 import logging
 from typing import Any, Dict, Optional
 import httpx
@@ -30,6 +31,7 @@ class NtfyNotifier:
         side_time: Optional[str] = None,
         side_slug: Optional[str] = None,
         side_external_url: Optional[str] = None,
+        target_date: Optional[str] = None,
     ) -> bool:
         """Send a rich push notification to the configured ntfy topic.
 
@@ -38,6 +40,20 @@ class NtfyNotifier:
         if not self.is_configured:
             logger.info("Ntfy notification skipped (NTFY_TOPIC is not set in .env).")
             return False
+
+        today_iso = date.today().isoformat()
+        is_today = not target_date or target_date == today_iso
+
+        day_heading = "Tonight"
+        day_sched_text = "tonight's meal plan"
+        if not is_today:
+            try:
+                dt = date.fromisoformat(target_date)
+                day_heading = f"{dt.strftime('%A')}"
+                day_sched_text = f"{dt.strftime('%A, %b %d')} on Mealie"
+            except Exception:
+                day_heading = target_date or "Planned"
+                day_sched_text = f"{target_date} on Mealie"
 
         # In ntfy, JSON payloads must be POSTed to the root server URL (e.g. https://ntfy.sh/)
         # with the 'topic' field inside the JSON body.
@@ -50,13 +66,13 @@ class NtfyNotifier:
         if external_url:
             from urllib.parse import urlparse
             domain = urlparse(external_url).netloc.replace("www.", "")
-            title = "Tonight's Dinner: Web Recipe Request!" + (f" ({dish_name} + {side_name})" if side_name else "")
+            title = f"{day_heading}'s Dinner: Web Recipe Request!" + (f" ({dish_name} + {side_name})" if side_name else "")
             message = (
                 f"Special web recipe request locked in:\n\n"
                 f"🌐 {dish_name}\n"
                 f"Source: {domain}"
                 f"{side_snippet}\n\n"
-                f"Scheduled on tonight's meal plan (cookbook untouched)."
+                f"Scheduled on {day_sched_text} (cookbook untouched)."
             )
             tags = ["globe_with_meridians", "bell"]
             click_url = external_url
@@ -83,12 +99,12 @@ class NtfyNotifier:
             if settings.mealie_base_url:
                 group = settings.mealie_group_slug or "home"
                 click_url = f"{settings.mealie_base_url}/g/{group}/planner"
-            title = "Tonight's Dinner: Custom Craving!" + (f" ({dish_name} + {side_name})" if side_name else "")
+            title = f"{day_heading}'s Dinner: Custom Craving!" + (f" ({dish_name} + {side_name})" if side_name else "")
             message = (
                 f"Special dinner request locked in:\n"
                 f"🍜 {dish_name}"
                 f"{side_snippet}\n\n"
-                f"Scheduled on Mealie for tonight."
+                f"Scheduled on {day_sched_text}."
             )
             tags = ["fork_and_knife", "bell"]
             if click_url:
@@ -106,12 +122,12 @@ class NtfyNotifier:
                 group = settings.mealie_group_slug or "home"
                 click_url = f"{settings.mealie_base_url}/g/{group}/r/{recipe_slug}"
             time_str = f" • ⏱️ {total_time}" if total_time else ""
-            title = f"Tonight's Dinner: {dish_name}" + (f" + {side_name}" if side_name else "")
+            title = f"{day_heading}'s Dinner: {dish_name}" + (f" + {side_name}" if side_name else "")
             message = (
-                f"Tonight's menu is locked in!\n\n"
+                f"{day_heading}'s menu is locked in!\n\n"
                 f"🍽️ {dish_name}{time_str}"
                 f"{side_snippet}\n\n"
-                f"Scheduled on Mealie. Time to get cooking! 👩‍🍳"
+                f"Scheduled on {day_sched_text}. Time to get cooking! 👩‍🍳"
             )
             tags = ["pot_of_food", "tada"]
             if click_url:
