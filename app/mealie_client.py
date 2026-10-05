@@ -770,6 +770,17 @@ class MealieClient:
                             first_c = raw_cats[0]
                             cat_label = first_c.get("name") if isinstance(first_c, dict) else str(first_c)
 
+                        badges = list(tax.get("badges", []))
+                        pantry_eval = r.get("_pantry") or {}
+                        if needs_pantry_filter:
+                            if pantry_eval.get("status") == "ready":
+                                badges.insert(0, {"icon": "🟢", "label": "Ready to Cook", "type": "pantry"})
+                            elif pantry_eval.get("status") == "almost_ready":
+                                missing_p = pantry_eval.get("missing_perishables", []) or pantry_eval.get("missing_items", [])
+                                target_item = missing_p[0] if missing_p else "1 item"
+                                short_lbl = target_item if len(target_item) <= 16 else target_item[:15] + "…"
+                                badges.insert(0, {"icon": "🟡", "label": f"Need: {short_lbl}", "type": "pantry"})
+
                         results.append(
                             {
                                 "id": recipe_id,
@@ -779,7 +790,7 @@ class MealieClient:
                                 "totalTime": format_recipe_time(r),
                                 "imageUrl": f"/api/recipe-image/{recipe_id}",
                                 "category": cat_label,
-                                "badges": tax.get("badges", []),
+                                "badges": badges[:3],
                                 "tags": list(tax.get("tags", set())),
                                 "tools": list(tax.get("tools", set())),
                                 "pantry": r.get("_pantry", {
@@ -807,7 +818,8 @@ class MealieClient:
             m["_pantry"] = pantry_manager.evaluate_recipe(m, in_stock_set)
 
         mock_candidates = MOCK_RECIPES
-        if pantry_only or mood in ("pantry", "pantry-ready"):
+        is_pantry_mode = pantry_only or mood in ("pantry", "pantry-ready")
+        if is_pantry_mode:
             ready_mocks = [m for m in MOCK_RECIPES if m["_pantry"]["is_ready"]]
             if ready_mocks:
                 ready_mocks.sort(key=lambda m: 0 if m["_pantry"].get("status") == "ready" else 1)
@@ -824,6 +836,16 @@ class MealieClient:
         results = []
         for m in selected_mocks:
             tax = m.get("_taxonomy") or extract_recipe_taxonomy(m)
+            badges = list(tax.get("badges", []))
+            pantry_eval = m.get("_pantry") or {}
+            if is_pantry_mode:
+                if pantry_eval.get("status") == "ready":
+                    badges.insert(0, {"icon": "🟢", "label": "Ready to Cook", "type": "pantry"})
+                elif pantry_eval.get("status") == "almost_ready":
+                    missing_p = pantry_eval.get("missing_perishables", []) or pantry_eval.get("missing_items", [])
+                    target_item = missing_p[0] if missing_p else "1 item"
+                    short_lbl = target_item if len(target_item) <= 16 else target_item[:15] + "…"
+                    badges.insert(0, {"icon": "🟡", "label": f"Need: {short_lbl}", "type": "pantry"})
             results.append(
                 {
                     "id": m["id"],
@@ -833,7 +855,7 @@ class MealieClient:
                     "totalTime": m["totalTime"],
                     "imageUrl": f"/api/recipe-image/{m['id']}",
                     "category": m.get("category", "Dinner"),
-                    "badges": tax.get("badges", []),
+                    "badges": badges[:3],
                     "tags": list(tax.get("tags", set())),
                     "tools": list(tax.get("tools", set())),
                     "emoji": m.get("emoji", "🥘"),

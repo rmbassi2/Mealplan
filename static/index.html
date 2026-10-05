@@ -1260,7 +1260,10 @@
 
       recipes.forEach((recipe) => {
         const isSelected = (selectedRecipeId === recipe.id);
-        const badgesHtml = (recipe.badges || []).map(renderBadgeHtml).join('');
+        const badgesHtml = (recipe.badges || [])
+          .filter(b => b.type !== 'pantry')
+          .map(renderBadgeHtml)
+          .join('');
         const card = document.createElement('div');
         card.className = `recipe-card cursor-pointer relative bg-white rounded-2xl overflow-hidden shadow-sm transition-all duration-200 border-2 ${
           isSelected 
