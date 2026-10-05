@@ -2,6 +2,7 @@ import asyncio
 import logging
 import random
 import re
+import time
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -10,7 +11,12 @@ import httpx
 from app.config import settings
 from app.mock_data import MOCK_RECIPES, MOCK_SIDES, generate_recipe_svg
 from app.pantry import pantry_manager
-from app.taxonomy import extract_recipe_taxonomy, select_balanced_recipes, select_side_recipes
+from app.taxonomy import (
+    extract_recipe_taxonomy,
+    is_dinner_recipe,
+    select_balanced_recipes,
+    select_side_recipes,
+)
 from app.url_helper import extract_url_from_text, fetch_recipe_url_info, clean_domain
 
 logger = logging.getLogger("mealie_client")
@@ -53,6 +59,14 @@ class MealieClient:
         self.mock_mode = settings.mock_mode or not settings.is_configured
         self._cached_today_plan: Optional[Dict[str, Any]] = None
         self._recipe_cache: Dict[str, Dict[str, Any]] = {}
+        self._cached_all_recipes: Optional[List[Dict[str, Any]]] = None
+        self._cached_all_recipes_time: float = 0.0
+        self._recipes_cache_ttl: float = 900.0  # 15 minutes TTL
+
+    def invalidate_recipes_cache(self) -> None:
+        """Invalidate the cached list of cookbook recipes."""
+        self._cached_all_recipes = None
+        self._cached_all_recipes_time = 0.0
 
     @property
     def headers(self) -> Dict[str, str]:
@@ -502,11 +516,19 @@ class MealieClient:
         await asyncio.gather(*[fetch_one(r) for r in missing_items], return_exceptions=True)
         return recipes
 
-    async def get_all_cookbook_recipes(self) -> List[Dict[str, Any]]:
-        """Fetch all recipes in the user's cookbook with their full ingredients."""
+    async def get_all_cookbook_recipes(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        """Fetch all recipes in the user's cookbook with their full ingredients, cached in memory."""
+        now = time.time()
+        if not force_refresh and self._cached_all_recipes is not None:
+            if now - self._cached_all_recipes_time < self._recipes_cache_ttl:
+                return self._cached_all_recipes
+
         if self.mock_mode:
             from app.mock_data import MOCK_RECIPES, MOCK_SIDES
-            return MOCK_RECIPES + MOCK_SIDES
+            recipes = MOCK_RECIPES + MOCK_SIDES
+            self._cached_all_recipes = recipes
+            self._cached_all_recipes_time = now
+            return recipes
 
         recipes: List[Dict[str, Any]] = []
         page = 1
@@ -543,6 +565,8 @@ class MealieClient:
 
         if recipes:
             await self.enrich_recipe_ingredients(recipes, max_fetch=len(recipes))
+            self._cached_all_recipes = recipes
+            self._cached_all_recipes_time = now
 
         return recipes
 
@@ -560,97 +584,78 @@ class MealieClient:
 
         if not self.mock_mode:
             try:
-                async with httpx.AsyncClient(timeout=8.0) as client:
-                    resp = await client.get(
-                        f"{self.base_url}/api/recipes?perPage=30",
-                        headers=self.headers,
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        items = (
-                            data.get("items", [])
-                            if isinstance(data, dict)
-                            else data
-                            if isinstance(data, list)
-                            else []
-                        )
+                all_recipes = await self.get_all_cookbook_recipes()
+                if all_recipes:
+                    # Auto-seed pantry strictly from actual cookbook recipes if empty
+                    if pantry_manager.get_stats()["total"] == 0:
+                        pantry_manager.seed_from_recipes(all_recipes)
+                        in_stock_set = pantry_manager.get_in_stock_set()
 
-                        if items:
-                            # Auto-seed pantry strictly from actual cookbook recipes if empty
-                            if pantry_manager.get_stats()["total"] == 0:
-                                await self.enrich_recipe_ingredients(items, max_fetch=len(items))
-                                pantry_manager.seed_from_recipes(items)
-                                in_stock_set = pantry_manager.get_in_stock_set()
+                    # Filter for dinner recipes
+                    dinner_recipes = [r for r in all_recipes if is_dinner_recipe(r)]
+                    if not dinner_recipes:
+                        dinner_recipes = all_recipes
 
-                            # If filtering strictly by pantry-ready, enrich candidate pool
-                            needs_pantry_filter = pantry_only or mood in ("pantry", "pantry-ready")
-                            if needs_pantry_filter:
-                                await self.enrich_recipe_ingredients(items, max_fetch=40)
-                                for r in items:
-                                    r["_pantry"] = pantry_manager.evaluate_recipe(r, in_stock_set)
-                                ready_pool = [r for r in items if r["_pantry"]["is_ready"]]
-                                if ready_pool:
-                                    ready_pool.sort(key=lambda r: 0 if r["_pantry"].get("status") == "ready" else 1)
-                                    candidate_items = ready_pool
-                                else:
-                                    candidate_items = items
-                            else:
-                                candidate_items = items
+                    # Attach pantry evaluation to candidate recipes
+                    for r in dinner_recipes:
+                        r["_pantry"] = pantry_manager.evaluate_recipe(r, in_stock_set)
 
-                            selected = select_balanced_recipes(
-                                candidate_items,
-                                count=count,
-                                mood=mood,
-                                protein=protein,
-                                tool=tool,
-                                cuisine=cuisine,
-                            )
-
-                            # Enrich the final selected recipes with full ingredients if not already done
-                            await self.enrich_recipe_ingredients(selected, max_fetch=len(selected))
-                            for r in selected:
-                                if "_pantry" not in r:
-                                    r["_pantry"] = pantry_manager.evaluate_recipe(r, in_stock_set)
-                            results = []
-                            for r in selected:
-                                tax = r.get("_taxonomy") or extract_recipe_taxonomy(r)
-                                recipe_id = r.get("id") or r.get("slug")
-                                # Derive category label
-                                cat_label = "Dinner"
-                                raw_cats = r.get("recipeCategory") or r.get("categories") or []
-                                if raw_cats and isinstance(raw_cats, list):
-                                    first_c = raw_cats[0]
-                                    cat_label = first_c.get("name") if isinstance(first_c, dict) else str(first_c)
-
-                                results.append(
-                                    {
-                                        "id": recipe_id,
-                                        "name": r.get("name", "Untitled Recipe"),
-                                        "slug": r.get("slug", ""),
-                                        "description": r.get("description") or "",
-                                        "totalTime": format_recipe_time(r),
-                                        "imageUrl": f"/api/recipe-image/{recipe_id}",
-                                        "category": cat_label,
-                                        "badges": tax.get("badges", []),
-                                        "tags": list(tax.get("tags", set())),
-                                        "tools": list(tax.get("tools", set())),
-                                        "pantry": r.get("_pantry", {
-                                            "is_ready": True,
-                                            "missing_count": 0,
-                                            "missing_items": [],
-                                            "in_stock_items": [],
-                                            "is_full_pantry": True,
-                                        }),
-                                        "is_mock": False,
-                                    }
-                                )
-                            return results
+                    needs_pantry_filter = pantry_only or mood in ("pantry", "pantry-ready")
+                    if needs_pantry_filter:
+                        ready_pool = [r for r in dinner_recipes if r["_pantry"]["is_ready"]]
+                        if ready_pool:
+                            ready_pool.sort(key=lambda r: 0 if r["_pantry"].get("status") == "ready" else 1)
+                            candidate_items = ready_pool
                         else:
-                            logger.warning("Mealie returned 0 recipes, falling back to mock options.")
+                            candidate_items = dinner_recipes
                     else:
-                        logger.warning(
-                            f"Mealie API returned status {resp.status_code}: {resp.text}, using mock options."
+                        candidate_items = dinner_recipes
+
+                    selected = select_balanced_recipes(
+                        candidate_items,
+                        count=count,
+                        mood=mood,
+                        protein=protein,
+                        tool=tool,
+                        cuisine=cuisine,
+                    )
+
+                    results = []
+                    for r in selected:
+                        tax = r.get("_taxonomy") or extract_recipe_taxonomy(r)
+                        recipe_id = r.get("id") or r.get("slug")
+                        # Derive category label
+                        cat_label = "Dinner"
+                        raw_cats = r.get("recipeCategory") or r.get("categories") or []
+                        if raw_cats and isinstance(raw_cats, list):
+                            first_c = raw_cats[0]
+                            cat_label = first_c.get("name") if isinstance(first_c, dict) else str(first_c)
+
+                        results.append(
+                            {
+                                "id": recipe_id,
+                                "name": r.get("name", "Untitled Recipe"),
+                                "slug": r.get("slug", ""),
+                                "description": r.get("description") or "",
+                                "totalTime": format_recipe_time(r),
+                                "imageUrl": f"/api/recipe-image/{recipe_id}",
+                                "category": cat_label,
+                                "badges": tax.get("badges", []),
+                                "tags": list(tax.get("tags", set())),
+                                "tools": list(tax.get("tools", set())),
+                                "pantry": r.get("_pantry", {
+                                    "is_ready": True,
+                                    "missing_count": 0,
+                                    "missing_items": [],
+                                    "in_stock_items": [],
+                                    "is_full_pantry": True,
+                                }),
+                                "is_mock": False,
+                            }
                         )
+                    return results
+                else:
+                    logger.warning("Mealie returned 0 recipes, falling back to mock options.")
             except Exception as e:
                 logger.warning(f"Failed to connect to Mealie ({e}), falling back to mock options.")
 
@@ -709,57 +714,45 @@ class MealieClient:
         """Fetch side dish options from Mealie, falling back to curated mock sides if needed."""
         if not self.mock_mode:
             try:
-                async with httpx.AsyncClient(timeout=6.0) as client:
-                    resp = await client.get(
-                        f"{self.base_url}/api/recipes?perPage=30",
-                        headers=self.headers,
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        items = (
-                            data.get("items", [])
-                            if isinstance(data, dict)
-                            else data
-                            if isinstance(data, list)
-                            else []
+                all_recipes = await self.get_all_cookbook_recipes()
+                if all_recipes:
+                    selected = select_side_recipes(all_recipes, count=count)
+                    results = []
+                    for r in selected:
+                        recipe_id = r.get("id") or r.get("slug")
+                        tax = r.get("_taxonomy") or extract_recipe_taxonomy(r)
+                        results.append(
+                            {
+                                "id": recipe_id,
+                                "name": r.get("name", "Side Dish"),
+                                "slug": r.get("slug", ""),
+                                "description": r.get("description") or "A tasty side to complement dinner.",
+                                "totalTime": format_recipe_time(r),
+                                "imageUrl": f"/api/recipe-image/{recipe_id}",
+                                "category": "Side Dish",
+                                "badges": tax.get("badges", []),
+                                "emoji": "🥗",
+                                "is_mock": False,
+                            }
                         )
-                        selected = select_side_recipes(items, count=count)
-                        results = []
-                        for r in selected:
-                            recipe_id = r.get("id") or r.get("slug")
-                            tax = r.get("_taxonomy") or extract_recipe_taxonomy(r)
+                    if len(results) < count:
+                        needed = count - len(results)
+                        for m in random.sample(MOCK_SIDES, min(needed, len(MOCK_SIDES))):
                             results.append(
                                 {
-                                    "id": recipe_id,
-                                    "name": r.get("name", "Side Dish"),
-                                    "slug": r.get("slug", ""),
-                                    "description": r.get("description") or "A tasty side to complement dinner.",
-                                    "totalTime": format_recipe_time(r),
-                                    "imageUrl": f"/api/recipe-image/{recipe_id}",
-                                    "category": "Side Dish",
-                                    "badges": tax.get("badges", []),
-                                    "emoji": "🥗",
-                                    "is_mock": False,
+                                    "id": m["id"],
+                                    "name": m["name"],
+                                    "slug": m["slug"],
+                                    "description": m["description"],
+                                    "totalTime": m["totalTime"],
+                                    "imageUrl": f"/api/recipe-image/{m['id']}",
+                                    "category": m.get("category", "Side Dish"),
+                                    "badges": [{"icon": "✨", "label": "Pantry Fav", "type": "vibe"}],
+                                    "emoji": m.get("emoji", "🥗"),
+                                    "is_mock": True,
                                 }
                             )
-                        if len(results) < count:
-                            needed = count - len(results)
-                            for m in random.sample(MOCK_SIDES, min(needed, len(MOCK_SIDES))):
-                                results.append(
-                                    {
-                                        "id": m["id"],
-                                        "name": m["name"],
-                                        "slug": m["slug"],
-                                        "description": m["description"],
-                                        "totalTime": m["totalTime"],
-                                        "imageUrl": f"/api/recipe-image/{m['id']}",
-                                        "category": m.get("category", "Side Dish"),
-                                        "badges": [{"icon": "✨", "label": "Pantry Fav", "type": "vibe"}],
-                                        "emoji": m.get("emoji", "🥗"),
-                                        "is_mock": True,
-                                    }
-                                )
-                        return results[:count]
+                    return results[:count]
             except Exception as e:
                 logger.warning(f"Error querying Mealie for sides, using fallback: {e}")
 

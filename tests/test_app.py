@@ -423,3 +423,113 @@ def test_taxonomy_overhaul_separation_and_diversity():
     trio_buckets = {classify_side_bucket(s, s["_taxonomy"]) for s in trio}
     assert trio_buckets == {"salad", "starch", "veggie"}
 
+
+@pytest.mark.anyio
+async def test_recipes_cache_and_invalidation():
+    from app.mealie_client import MealieClient
+
+    client = MealieClient()
+    client.mock_mode = True
+
+    # 1. First fetch populates cache
+    recipes1 = await client.get_all_cookbook_recipes()
+    assert client._cached_all_recipes is not None
+    assert len(recipes1) > 0
+
+    # 2. Second fetch returns the same cached list
+    recipes2 = await client.get_all_cookbook_recipes()
+    assert recipes1 is recipes2
+
+    # 3. Invalidate cache
+    client.invalidate_recipes_cache()
+    assert client._cached_all_recipes is None
+
+    # 4. Refetch after invalidation
+    recipes3 = await client.get_all_cookbook_recipes()
+    assert client._cached_all_recipes is not None
+    assert len(recipes3) == len(recipes1)
+
+
+@pytest.mark.anyio
+async def test_paginated_recipes_fetching(monkeypatch):
+    from app.mealie_client import MealieClient
+    import httpx
+
+    client = MealieClient()
+    client.mock_mode = False
+    client.base_url = "http://fake-mealie"
+    client.api_token = "fake-token"
+
+    # Create 35 dummy recipes across 2 pages (25 on page 1, 10 on page 2)
+    page1_items = [
+        {"id": f"recipe-{i}", "name": f"Recipe {i}", "recipeIngredient": ["salt"]}
+        for i in range(1, 26)
+    ]
+    page2_items = [
+        {"id": f"recipe-{i}", "name": f"Recipe {i}", "recipeIngredient": ["pepper"]}
+        for i in range(26, 36)
+    ]
+
+    async def mock_get(self, url, **kwargs):
+        if "page=1" in url:
+            return httpx.Response(200, json={"items": page1_items, "total": 35})
+        elif "page=2" in url:
+            return httpx.Response(200, json={"items": page2_items, "total": 35})
+        return httpx.Response(404)
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
+
+    recipes = await client.get_all_cookbook_recipes(force_refresh=True)
+    assert len(recipes) == 35
+    assert recipes[0]["name"] == "Recipe 1"
+    assert recipes[34]["name"] == "Recipe 35"
+    assert client._cached_all_recipes is not None
+    assert len(client._cached_all_recipes) == 35
+
+
+@pytest.mark.anyio
+async def test_get_dinner_options_uses_all_paginated_recipes(monkeypatch):
+    from app.mealie_client import MealieClient
+    import httpx
+
+    client = MealieClient()
+    client.mock_mode = False
+    client.base_url = "http://fake-mealie"
+    client.api_token = "fake-token"
+
+    # 35 recipes, recipe 35 is Shepherd's Pie
+    items = [
+        {
+            "id": f"recipe-{i}",
+            "name": f"Recipe {i}",
+            "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+            "recipeIngredient": ["1 lb ground beef", "2 carrots"],
+            "tags": [{"slug": "beef"}],
+        }
+        for i in range(1, 35)
+    ]
+    shepherds_pie = {
+        "id": "recipe-shepherds-pie",
+        "name": "Classic Shepherd's Pie",
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "recipeIngredient": ["1.5 lbs ground lamb", "1 onion", "peas"],
+        "tags": [{"slug": "comfort-food"}, {"slug": "lamb"}],
+    }
+    all_items = items + [shepherds_pie]
+
+    async def mock_get(self, url, **kwargs):
+        if "page=1" in url:
+            return httpx.Response(200, json={"items": all_items[:25], "total": 35})
+        elif "page=2" in url:
+            return httpx.Response(200, json={"items": all_items[25:], "total": 35})
+        return httpx.Response(404)
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
+
+    options = await client.get_dinner_options(count=5, mood="comfort")
+    assert len(options) > 0
+    # Shepherd's pie is on page 2 (item 35) and should be available in candidate pool
+    all_cached_ids = [r["id"] for r in client._cached_all_recipes]
+    assert "recipe-shepherds-pie" in all_cached_ids
+
+

@@ -604,6 +604,16 @@ def select_balanced_recipes(
         tags = r["_taxonomy"]["tags"]
         is_quick = "quick-weeknight" in tags or "low-effort" in tags
         w = 1.8 if (is_weeknight and is_quick) else 1.0
+
+        p_info = r.get("_pantry")
+        if p_info:
+            if p_info.get("status") == "ready":
+                w *= 1.6
+            elif p_info.get("status") == "almost_ready":
+                w *= 1.2
+            elif not p_info.get("is_ready", True):
+                w *= 0.2
+
         base_weights.append(w)
 
     selected: List[Dict[str, Any]] = []
