@@ -533,3 +533,64 @@ async def test_get_dinner_options_uses_all_paginated_recipes(monkeypatch):
     assert "recipe-shepherds-pie" in all_cached_ids
 
 
+@pytest.mark.anyio
+async def test_week_plan_endpoints():
+    from datetime import date, timedelta
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Fetch rolling week plan
+        resp = await client.get("/api/plan/week")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "days" in data
+        assert len(data["days"]) == 7
+        assert data["total_days"] == 7
+        assert "start_date" in data
+        assert "end_date" in data
+
+        first_day = data["days"][0]
+        assert first_day["is_today"] is True
+        assert "day_name" in first_day
+        assert "day_num" in first_day
+
+        # 2. Schedule a dinner for day 2 (tomorrow)
+        tomorrow = (date.today() + timedelta(days=1)).isoformat()
+        choose_resp = await client.post(
+            "/api/choose",
+            json={
+                "custom_note": "Taco Tuesday Night Out",
+                "target_date": tomorrow,
+            },
+        )
+        assert choose_resp.status_code == 200
+        choose_data = choose_resp.json()
+        assert choose_data["date"] == tomorrow
+        assert "Taco Tuesday" in choose_data["dish_name"]
+
+        # 3. Check /api/plan/date for tomorrow
+        date_resp = await client.get(f"/api/plan/date/{tomorrow}")
+        assert date_resp.status_code == 200
+        date_data = date_resp.json()
+        assert date_data["has_plan"] is True
+        assert "Taco Tuesday" in date_data["plan"]["dish_name"]
+
+        # 4. Check /api/plan/week reflects tomorrow's meal
+        week_resp2 = await client.get("/api/plan/week")
+        assert week_resp2.status_code == 200
+        week_data2 = week_resp2.json()
+        assert week_data2["planned_count"] >= 1
+        day2 = next(d for d in week_data2["days"] if d["date"] == tomorrow)
+        assert day2["has_plan"] is True
+        assert "Taco Tuesday" in day2["plan"]["dish_name"]
+
+        # 5. Reset plan for tomorrow
+        reset_resp = await client.post("/api/plan/reset", json={"date": tomorrow})
+        assert reset_resp.status_code == 200
+        reset_data = reset_resp.json()
+        assert reset_data["status"] == "success"
+
+        # Check tomorrow is now open
+        date_resp3 = await client.get(f"/api/plan/date/{tomorrow}")
+        assert date_resp3.status_code == 200
+        assert date_resp3.json()["has_plan"] is False
+
+
