@@ -757,6 +757,55 @@ def test_get_tiered_dashboard(temp_pantry):
     assert dashboard["tier_stats"]["staples_total"] == 1
 
 
+def test_pantry_badges_consistency_and_dict_category_handling():
+    """Verify that extract_recipe_taxonomy never produces negative pantry badges like 'No Chicken Breast'
+    and that is_dinner_recipe/is_side_recipe safely handle dict category representations without throwing.
+    """
+    from app.taxonomy import extract_recipe_taxonomy, is_dinner_recipe, is_side_recipe
+
+    # 1. Recipe with _pantry metadata attached
+    recipe = {
+        "name": "Homemade Earls Cajun Chicken",
+        "description": "Blackened chicken breast with garlic butter",
+        "recipeIngredient": ["chicken breasts", "black peppercorns", "butter"],
+        "recipeCategory": [{"name": "Dinner", "slug": "dinner"}],
+        "categories": [{"name": "Dinner", "slug": "dinner"}],
+        "_pantry": {
+            "status": "ready",
+            "is_ready": True,
+            "anchor_protein": "Chicken Breast",
+            "missing_anchor": None,
+            "missing_count": 0,
+            "missing_items": [],
+        },
+    }
+
+    tax = extract_recipe_taxonomy(recipe)
+    badge_labels = [b["label"] for b in tax["badges"]]
+    # Taxonomy badges should NEVER contain negative missing anchor labels like "No Chicken Breast"
+    assert not any("No " in b for b in badge_labels)
+    assert not any(b.get("type") == "pantry" for b in tax["badges"])
+
+    # 2. Even if evaluated as unavailable with missing_anchor, static taxonomy badges must remain clean
+    recipe_unavailable = dict(recipe)
+    recipe_unavailable["_pantry"] = {
+        "status": "unavailable",
+        "is_ready": False,
+        "anchor_protein": "Chicken Breast",
+        "missing_anchor": "Chicken Breast",
+        "missing_count": 1,
+        "missing_items": ["Chicken Breast"],
+    }
+    tax_unavail = extract_recipe_taxonomy(recipe_unavailable)
+    unavail_badge_labels = [b["label"] for b in tax_unavail["badges"]]
+    assert not any("No " in b for b in unavail_badge_labels)
+    assert not any("Missing" in b for b in unavail_badge_labels)
+
+    # 3. is_dinner_recipe and is_side_recipe must safely parse raw Mealie dict categories
+    assert is_dinner_recipe(recipe) is True
+    assert is_side_recipe(recipe) is False
+
+
 
 
 

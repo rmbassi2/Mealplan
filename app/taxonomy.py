@@ -256,28 +256,6 @@ def extract_recipe_taxonomy(recipe: Dict[str, Any]) -> Dict[str, Any]:
             badges.append({"icon": ico, "label": lbl, "type": "dietary"})
             seen_badges.add(d)
 
-    # Pantry stock badge (if _pantry metadata is attached)
-    pantry_info = recipe.get("_pantry")
-    if pantry_info:
-        status = pantry_info.get("status")
-        missing_count = pantry_info.get("missing_count", 0)
-        missing_items = pantry_info.get("missing_items", [])
-        missing_perishables = pantry_info.get("missing_perishables", [])
-        missing_anchor = pantry_info.get("missing_anchor")
-
-        if status == "ready" or (status is None and missing_count == 0):
-            badges.insert(0, {"icon": "🟢", "label": "Ready to Cook", "type": "pantry"})
-        elif status == "almost_ready" or (status is None and missing_count in (1, 2)):
-            target_item = missing_perishables[0] if missing_perishables else (missing_items[0] if missing_items else "1 item")
-            short_lbl = target_item if len(target_item) <= 16 else target_item[:15] + "…"
-            badges.insert(0, {"icon": "🟡", "label": f"Need: {short_lbl}", "type": "pantry"})
-        else:
-            if missing_anchor:
-                short_anchor = missing_anchor if len(missing_anchor) <= 14 else missing_anchor[:13] + "…"
-                badges.insert(0, {"icon": "⚪", "label": f"No {short_anchor}", "type": "pantry"})
-            else:
-                badges.insert(0, {"icon": "⚪", "label": f"{missing_count} Missing", "type": "pantry"})
-
     return {
         "categories": categories,
         "tools": tools,
@@ -294,7 +272,16 @@ def is_dinner_recipe(tax: Dict[str, Any]) -> bool:
     Strictly excludes recipes categorized as Side Dish.
     If the user has not categorized recipes yet, allow uncategorized.
     """
-    cats = tax.get("categories", set())
+    raw_cats = tax.get("categories", set())
+    cats = set()
+    for c in raw_cats:
+        if isinstance(c, dict):
+            name = c.get("name") or c.get("slug") or ""
+            if name:
+                cats.add(name.lower())
+        elif isinstance(c, str):
+            cats.add(c.lower())
+
     # Exclude any recipe explicitly designated as a side
     if any(c in SIDE_ELIGIBLE_CATEGORIES or "side" in c for c in cats):
         return False
@@ -322,7 +309,15 @@ def is_side_recipe(tax: Dict[str, Any], recipe: Optional[Dict[str, Any]] = None)
 
     Strictly ensures main dinner recipes (even with salad/potato tags) are never classified as sides.
     """
-    cats = tax.get("categories", set())
+    raw_cats = tax.get("categories", set())
+    cats = set()
+    for c in raw_cats:
+        if isinstance(c, dict):
+            name = c.get("name") or c.get("slug") or ""
+            if name:
+                cats.add(name.lower())
+        elif isinstance(c, str):
+            cats.add(c.lower())
 
     # 1. If explicitly categorized as Dinner, it is a main course, NOT a side
     if any(c in DINNER_ELIGIBLE_CATEGORIES or "dinner" in c for c in cats):
