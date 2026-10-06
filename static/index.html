@@ -103,48 +103,53 @@
 <body class="text-stone-800 antialiased min-h-screen flex flex-col justify-between selection:bg-amber-200">
 
   <!-- Main Container (optimized for mobile 390px-480px, centered on desktop) -->
-  <main class="w-full max-w-md mx-auto px-4 pt-6 pb-28 flex-1">
+  <main class="w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto px-4 pt-6 pb-28 flex-1">
 
     <!-- Top Persistent Header & 7-Day Planning Strip -->
     <div class="space-y-3 pb-3 border-b border-stone-200/80 mb-4">
-      <header class="flex items-start justify-between gap-2">
-        <div class="min-w-0 pr-1">
-          <div class="flex items-center space-x-1.5 text-xs font-semibold uppercase tracking-wider text-amber-700/90 mb-0.5">
+      <header class="space-y-2">
+        <!-- Top Utility Row: Date on left, Quick Actions on right -->
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center space-x-1.5 text-xs font-semibold uppercase tracking-wider text-amber-700/90 min-w-0">
             <span>🍲</span>
-            <span id="dateSubtitle">Dinner Decider</span>
+            <span id="dateSubtitle" class="truncate">Dinner Decider</span>
           </div>
-          <h1 id="mainHeaderTitle" class="text-2xl font-bold font-serif-title text-stone-900 tracking-tight">
+          <!-- Header Actions: Week, Pantry & Shuffle -->
+          <div class="flex items-center space-x-1 sm:space-x-1.5 shrink-0">
+            <button id="weekOverviewBtn" 
+                    onclick="openWeekModal()" 
+                    title="View rolling 7-day dinner plan"
+                    class="flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-stone-700 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all focus:outline-none whitespace-nowrap shrink-0">
+              <span>📅</span>
+              <span class="hidden sm:inline">Week</span>
+              <span id="weekPlanBadge" class="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full whitespace-nowrap shrink-0">0/7</span>
+            </button>
+            <button id="pantryBtn" 
+                    onclick="openPantryModal()" 
+                    title="View and update pantry inventory"
+                    class="flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-stone-700 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all focus:outline-none whitespace-nowrap shrink-0">
+              <span>🧺</span>
+              <span class="hidden sm:inline">Pantry</span>
+              <span id="pantryInStockBadge" class="hidden px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full whitespace-nowrap shrink-0 inline-flex items-center"></span>
+            </button>
+            <button id="refreshBtn" 
+                    onclick="refreshOptions()" 
+                    title="Roll for 3 new dinner ideas"
+                    class="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-medium text-stone-600 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all focus:outline-none whitespace-nowrap shrink-0">
+              <svg id="refreshIcon" class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span class="hidden sm:inline text-stone-700">Shuffle</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Main Headline & Subtitle: Full width, zero vertical wrapping bugs -->
+        <div>
+          <h1 id="mainHeaderTitle" class="text-2xl sm:text-3xl font-bold font-serif-title text-stone-900 tracking-tight leading-tight">
             Tonight's Dinner
           </h1>
-          <p id="mainHeaderSubtitle" class="text-xs text-stone-500 mt-0.5 truncate sm:whitespace-normal">What are you in the mood for?</p>
-        </div>
-        <!-- Header Actions: Week, Pantry & Shuffle -->
-        <div class="flex items-center space-x-1 sm:space-x-1.5 shrink-0">
-          <button id="weekOverviewBtn" 
-                  onclick="openWeekModal()" 
-                  title="View rolling 7-day dinner plan"
-                  class="flex items-center space-x-1 px-2 sm:px-2.5 py-2 text-xs font-semibold text-stone-700 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all focus:outline-none whitespace-nowrap shrink-0">
-            <span>📅</span>
-            <span class="hidden sm:inline">Week</span>
-            <span id="weekPlanBadge" class="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full whitespace-nowrap shrink-0">0/7</span>
-          </button>
-          <button id="pantryBtn" 
-                  onclick="openPantryModal()" 
-                  title="View and update pantry inventory"
-                  class="flex items-center space-x-1 px-2 sm:px-2.5 py-2 text-xs font-semibold text-stone-700 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all focus:outline-none whitespace-nowrap shrink-0">
-            <span>🧺</span>
-            <span class="hidden sm:inline">Pantry</span>
-            <span id="pantryInStockBadge" class="hidden px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full whitespace-nowrap shrink-0 inline-flex items-center"></span>
-          </button>
-          <button id="refreshBtn" 
-                  onclick="refreshOptions()" 
-                  title="Roll for 3 new dinner ideas"
-                  class="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-2 text-xs font-medium text-stone-600 bg-white hover:bg-stone-50 active:bg-stone-100 rounded-full border border-stone-200 shadow-sm transition-all focus:outline-none whitespace-nowrap shrink-0">
-            <svg id="refreshIcon" class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span class="hidden sm:inline text-stone-700">Shuffle</span>
-          </button>
+          <p id="mainHeaderSubtitle" class="text-xs sm:text-sm text-stone-500 mt-0.5">What are you in the mood for?</p>
         </div>
       </header>
 
@@ -520,7 +525,7 @@
 
   <!-- Sticky Bottom Bar: 2-Step Action -->
   <footer id="bottomBar" class="fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur-md border-t border-stone-200/80 p-4 z-40 transition-transform">
-    <div class="max-w-md mx-auto space-y-2">
+    <div class="max-w-md sm:max-w-lg md:max-w-xl mx-auto space-y-2">
       <button 
         id="lockItInBtn"
         disabled

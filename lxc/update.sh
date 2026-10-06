@@ -16,7 +16,7 @@ echo "=========================================================="
 
 echo "[+] Pulling latest changes from git repository..."
 cd "$REPO_DIR"
-git pull origin master
+git pull origin main
 
 echo "[+] Syncing updated files into container ${CTID}..."
 pct push "$CTID" "${REPO_DIR}/main.py" /opt/dinner-decider/main.py
