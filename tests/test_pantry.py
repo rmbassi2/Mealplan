@@ -809,3 +809,26 @@ def test_pantry_badges_consistency_and_dict_category_handling():
 
 
 
+
+
+def test_evaluate_recipe_ingredient_lines(temp_pantry):
+    """evaluate_recipe returns a per-ingredient checklist with full line text and status."""
+    pm = temp_pantry
+    pm.upsert_item("chicken breast", display_name="Chicken Breast", in_stock=True)
+    pm.upsert_item("baby spinach", display_name="Baby Spinach", in_stock=False)
+
+    recipe = {
+        "recipeIngredient": [
+            {"display": "2 lbs boneless chicken breast", "food": {"name": "chicken breast"}},
+            {"display": "3 cups baby spinach", "food": {"name": "baby spinach"}},
+            {"display": "1 tsp kosher salt", "food": {"name": "kosher salt"}},
+        ]
+    }
+    result = pm.evaluate_recipe(recipe)
+    lines = result["ingredient_lines"]
+    by_text = {line["text"]: line["status"] for line in lines}
+
+    assert by_text["2 lbs boneless chicken breast"] == "have"
+    assert by_text["3 cups baby spinach"] == "missing"
+    # Salt is a staple: either shown as a staple line or filtered out entirely, never "missing"
+    assert by_text.get("1 tsp kosher salt", "staple") == "staple"

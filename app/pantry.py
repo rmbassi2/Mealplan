@@ -1579,6 +1579,7 @@ class PantryManager:
         perishables: List[str] = []
         missing_perishables: List[str] = []
         in_stock_items: List[str] = []
+        ingredient_lines: List[Dict[str, str]] = []
         total_count = 0
 
         for item in raw_ingredients:
@@ -1597,7 +1598,13 @@ class PantryManager:
                         or ""
                     )
                 )
-                display_name = item.get("display") or item.get("name") or raw_name
+                display_name = (
+                    item.get("display")
+                    or item.get("originalText")
+                    or item.get("note")
+                    or item.get("name")
+                    or raw_name
+                )
             elif isinstance(item, str):
                 raw_name = item
                 display_name = item
@@ -1624,6 +1631,15 @@ class PantryManager:
                 or norm in ALWAYS_ON_STAPLES
                 or norm in DEFAULT_STAPLES
                 or is_staple_ingredient(norm, raw_name)
+            )
+
+            line_text = str(display_name or raw_name).strip() or clean_display
+            if tier == "anchor" or tier == "perishable":
+                line_status = "have" if has_match else "missing"
+            else:
+                line_status = "staple"
+            ingredient_lines.append(
+                {"text": line_text, "name": clean_display, "tier": tier, "status": line_status}
             )
 
             if tier == "anchor":
@@ -1684,6 +1700,7 @@ class PantryManager:
             "missing_count": len(all_missing),
             "in_stock_items": list(dict.fromkeys(in_stock_items)),
             "total_ingredients": total_count,
+            "ingredient_lines": ingredient_lines,
             "reason": reason,
         }
 
