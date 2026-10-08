@@ -793,6 +793,12 @@ class MealieClient:
                                 "badges": badges[:3],
                                 "tags": list(tax.get("tags", set())),
                                 "tools": list(tax.get("tools", set())),
+                                "servings": str(r.get("recipeYield") or r.get("recipeServings") or "").strip(),
+                                "mealieUrl": (
+                                    f"{self.base_url}/g/{settings.mealie_group_slug or 'home'}/r/{r.get('slug')}"
+                                    if self.base_url and r.get("slug")
+                                    else None
+                                ),
                                 "pantry": r.get("_pantry", {
                                     "is_ready": True,
                                     "missing_count": 0,
