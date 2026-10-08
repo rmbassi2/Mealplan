@@ -169,7 +169,7 @@ Dinner Decider includes a zero-friction, embedded pantry inventory tracker desig
 3. **"Pantry Ready" Carousel Filter:** Tap the **🧺 Pantry Ready** filter pill in the style bar to filter the carousel to meals you have 100% of the ingredients for, or are at most 1 item off from making.
 4. **Missing Ingredient Badges & Alerts:** Recipe cards display clear stock badges (`🟢 Pantry Ready` or `⚠️ Need: [Item]`) and inline missing item alerts.
 5. **One-Tap Mealie Shopping List:** When locking in a dinner missing 1 item, tap **Add to Mealie Shopping List** to instantly push the deficit item to your Mealie household list.
-6. **Data Persistence:** Stored in a lightweight SQLite database (`data/pantry.db`). When running in Docker, `./data:/app/data` is mounted to ensure persistence across restarts.
+6. **Data Persistence:** Stored in a lightweight SQLite database (`data/pantry.db`). When running in Docker, a named volume (`dinner_decider_data:/app/data`) or host mount (`./data:/app/data`) is mounted to ensure persistence across container updates and restarts.
 
 ---
 

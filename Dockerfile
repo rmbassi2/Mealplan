@@ -44,6 +44,9 @@ COPY main.py .
 # Ensure data directory exists and app files are owned by appuser
 RUN mkdir -p /app/data && chown -R appuser:appgroup /app
 
+# Declare persistent data volume
+VOLUME ["/app/data"]
+
 # Switch to non-root user
 USER appuser
 
