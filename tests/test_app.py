@@ -594,3 +594,47 @@ async def test_week_plan_endpoints():
         assert date_resp3.json()["has_plan"] is False
 
 
+@pytest.mark.anyio
+async def test_parse_dinner_entries_with_null_recipe():
+    """Verify that Mealie client correctly parses meal plans where 'recipe' is None (e.g. custom craving or link)."""
+    from app.mealie_client import mealie_client
+
+    sample_entries = [
+        {
+            "date": "2026-11-02",
+            "entryType": "dinner",
+            "title": "Spanakopita (Greek Spinach Pie)",
+            "text": "Recipe Link: https://www.recipetineats.com/spanakopita-greek-spinach-pie/#h-how-to-make-spanakopita\n\nSource: recipetineats.com",
+            "recipeId": None,
+            "recipe": None,
+            "id": 42,
+        }
+    ]
+
+    plan = await mealie_client._parse_dinner_entries(sample_entries, "2026-11-02")
+    assert plan is not None
+    assert plan["dish_name"] == "Spanakopita (Greek Spinach Pie)"
+    assert plan["is_custom"] is True
+    assert plan["external_url"] == "https://www.recipetineats.com/spanakopita-greek-spinach-pie/#h-how-to-make-spanakopita"
+    assert plan["source_domain"] == "recipetineats.com"
+
+
+@pytest.mark.anyio
+async def test_plan_reset_with_target_date_key():
+    """Verify that /api/plan/reset accepts 'target_date' parameter sent by frontend."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Schedule a dinner for a specific date
+        target = "2026-12-25"
+        await client.post(
+            "/api/choose",
+            json={"custom_note": "Christmas Feast", "target_date": target},
+        )
+
+        # Reset using target_date
+        resp = await client.post("/api/plan/reset", json={"target_date": target})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "success"
+        assert resp.json()["date"] == target
+
+
+

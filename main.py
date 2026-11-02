@@ -53,6 +53,7 @@ class DinnerChoice(BaseModel):
 
 class PlanResetRequest(BaseModel):
     date: Optional[str] = None
+    target_date: Optional[str] = None
 
 
 class PantryToggleRequest(BaseModel):
@@ -228,7 +229,8 @@ async def reset_today_dinner():
 async def reset_plan(req: Optional[PlanResetRequest] = None):
     """Reset the planned dinner for a specific date (defaults to today)."""
     try:
-        target = req.date.strip() if req and req.date and req.date.strip() else date.today().isoformat()
+        raw_target = (req.target_date or req.date) if req else None
+        target = raw_target.strip() if raw_target and raw_target.strip() else date.today().isoformat()
         deleted = await mealie_client.reset_date_plan(target)
         return {
             "status": "success",

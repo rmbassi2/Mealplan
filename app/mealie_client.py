@@ -111,7 +111,16 @@ class MealieClient:
         side_entry = None
         for ent in dinner_entries:
             t_text = str(ent.get("title") or ent.get("text") or "").lower()
-            rec_c = str(ent.get("recipe", {}).get("recipeCategory") or "").lower()
+            rec = ent.get("recipe")
+            rec_c = ""
+            if rec and isinstance(rec, dict):
+                cats = rec.get("recipeCategory")
+                if isinstance(cats, list):
+                    rec_c = " ".join(
+                        (c.get("name", "") if isinstance(c, dict) else str(c)) for c in cats
+                    ).lower()
+                elif cats:
+                    rec_c = str(cats).lower()
             if t_text.startswith("side:") or "side" in rec_c or "side" in t_text:
                 if not side_entry:
                     side_entry = ent
@@ -253,6 +262,8 @@ class MealieClient:
                 try:
                     resp = await client.get(url, headers=self.headers)
                     if resp.status_code == 200:
+                        if "json" not in resp.headers.get("content-type", "").lower():
+                            continue
                         data = resp.json()
                         items = (
                             data.get("items", [])
@@ -316,6 +327,8 @@ class MealieClient:
                 try:
                     resp = await client.get(url, headers=self.headers)
                     if resp.status_code == 200:
+                        if "json" not in resp.headers.get("content-type", "").lower():
+                            continue
                         queried_successfully = True
                         data = resp.json()
                         items = []
@@ -415,6 +428,8 @@ class MealieClient:
                 try:
                     resp = await client.get(url, headers=self.headers)
                     if resp.status_code == 200:
+                        if "json" not in resp.headers.get("content-type", "").lower():
+                            continue
                         data = resp.json()
                         items = (
                             data.get("items", [])

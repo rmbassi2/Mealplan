@@ -747,8 +747,16 @@
       { id: 'vegetarian', label: 'Vegetarian', icon: '🥑', param: 'protein=vegetarian' },
     ];
 
+    // Local date helper (YYYY-MM-DD in browser's local timezone)
+    function getLocalDateString(d = new Date()) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
     // State
-    let selectedDate = new Date().toISOString().split('T')[0];
+    let selectedDate = getLocalDateString();
     let weekDays = [];
     let weekStats = { total_days: 7, planned_count: 0 };
 
@@ -820,7 +828,7 @@
     // Helper: format Day Name from YYYY-MM-DD
     function getDayName(isoDate) {
       if (!isoDate) return 'Tonight';
-      const todayIso = new Date().toISOString().split('T')[0];
+      const todayIso = getLocalDateString();
       if (isoDate === todayIso) return 'Tonight';
       const [y, m, d] = isoDate.split('-').map(Number);
       const dt = new Date(y, m - 1, d);
@@ -829,7 +837,7 @@
 
     // Initialize & Update Date Header based on selectedDate
     function updateHeaderTexts() {
-      const todayIso = new Date().toISOString().split('T')[0];
+      const todayIso = getLocalDateString();
       const isToday = (selectedDate === todayIso);
       const [y, m, d] = selectedDate.split('-').map(Number);
       const dt = new Date(y, m - 1, d);
@@ -857,13 +865,13 @@
       if (!container) return;
       container.innerHTML = '';
 
-      const todayIso = new Date().toISOString().split('T')[0];
+      const todayIso = getLocalDateString();
 
       // If weekDays is empty, build a temporary 7-day fallback
       const days = (weekDays && weekDays.length === 7) ? weekDays : Array.from({ length: 7 }, (_, i) => {
         const d = new Date();
         d.setDate(d.getDate() + i);
-        const iso = d.toISOString().split('T')[0];
+        const iso = getLocalDateString(d);
         return {
           date: iso,
           is_today: i === 0,
@@ -1144,7 +1152,7 @@
 
     async function clearCurrentDatePlan() {
       const dateToClear = selectedDate;
-      const todayIso = new Date().toISOString().split('T')[0];
+      const todayIso = getLocalDateString();
       if (dateToClear === todayIso) {
         try {
           localStorage.removeItem('dinnerDeciderToday');
@@ -1166,7 +1174,7 @@
     }
 
     async function clearDatePlanFromModal(dateStr) {
-      const todayIso = new Date().toISOString().split('T')[0];
+      const todayIso = getLocalDateString();
       if (dateStr === todayIso) {
         try {
           localStorage.removeItem('dinnerDeciderToday');
@@ -1998,7 +2006,7 @@
           side_mealie_url: data.side_mealie_url || null,
         };
 
-        const todayIso = new Date().toISOString().split('T')[0];
+        const todayIso = getLocalDateString();
         if (selectedDate === todayIso) {
           try {
             localStorage.setItem('dinnerDeciderToday', JSON.stringify(planObj));
@@ -2029,7 +2037,7 @@
       document.getElementById('confirmDishEmoji').textContent = plan.emoji || (plan.external_url ? '🌐' : (plan.is_custom ? '🍜' : '🥘'));
 
       const planDate = plan.target_date || plan.date || selectedDate;
-      const todayIso = new Date().toISOString().split('T')[0];
+      const todayIso = getLocalDateString();
       const isToday = (planDate === todayIso);
       let dayName = 'Tonight';
       let dayLong = 'Tonight';
@@ -2725,7 +2733,7 @@
         const cached = localStorage.getItem('dinnerDeciderToday');
         if (cached) {
           const parsed = JSON.parse(cached);
-          const todayIso = new Date().toISOString().split('T')[0];
+          const todayIso = getLocalDateString();
           if (parsed && parsed.date === todayIso && parsed.dish_name) {
             showConfirmation(parsed);
           }
@@ -2792,7 +2800,7 @@
       initDate();
       renderFilterPills();
       loadPantry();
-      const todayIso = new Date().toISOString().split('T')[0];
+      const todayIso = getLocalDateString();
       selectedDate = todayIso;
       const weekData = await loadWeekPlan();
       const todayEntry = weekData && weekData.days ? weekData.days.find(d => d.date === todayIso) : null;
