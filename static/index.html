@@ -62,6 +62,12 @@
       scrollbar-width: none;
     }
 
+    /* Smooth isolated touch scrolling for search dropdown lists */
+    .search-scroll-list {
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
     /* Card active transition */
     .recipe-card {
       transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
@@ -226,7 +232,7 @@
         </div>
 
         <div id="customNoteInputWrapper" class="relative mt-2">
-          <svg class="w-4 h-4 text-stone-400 pointer-events-none absolute left-3 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <svg class="w-4 h-4 text-stone-400 pointer-events-none absolute left-3 top-3.5 sm:top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
           </svg>
           <input 
@@ -235,15 +241,16 @@
             maxlength="250"
             autocomplete="off"
             placeholder="Search Mealie recipes, paste a URL, or type a craving..."
-            class="w-full pl-9 pr-9 py-2.5 text-sm bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/60 transition-all outline-none text-stone-800 placeholder-stone-400"
+            class="w-full pl-9 pr-9 py-2.5 text-base sm:text-sm bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/60 transition-all outline-none text-stone-800 placeholder-stone-400"
             oninput="handleCustomInput(this.value)"
             onfocus="handleCustomFocus()"
+            onblur="handleSearchInputBlur('main')"
             onkeydown="handleCustomKeydown(event)"
           />
           <button 
             id="clearCustomBtn"
             onclick="clearCustomInput()" 
-            class="hidden absolute right-3 top-2.5 text-stone-400 hover:text-stone-600 p-0.5 text-xs font-semibold"
+            class="hidden absolute right-3 top-3 sm:top-2.5 text-stone-400 hover:text-stone-600 p-0.5 text-xs font-semibold"
             type="button"
             title="Clear text">
             ✕
@@ -280,7 +287,7 @@
             <span class="flex items-center gap-1.5"><span>📚</span><span>In your Mealie cookbook</span></span>
             <span id="mealieSearchStatus" class="text-[10px] font-medium text-stone-400"></span>
           </div>
-          <div id="mealieSearchList" class="max-h-64 overflow-y-auto divide-y divide-stone-100" role="listbox" aria-label="Mealie recipe search results"></div>
+          <div id="mealieSearchList" class="search-scroll-list max-h-64 overflow-y-auto divide-y divide-stone-100" role="listbox" aria-label="Mealie recipe search results"></div>
           <div id="mealieSearchFooter" class="px-3 py-1.5 bg-stone-50/70 border-t border-stone-100 text-[11px] text-stone-500">
             Tap a Mealie recipe to link it, or keep typing for a custom craving.
           </div>
@@ -389,7 +396,7 @@
         </div>
 
         <div id="customSideInputWrapper" class="relative mt-2">
-          <svg class="w-4 h-4 text-stone-400 pointer-events-none absolute left-3 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <svg class="w-4 h-4 text-stone-400 pointer-events-none absolute left-3 top-3.5 sm:top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
           </svg>
           <input 
@@ -398,15 +405,16 @@
             maxlength="250"
             autocomplete="off"
             placeholder="Search Mealie recipes, paste a URL, or type a side..."
-            class="w-full pl-9 pr-9 py-2.5 text-sm bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/60 transition-all outline-none text-stone-800 placeholder-stone-400"
+            class="w-full pl-9 pr-9 py-2.5 text-base sm:text-sm bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/60 transition-all outline-none text-stone-800 placeholder-stone-400"
             oninput="handleCustomSideInput(this.value)"
             onfocus="handleCustomSideFocus()"
+            onblur="handleSearchInputBlur('side')"
             onkeydown="handleCustomSideKeydown(event)"
           />
           <button 
             id="clearCustomSideBtn"
             onclick="clearCustomSideInput()" 
-            class="hidden absolute right-3 top-2.5 text-stone-400 hover:text-stone-600 p-0.5 text-xs font-semibold"
+            class="hidden absolute right-3 top-3 sm:top-2.5 text-stone-400 hover:text-stone-600 p-0.5 text-xs font-semibold"
             type="button"
             title="Clear side text">
             ✕
@@ -438,7 +446,7 @@
             <span class="flex items-center gap-1.5"><span>📚</span><span>In your Mealie cookbook</span></span>
             <span id="sideMealieSearchStatus" class="text-[10px] font-medium text-stone-400"></span>
           </div>
-          <div id="sideMealieSearchList" class="max-h-56 overflow-y-auto divide-y divide-stone-100" role="listbox" aria-label="Mealie side search results"></div>
+          <div id="sideMealieSearchList" class="search-scroll-list max-h-56 overflow-y-auto divide-y divide-stone-100" role="listbox" aria-label="Mealie side search results"></div>
           <div id="sideMealieSearchFooter" class="px-3 py-1.5 bg-stone-50/70 border-t border-stone-100 text-[11px] text-stone-500">
             Tap a Mealie recipe to link it, or keep typing for a custom side.
           </div>
@@ -599,6 +607,8 @@
       </div>
     </div>
 
+    <!-- Dynamic Mobile Keyboard & Search Scroll Runway -->
+    <div id="mobileSearchSpacer" aria-hidden="true" class="transition-[height] duration-200 ease-out" style="height: 0px;"></div>
   </main>
 
   <!-- Sticky Bottom Bar: 2-Step Action -->
@@ -868,11 +878,18 @@
     let sideSearchHighlightIdx = -1;
     let lastSideSearchQuery = '';
 
+    // Mobile keyboard & search scroll state
+    let activeMobileSearchTarget = null; // 'main' | 'side' | null
+    let mobileSpacerCollapseTimer = null;
+    let mobileScrollTimer = null;
+    let lastVisualViewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
     // Elements
     const votingView = document.getElementById('votingView');
     const sideView = document.getElementById('sideView');
     const confirmationView = document.getElementById('confirmationView');
     const bottomBar = document.getElementById('bottomBar');
+    const mobileSearchSpacer = document.getElementById('mobileSearchSpacer');
 
     const skeletons = document.getElementById('skeletons');
     const recipeList = document.getElementById('recipeList');
@@ -1683,6 +1700,185 @@
         || (selectedSearchedRecipe && selectedSearchedRecipe.id === selectedRecipeId ? selectedSearchedRecipe : null);
     }
 
+    // ==========================================
+    // Mobile Search Viewport, Runway & Auto-Scroll
+    // ==========================================
+    function isMobileSearchViewport() {
+      return window.innerWidth < 768;
+    }
+
+    function isAnySearchDropdownOpen() {
+      const mainOpen = Boolean(mealieSearchResultsEl && !mealieSearchResultsEl.classList.contains('hidden'));
+      const sideOpen = Boolean(sideMealieSearchResultsEl && !sideMealieSearchResultsEl.classList.contains('hidden'));
+      return mainOpen || sideOpen;
+    }
+
+    function getVisibleViewportMetrics() {
+      const vv = window.visualViewport;
+      const visibleHeight = vv ? vv.height : window.innerHeight;
+      const keyboardHeight = vv ? Math.max(0, window.innerHeight - vv.height) : 0;
+      const bottomBarHeight = (bottomBar && !bottomBar.classList.contains('hidden'))
+        ? bottomBar.getBoundingClientRect().height
+        : 0;
+      return { visibleHeight, keyboardHeight, bottomBarHeight };
+    }
+
+    function updateMobileSearchListMaxHeight(target) {
+      const listEl = (target === 'side') ? sideMealieSearchListEl : mealieSearchListEl;
+      const resultsEl = (target === 'side') ? sideMealieSearchResultsEl : mealieSearchResultsEl;
+      if (!listEl || !resultsEl || resultsEl.classList.contains('hidden')) return;
+
+      if (!isMobileSearchViewport()) {
+        listEl.style.maxHeight = '';
+        return;
+      }
+
+      const { visibleHeight, bottomBarHeight } = getVisibleViewportMetrics();
+      const listTop = listEl.getBoundingClientRect().top;
+      // Reserve ~40px for dropdown footer + breathing margin above bottomBar
+      const available = Math.floor(visibleHeight - bottomBarHeight - listTop - 40);
+      const clamped = Math.max(140, Math.min(256, available));
+      listEl.style.maxHeight = `${clamped}px`;
+    }
+
+    function updateMobileSearchSpacer(active, target = null) {
+      clearTimeout(mobileSpacerCollapseTimer);
+      if (!mobileSearchSpacer) return;
+
+      if (!active || !isMobileSearchViewport()) {
+        activeMobileSearchTarget = null;
+        mobileSearchSpacer.style.height = '0px';
+        if (mealieSearchListEl) mealieSearchListEl.style.maxHeight = '';
+        if (sideMealieSearchListEl) sideMealieSearchListEl.style.maxHeight = '';
+        updateBottomBar();
+        return;
+      }
+
+      if (target) {
+        activeMobileSearchTarget = target;
+      }
+
+      const { keyboardHeight, bottomBarHeight } = getVisibleViewportMetrics();
+      // Fallback runway when iOS overlays keyboard without shrinking innerHeight/visualViewport
+      const effectiveKeyboard = keyboardHeight > 60 ? keyboardHeight : Math.round(window.innerHeight * 0.42);
+      const spacerHeight = Math.max(280, Math.min(560, effectiveKeyboard + bottomBarHeight + 180));
+      mobileSearchSpacer.style.height = `${spacerHeight}px`;
+      updateBottomBar();
+    }
+
+    function scrollSearchCardIntoView(target, { force = false, delay = 0 } = {}) {
+      const cardEl = (target === 'side') ? customSideCard : customCravingCard;
+      const resultsEl = (target === 'side') ? sideMealieSearchResultsEl : mealieSearchResultsEl;
+      if (!cardEl) return;
+
+      const isMobile = isMobileSearchViewport();
+      if (isMobile) {
+        updateMobileSearchSpacer(true, target);
+      }
+
+      clearTimeout(mobileScrollTimer);
+      const performScroll = () => {
+        const { visibleHeight, bottomBarHeight } = getVisibleViewportMetrics();
+        const cardRect = cardEl.getBoundingClientRect();
+        const dropdownVisible = Boolean(resultsEl && !resultsEl.classList.contains('hidden'));
+        const visibleBottom = visibleHeight - bottomBarHeight - 8;
+        const dropdownClipped = dropdownVisible && resultsEl.getBoundingClientRect().bottom > visibleBottom;
+
+        if (isMobile) {
+          // Bring card near top of viewport (12px breathing room) so input + results sit cleanly above soft keyboard
+          if (force || cardRect.top > 36 || dropdownClipped) {
+            const targetY = Math.max(0, window.scrollY + cardRect.top - 12);
+            window.scrollTo({ top: targetY, behavior: 'smooth' });
+          }
+          setTimeout(() => updateMobileSearchListMaxHeight(target), 220);
+        } else if (dropdownClipped) {
+          // On short desktop viewports, nudge just enough so results aren't clipped under #bottomBar
+          const overflow = resultsEl.getBoundingClientRect().bottom - visibleBottom;
+          window.scrollBy({ top: Math.ceil(overflow + 16), behavior: 'smooth' });
+        }
+      };
+
+      if (delay > 0) {
+        mobileScrollTimer = setTimeout(() => requestAnimationFrame(performScroll), delay);
+      } else {
+        requestAnimationFrame(performScroll);
+      }
+    }
+
+    function handleSearchInputBlur(target) {
+      if (!isMobileSearchViewport()) return;
+      clearTimeout(mobileSpacerCollapseTimer);
+      // Delay collapse so tapping a search result row finishes before layout height changes (iOS Safari tap safety)
+      mobileSpacerCollapseTimer = setTimeout(() => {
+        const activeEl = document.activeElement;
+        const stillFocused = (activeEl === customNoteInput || activeEl === customSideInput);
+        if (!stillFocused && !isAnySearchDropdownOpen()) {
+          updateMobileSearchSpacer(false);
+        }
+      }, 200);
+    }
+
+    function renderSearchLoadingState(listEl, statusEl, footerEl, resultsEl, target) {
+      if (!listEl || !statusEl || !footerEl || !resultsEl) return;
+      const wasHidden = resultsEl.classList.contains('hidden');
+      statusEl.innerHTML = `
+        <span class="inline-flex items-center gap-1 text-amber-700 font-semibold">
+          <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <span>Searching…</span>
+        </span>
+      `;
+      if (wasHidden) {
+        footerEl.textContent = 'Searching your Mealie cookbook…';
+        listEl.innerHTML = `
+          <div class="px-3 py-2 flex items-center gap-2.5 text-xs text-stone-500">
+            <div class="w-10 h-10 rounded-lg skeleton flex-shrink-0"></div>
+            <div class="flex-1 space-y-1.5">
+              <div class="h-3 w-3/5 rounded skeleton"></div>
+              <div class="h-2.5 w-2/5 rounded skeleton"></div>
+            </div>
+          </div>
+          <div class="px-3 py-2 flex items-center gap-2.5 text-xs text-stone-500">
+            <div class="w-10 h-10 rounded-lg skeleton flex-shrink-0"></div>
+            <div class="flex-1 space-y-1.5">
+              <div class="h-3 w-1/2 rounded skeleton"></div>
+              <div class="h-2.5 w-1/3 rounded skeleton"></div>
+            </div>
+          </div>
+        `;
+        resultsEl.classList.remove('hidden');
+        updateBottomBar();
+        scrollSearchCardIntoView(target, { force: false });
+      }
+    }
+
+    // Track visualViewport resizes (mobile soft keyboard open / close)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        const currentH = window.visualViewport.height;
+        const shrank = currentH < lastVisualViewportHeight - 80;
+        const expanded = currentH > lastVisualViewportHeight + 80;
+        lastVisualViewportHeight = currentH;
+
+        if (!isMobileSearchViewport()) return;
+
+        const focusedTarget = document.activeElement === customNoteInput
+          ? 'main'
+          : (document.activeElement === customSideInput ? 'side' : activeMobileSearchTarget);
+
+        if (shrank && focusedTarget) {
+          updateMobileSearchSpacer(true, focusedTarget);
+          scrollSearchCardIntoView(focusedTarget, { force: true, delay: 40 });
+        } else if (expanded && !isAnySearchDropdownOpen() && document.activeElement !== customNoteInput && document.activeElement !== customSideInput) {
+          updateMobileSearchSpacer(false);
+        } else if (focusedTarget && isAnySearchDropdownOpen()) {
+          updateMobileSearchListMaxHeight(focusedTarget);
+        }
+      });
+    }
+
     function resetMainSearchState() {
       clearTimeout(mealieSearchDebounce);
       mealieSearchSeq += 1;
@@ -1690,14 +1886,29 @@
       mealieSearchResults = [];
       mealieSearchHighlightIdx = -1;
       if (mealieSearchResultsEl) mealieSearchResultsEl.classList.add('hidden');
-      if (mealieSearchListEl) mealieSearchListEl.innerHTML = '';
+      if (mealieSearchListEl) {
+        mealieSearchListEl.innerHTML = '';
+        mealieSearchListEl.style.maxHeight = '';
+      }
       if (selectedSearchRecipeCard) selectedSearchRecipeCard.classList.add('hidden');
       if (customNoteInputWrapper) customNoteInputWrapper.classList.remove('hidden');
+      if (activeMobileSearchTarget === 'main') {
+        updateMobileSearchSpacer(false);
+      }
     }
 
     function hideMainSearchDropdown() {
+      const wasOpen = Boolean(mealieSearchResultsEl && !mealieSearchResultsEl.classList.contains('hidden'));
       if (mealieSearchResultsEl) mealieSearchResultsEl.classList.add('hidden');
+      if (mealieSearchListEl) mealieSearchListEl.style.maxHeight = '';
       mealieSearchHighlightIdx = -1;
+      if (wasOpen) {
+        if (document.activeElement !== customNoteInput) {
+          updateMobileSearchSpacer(false);
+        } else {
+          updateBottomBar();
+        }
+      }
     }
 
     // Select a Recipe Card
@@ -1737,9 +1948,11 @@
       renderCards(currentOptions);
 
       // Hide input & dropdown, show rich selected Mealie recipe summary
+      if (customNoteInput) customNoteInput.blur();
       customNoteInputWrapper.classList.add('hidden');
       mealieSearchResultsEl.classList.add('hidden');
       urlPreviewContainer.classList.add('hidden');
+      updateMobileSearchSpacer(false);
 
       selectedSearchRecipeImg.src = recipe.imageUrl || '';
       selectedSearchRecipeImg.alt = recipe.name || 'Selected recipe';
@@ -1796,7 +2009,13 @@
       }
 
       lastMainSearchQuery = trimmed;
-      mealieSearchStatusEl.textContent = 'Searching...';
+      renderSearchLoadingState(
+        mealieSearchListEl,
+        mealieSearchStatusEl,
+        mealieSearchFooterEl,
+        mealieSearchResultsEl,
+        'main'
+      );
 
       mealieSearchDebounce = setTimeout(async () => {
         try {
@@ -1826,6 +2045,8 @@
         mealieSearchStatusEl.textContent = '0 matches';
         mealieSearchFooterEl.textContent = 'No matches in Mealie — will be saved as a custom craving.';
         mealieSearchResultsEl.classList.remove('hidden');
+        updateBottomBar();
+        scrollSearchCardIntoView('main', { force: false });
         return;
       }
 
@@ -1841,6 +2062,8 @@
         row.className = `flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors ${
           isHighlighted ? 'bg-amber-50' : 'hover:bg-amber-50/60 active:bg-amber-100/70'
         }`;
+        // Prevent input blur before tap/click finishes so iOS/mobile selects cleanly on first tap
+        row.addEventListener('mousedown', (e) => e.preventDefault());
         row.onclick = () => selectSearchedRecipe(recipe);
 
         const pantryMini = renderPantryMiniBadge(recipe.pantry);
@@ -1878,8 +2101,10 @@
 
         const detailBtn = row.querySelector('.search-detail-btn');
         if (detailBtn) {
+          detailBtn.addEventListener('mousedown', (e) => e.preventDefault());
           detailBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (customNoteInput) customNoteInput.blur();
             openRecipeDetails(recipe);
           });
         }
@@ -1888,6 +2113,8 @@
       });
 
       mealieSearchResultsEl.classList.remove('hidden');
+      updateBottomBar();
+      scrollSearchCardIntoView('main', { force: false });
     }
 
     function updateMainSearchHighlight() {
@@ -2001,6 +2228,7 @@
     }
 
     function handleCustomFocus() {
+      clearTimeout(mobileSpacerCollapseTimer);
       if (customNote.trim().length > 0 && selectedRecipeId !== null && !selectedSearchedRecipe) {
         selectedRecipeId = null;
         renderCards(currentOptions);
@@ -2009,9 +2237,13 @@
       if (!selectedSearchedRecipe && customNote.trim().length >= 2 && !customNote.match(/https?:\/\/[^\s<>"]+/i)) {
         if (mealieSearchResults.length > 0) {
           mealieSearchResultsEl.classList.remove('hidden');
+          updateBottomBar();
         } else {
           triggerMealieSearch(customNote);
         }
+      }
+      if (isMobileSearchViewport()) {
+        scrollSearchCardIntoView('main', { force: true, delay: 120 });
       }
     }
 
@@ -2149,14 +2381,29 @@
       sideSearchResults = [];
       sideSearchHighlightIdx = -1;
       if (sideMealieSearchResultsEl) sideMealieSearchResultsEl.classList.add('hidden');
-      if (sideMealieSearchListEl) sideMealieSearchListEl.innerHTML = '';
+      if (sideMealieSearchListEl) {
+        sideMealieSearchListEl.innerHTML = '';
+        sideMealieSearchListEl.style.maxHeight = '';
+      }
       if (selectedSearchSideCard) selectedSearchSideCard.classList.add('hidden');
       if (customSideInputWrapper) customSideInputWrapper.classList.remove('hidden');
+      if (activeMobileSearchTarget === 'side') {
+        updateMobileSearchSpacer(false);
+      }
     }
 
     function hideSideSearchDropdown() {
+      const wasOpen = Boolean(sideMealieSearchResultsEl && !sideMealieSearchResultsEl.classList.contains('hidden'));
       if (sideMealieSearchResultsEl) sideMealieSearchResultsEl.classList.add('hidden');
+      if (sideMealieSearchListEl) sideMealieSearchListEl.style.maxHeight = '';
       sideSearchHighlightIdx = -1;
+      if (wasOpen) {
+        if (document.activeElement !== customSideInput) {
+          updateMobileSearchSpacer(false);
+        } else {
+          updateBottomBar();
+        }
+      }
     }
 
     function selectSide(id) {
@@ -2192,9 +2439,11 @@
       renderSideCards(currentSideOptions);
       resetPantryChips();
 
+      if (customSideInput) customSideInput.blur();
       customSideInputWrapper.classList.add('hidden');
       sideMealieSearchResultsEl.classList.add('hidden');
       sideUrlPreviewContainer.classList.add('hidden');
+      updateMobileSearchSpacer(false);
 
       selectedSearchSideImg.src = recipe.imageUrl || '';
       selectedSearchSideImg.alt = recipe.name || 'Selected side';
@@ -2246,7 +2495,13 @@
       }
 
       lastSideSearchQuery = trimmed;
-      sideMealieSearchStatusEl.textContent = 'Searching...';
+      renderSearchLoadingState(
+        sideMealieSearchListEl,
+        sideMealieSearchStatusEl,
+        sideMealieSearchFooterEl,
+        sideMealieSearchResultsEl,
+        'side'
+      );
 
       sideSearchDebounce = setTimeout(async () => {
         try {
@@ -2275,6 +2530,8 @@
         sideMealieSearchStatusEl.textContent = '0 matches';
         sideMealieSearchFooterEl.textContent = 'No matches in Mealie — will be saved as a custom side.';
         sideMealieSearchResultsEl.classList.remove('hidden');
+        updateBottomBar();
+        scrollSearchCardIntoView('side', { force: false });
         return;
       }
 
@@ -2290,6 +2547,7 @@
         row.className = `flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors ${
           isHighlighted ? 'bg-emerald-50' : 'hover:bg-emerald-50/60 active:bg-emerald-100/70'
         }`;
+        row.addEventListener('mousedown', (e) => e.preventDefault());
         row.onclick = () => selectSearchedSide(recipe);
 
         const pantryMini = renderPantryMiniBadge(recipe.pantry);
@@ -2319,6 +2577,8 @@
       });
 
       sideMealieSearchResultsEl.classList.remove('hidden');
+      updateBottomBar();
+      scrollSearchCardIntoView('side', { force: false });
     }
 
     function updateSideSearchHighlight() {
@@ -2357,12 +2617,17 @@
     }
 
     function handleCustomSideFocus() {
+      clearTimeout(mobileSpacerCollapseTimer);
       if (!selectedSearchedSide && customSideNote.trim().length >= 2 && !customSideNote.match(/https?:\/\/[^\s<>"]+/i)) {
         if (sideSearchResults.length > 0) {
           sideMealieSearchResultsEl.classList.remove('hidden');
+          updateBottomBar();
         } else {
           triggerSideMealieSearch(customSideNote);
         }
+      }
+      if (isMobileSearchViewport()) {
+        scrollSearchCardIntoView('side', { force: true, delay: 120 });
       }
     }
 
@@ -2513,6 +2778,9 @@
       const hasMain = (selectedRecipeId !== null) || (customNote.trim().length > 0);
       if (!hasMain) return;
 
+      hideMainSearchDropdown();
+      updateMobileSearchSpacer(false);
+
       currentStep = 2;
       sideSkipped = false;
 
@@ -2539,6 +2807,8 @@
     }
 
     function goToStep1() {
+      hideSideSearchDropdown();
+      updateMobileSearchSpacer(false);
       currentStep = 1;
       sideView.classList.add('hidden');
       votingView.classList.remove('hidden');
@@ -2549,12 +2819,14 @@
     // Update Bottom Bar UI
     function updateBottomBar() {
       const dayLabel = getDayName(selectedDate);
+      const compactForMobileSearch = isMobileSearchViewport() && isAnySearchDropdownOpen();
+
       if (currentStep === 1) {
         const hasMain = (selectedRecipeId !== null) || (customNote.trim().length > 0);
         lockItInBtn.disabled = !hasMain || isSubmitting;
         btnIcon.textContent = '🥗';
         btnText.textContent = dayLabel === 'Tonight' ? 'Next: Pick a Side' : `Next: Pick a Side (${dayLabel})`;
-        if (hasMain) {
+        if (hasMain && !compactForMobileSearch) {
           secondaryActionRow.classList.remove('hidden');
           secondaryActionBtn.textContent = dayLabel === 'Tonight' 
             ? 'or Skip Side & Lock In Main Course' 
@@ -2572,8 +2844,12 @@
           btnIcon.textContent = '🍽️';
           btnText.textContent = dayLabel === 'Tonight' ? 'Lock In (No Side Tonight)' : `Lock In for ${dayLabel} (No Side)`;
         }
-        secondaryActionRow.classList.remove('hidden');
-        secondaryActionBtn.textContent = '← Back to Main Course';
+        if (compactForMobileSearch) {
+          secondaryActionRow.classList.add('hidden');
+        } else {
+          secondaryActionRow.classList.remove('hidden');
+          secondaryActionBtn.textContent = '← Back to Main Course';
+        }
       }
     }
 
@@ -2712,6 +2988,10 @@
 
     // Transition to Confirmation Screen
     function showConfirmation(plan) {
+      hideMainSearchDropdown();
+      hideSideSearchDropdown();
+      updateMobileSearchSpacer(false);
+
       // Main Dish Card
       document.getElementById('confirmDishTitle').textContent = plan.dish_name;
       document.getElementById('confirmDishEmoji').textContent = plan.emoji || (plan.external_url ? '🌐' : (plan.is_custom ? '🍜' : '🥘'));

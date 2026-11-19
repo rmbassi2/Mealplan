@@ -183,5 +183,12 @@ def test_frontend_has_amalgamated_search_hooks():
         "selectSearchedSide",
         "handleCustomKeydown",
         "handleCustomSideKeydown",
+        "mobileSearchSpacer",
+        "scrollSearchCardIntoView",
+        "updateMobileSearchSpacer",
+        "renderSearchLoadingState",
+        "handleSearchInputBlur",
+        "search-scroll-list",
+        "visualViewport",
     ):
         assert marker in html, f"Expected amalgamated search marker '{marker}' in static/index.html"
