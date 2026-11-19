@@ -1349,17 +1349,19 @@
     }
 
     // Fetch Dinner Options from /api/options with active filter
-    async function loadOptions() {
+    async function loadOptions(penalizeIds = []) {
       showSkeletons(true);
       hideError();
       refreshIcon.classList.add('spin-icon');
 
       try {
         const filter = MOOD_FILTERS.find(f => f.id === activeFilterId);
-        let url = '/api/options';
-        if (filter && filter.param) {
-          url += `?${filter.param}`;
+        const params = new URLSearchParams(filter && filter.param ? filter.param : '');
+        if (Array.isArray(penalizeIds) && penalizeIds.length > 0) {
+          params.set('penalize', penalizeIds.join(','));
         }
+        const queryStr = params.toString();
+        const url = queryStr ? `/api/options?${queryStr}` : '/api/options';
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -1375,13 +1377,14 @@
     }
 
     function refreshOptions() {
+      const dismissedIds = (currentOptions || []).map(o => o.id).filter(Boolean);
       if (selectedSearchedRecipe) {
         clearCustomInput();
       }
       selectedRecipeId = null;
       renderCards(currentOptions);
       updateBottomBar();
-      loadOptions();
+      loadOptions(dismissedIds);
     }
 
     function showSkeletons(show) {
@@ -2024,11 +2027,17 @@
     }
 
     // Step 2: Fetch and Render Side Dishes
-    async function loadSideOptions() {
+    async function loadSideOptions(penalizeIds = []) {
       showSideSkeletons(true);
       refreshSidesIcon.classList.add('spin-icon');
       try {
-        const res = await fetch('/api/side-options');
+        const params = new URLSearchParams();
+        if (Array.isArray(penalizeIds) && penalizeIds.length > 0) {
+          params.set('penalize', penalizeIds.join(','));
+        }
+        const queryStr = params.toString();
+        const url = queryStr ? `/api/side-options?${queryStr}` : '/api/side-options';
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         currentSideOptions = data.options || [];
@@ -2043,11 +2052,12 @@
     }
 
     function refreshSideOptions() {
+      const dismissedIds = (currentSideOptions || []).map(o => o.id).filter(Boolean);
       if (selectedSearchedSide) {
         clearCustomSideInput();
       }
       selectedSideId = null;
-      loadSideOptions();
+      loadSideOptions(dismissedIds);
       updateBottomBar();
     }
 

@@ -11,7 +11,10 @@ import httpx
 from app.config import settings
 from app.mock_data import MOCK_RECIPES, MOCK_SIDES, generate_recipe_svg
 from app.pantry import pantry_manager
+from app.shuffle_cooldown import ShuffleCooldownTracker
 from app.taxonomy import (
+    _cooldown_fallback_weights,
+    _pick_weighted_without_replacement,
     extract_recipe_taxonomy,
     is_dinner_recipe,
     is_side_recipe,
@@ -64,6 +67,18 @@ class MealieClient:
         self._cached_all_recipes: Optional[List[Dict[str, Any]]] = None
         self._cached_all_recipes_time: float = 0.0
         self._recipes_cache_ttl: float = 900.0  # 15 minutes TTL
+        self.shuffle_cooldown = ShuffleCooldownTracker(
+            cooldown_seconds=settings.shuffle_cooldown_minutes * 60,
+        )
+
+    def penalize_shuffled_recipes(self, recipe_ids: Optional[List[str]]) -> None:
+        """Record recipe IDs shuffled away so they are penalized during the cooldown window."""
+        if recipe_ids:
+            self.shuffle_cooldown.record_shuffled(recipe_ids)
+
+    def clear_shuffle_cooldown(self) -> None:
+        """Reset all active shuffle cooldown penalties."""
+        self.shuffle_cooldown.clear()
 
     def invalidate_recipes_cache(self) -> None:
         """Invalidate the cached list of cookbook recipes."""
@@ -733,8 +748,12 @@ class MealieClient:
         tool: Optional[str] = None,
         cuisine: Optional[str] = None,
         pantry_only: bool = False,
+        penalize_ids: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Fetch recipe options with taxonomy-aware balanced selection, pantry status, and badges."""
+        if penalize_ids:
+            self.penalize_shuffled_recipes(penalize_ids)
+        penalties = self.shuffle_cooldown.get_penalties()
         in_stock_set = pantry_manager.get_in_stock_set()
 
         if not self.mock_mode:
@@ -773,6 +792,7 @@ class MealieClient:
                         protein=protein,
                         tool=tool,
                         cuisine=cuisine,
+                        penalized_recipes=penalties,
                     )
 
                     results = []
@@ -854,6 +874,7 @@ class MealieClient:
             protein=protein,
             tool=tool,
             cuisine=cuisine,
+            penalized_recipes=penalties,
         )
         results = []
         for m in selected_mocks:
@@ -893,13 +914,49 @@ class MealieClient:
             )
         return results
 
-    async def get_side_options(self, count: int = 3) -> List[Dict[str, Any]]:
+    def _sample_mock_sides(
+        self,
+        count: int,
+        penalties: Dict[str, float],
+        exclude_ids: Optional[set] = None,
+    ) -> List[Dict[str, Any]]:
+        """Select mock sides while respecting active shuffle cooldown penalties."""
+        excluded = exclude_ids or set()
+        candidates = [m for m in MOCK_SIDES if m["id"] not in excluded]
+        if len(candidates) <= count:
+            return list(candidates)
+
+        fresh = [m for m in candidates if m["id"] not in penalties]
+        cooldown = [m for m in candidates if m["id"] in penalties]
+
+        picked: List[Dict[str, Any]] = []
+        if fresh:
+            picked.extend(random.sample(fresh, min(count, len(fresh))))
+        if len(picked) < count and cooldown:
+            weights = _cooldown_fallback_weights(cooldown, penalties)
+            picked.extend(_pick_weighted_without_replacement(cooldown, weights, count - len(picked)))
+        random.shuffle(picked)
+        return picked
+
+    async def get_side_options(
+        self,
+        count: int = 3,
+        penalize_ids: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
         """Fetch side dish options from Mealie, falling back to curated mock sides if needed."""
+        if penalize_ids:
+            self.penalize_shuffled_recipes(penalize_ids)
+        penalties = self.shuffle_cooldown.get_penalties()
+
         if not self.mock_mode:
             try:
                 all_recipes = await self.get_all_cookbook_recipes()
                 if all_recipes:
-                    selected = select_side_recipes(all_recipes, count=count)
+                    selected = select_side_recipes(
+                        all_recipes,
+                        count=count,
+                        penalized_recipes=penalties,
+                    )
                     results = []
                     for r in selected:
                         recipe_id = r.get("id") or r.get("slug")
@@ -920,7 +977,8 @@ class MealieClient:
                         )
                     if len(results) < count:
                         needed = count - len(results)
-                        for m in random.sample(MOCK_SIDES, min(needed, len(MOCK_SIDES))):
+                        existing_ids = {r["id"] for r in results}
+                        for m in self._sample_mock_sides(needed, penalties, exclude_ids=existing_ids):
                             results.append(
                                 {
                                     "id": m["id"],
@@ -940,7 +998,7 @@ class MealieClient:
                 logger.warning(f"Error querying Mealie for sides, using fallback: {e}")
 
         # In mock mode or fallback
-        sample_sides = random.sample(MOCK_SIDES, min(count, len(MOCK_SIDES)))
+        sample_sides = self._sample_mock_sides(count, penalties)
         return [
             {
                 "id": m["id"],
