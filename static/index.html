@@ -207,33 +207,38 @@
         <div id="recipeList" class="space-y-3.5 hidden"></div>
       </div>
 
-      <!-- Option 4: "Something Else" Custom Craving Card -->
+      <!-- Option 4: Amalgamated Mealie Search & Custom Craving Card -->
       <div id="customCravingCard" 
            class="recipe-card relative bg-white border-2 border-dashed border-stone-300 hover:border-stone-400 rounded-2xl p-4 shadow-sm transition-all duration-200">
         <div class="flex items-start space-x-3 mb-2">
           <div id="customCravingIconWrapper" class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-lg flex-shrink-0 text-amber-700 transition-colors">
             🍜
           </div>
-          <div class="flex-1">
-            <h3 class="text-sm font-semibold text-stone-900 flex items-center justify-between">
-              <span id="customCardTitle">Craving something else?</span>
-              <span id="customActiveBadge" class="hidden text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full">
+          <div class="flex-1 min-w-0">
+            <h3 class="text-sm font-semibold text-stone-900 flex items-center justify-between gap-2">
+              <span id="customCardTitle">Something else in mind?</span>
+              <span id="customActiveBadge" class="hidden text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full flex-shrink-0">
                 Active
               </span>
             </h3>
-            <p id="customCardDesc" class="text-xs text-stone-500 mt-0.5">Takeout, external recipe link, pantry raid, or a specific craving</p>
+            <p id="customCardDesc" class="text-xs text-stone-500 mt-0.5">Search your Mealie cookbook, paste a recipe link, or type any craving</p>
           </div>
         </div>
 
-        <div class="relative mt-2">
+        <div id="customNoteInputWrapper" class="relative mt-2">
+          <svg class="w-4 h-4 text-stone-400 pointer-events-none absolute left-3 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+          </svg>
           <input 
             type="text" 
             id="customNoteInput" 
             maxlength="250"
-            placeholder="e.g. Thai curry, https://seriouseats.com/..., pizza night..."
-            class="w-full px-3.5 py-2.5 text-sm bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/60 transition-all outline-none text-stone-800 placeholder-stone-400"
+            autocomplete="off"
+            placeholder="Search Mealie recipes, paste a URL, or type a craving..."
+            class="w-full pl-9 pr-9 py-2.5 text-sm bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/60 transition-all outline-none text-stone-800 placeholder-stone-400"
             oninput="handleCustomInput(this.value)"
             onfocus="handleCustomFocus()"
+            onkeydown="handleCustomKeydown(event)"
           />
           <button 
             id="clearCustomBtn"
@@ -243,6 +248,42 @@
             title="Clear text">
             ✕
           </button>
+        </div>
+
+        <!-- Selected Mealie Recipe (from Search) -->
+        <div id="selectedSearchRecipeCard" class="hidden mt-2.5 p-2.5 rounded-xl bg-white border border-emerald-200/90 shadow-sm">
+          <div class="flex items-center space-x-3">
+            <img id="selectedSearchRecipeImg" src="" alt="" class="w-14 h-14 rounded-xl object-cover bg-stone-100 flex-shrink-0 border border-stone-200/70" />
+            <div class="flex-1 min-w-0">
+              <div id="selectedSearchRecipeName" class="text-sm font-bold text-stone-900 truncate"></div>
+              <div id="selectedSearchRecipeMeta" class="text-[11px] text-stone-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5"></div>
+              <div class="mt-1.5 flex items-center gap-3">
+                <button id="selectedSearchRecipeDetailsBtn" type="button" class="text-[11px] font-semibold text-amber-700 hover:text-amber-900 flex items-center gap-1">
+                  <span>🧾</span><span>Details</span>
+                </button>
+                <button type="button" onclick="changeSearchedRecipe()" class="text-[11px] font-semibold text-stone-500 hover:text-stone-800 underline">
+                  Change
+                </button>
+              </div>
+            </div>
+            <div class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Mealie Cookbook Search Results -->
+        <div id="mealieSearchResults" class="hidden mt-2.5 rounded-xl border border-stone-200 bg-white overflow-hidden shadow-sm">
+          <div class="px-3 py-1.5 bg-stone-50 border-b border-stone-200/80 flex items-center justify-between text-[11px] font-semibold text-stone-600">
+            <span class="flex items-center gap-1.5"><span>📚</span><span>In your Mealie cookbook</span></span>
+            <span id="mealieSearchStatus" class="text-[10px] font-medium text-stone-400"></span>
+          </div>
+          <div id="mealieSearchList" class="max-h-64 overflow-y-auto divide-y divide-stone-100" role="listbox" aria-label="Mealie recipe search results"></div>
+          <div id="mealieSearchFooter" class="px-3 py-1.5 bg-stone-50/70 border-t border-stone-100 text-[11px] text-stone-500">
+            Tap a Mealie recipe to link it, or keep typing for a custom craving.
+          </div>
         </div>
 
         <!-- Recipe URL Live Preview Pill -->
@@ -322,18 +363,18 @@
         <div id="sideList" class="space-y-3 hidden"></div>
       </div>
 
-      <!-- Quick Pantry Staples & Custom Side Card -->
+      <!-- Quick Pantry Staples, Mealie Side Search & Custom Side Card -->
       <div id="customSideCard" class="recipe-card relative bg-white border-2 border-dashed border-stone-300 hover:border-stone-400 rounded-2xl p-4 shadow-sm transition-all duration-200">
         <div class="flex items-start space-x-3 mb-2">
           <div id="customSideIconWrapper" class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-lg flex-shrink-0 text-amber-700 transition-colors">
             🥗
           </div>
-          <div class="flex-1">
-            <h3 class="text-sm font-semibold text-stone-900 flex items-center justify-between">
-              <span>Quick Staple or Custom Side</span>
-              <span id="customSideActiveBadge" class="hidden text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full">Active</span>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-sm font-semibold text-stone-900 flex items-center justify-between gap-2">
+              <span>Quick Staple, Search Mealie, or Custom Side</span>
+              <span id="customSideActiveBadge" class="hidden text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full flex-shrink-0">Active</span>
             </h3>
-            <p class="text-xs text-stone-500 mt-0.5">Tap a household staple or type any side / recipe link</p>
+            <p class="text-xs text-stone-500 mt-0.5">Tap a staple, search your Mealie cookbook, or type any side / link</p>
           </div>
         </div>
 
@@ -347,14 +388,20 @@
           <button type="button" onclick="selectPantryStaple('French Fries', '🍟')" class="pantry-chip px-2.5 py-1 rounded-lg text-xs bg-stone-100 hover:bg-amber-100 active:bg-amber-200 text-stone-700 font-medium border border-stone-200 transition-colors">🍟 Fries</button>
         </div>
 
-        <div class="relative mt-2">
+        <div id="customSideInputWrapper" class="relative mt-2">
+          <svg class="w-4 h-4 text-stone-400 pointer-events-none absolute left-3 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+          </svg>
           <input 
             type="text" 
             id="customSideInput" 
             maxlength="250"
-            placeholder="e.g. Garden salad, fries, https://seriouseats.com/..."
-            class="w-full px-3.5 py-2.5 text-sm bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/60 transition-all outline-none text-stone-800 placeholder-stone-400"
+            autocomplete="off"
+            placeholder="Search Mealie recipes, paste a URL, or type a side..."
+            class="w-full pl-9 pr-9 py-2.5 text-sm bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/60 transition-all outline-none text-stone-800 placeholder-stone-400"
             oninput="handleCustomSideInput(this.value)"
+            onfocus="handleCustomSideFocus()"
+            onkeydown="handleCustomSideKeydown(event)"
           />
           <button 
             id="clearCustomSideBtn"
@@ -364,6 +411,37 @@
             title="Clear side text">
             ✕
           </button>
+        </div>
+
+        <!-- Selected Mealie Side Recipe (from Search) -->
+        <div id="selectedSearchSideCard" class="hidden mt-2.5 p-2.5 rounded-xl bg-white border border-emerald-200/90 shadow-sm">
+          <div class="flex items-center space-x-3">
+            <img id="selectedSearchSideImg" src="" alt="" class="w-12 h-12 rounded-xl object-cover bg-stone-100 flex-shrink-0 border border-stone-200/70" />
+            <div class="flex-1 min-w-0">
+              <div id="selectedSearchSideName" class="text-sm font-bold text-stone-900 truncate"></div>
+              <div id="selectedSearchSideMeta" class="text-[11px] text-stone-500 mt-0.5 flex flex-wrap items-center gap-x-2"></div>
+              <button type="button" onclick="changeSearchedSide()" class="mt-1 text-[11px] font-semibold text-stone-500 hover:text-stone-800 underline">
+                Change
+              </button>
+            </div>
+            <div class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Mealie Side Search Results -->
+        <div id="sideMealieSearchResults" class="hidden mt-2.5 rounded-xl border border-stone-200 bg-white overflow-hidden shadow-sm">
+          <div class="px-3 py-1.5 bg-stone-50 border-b border-stone-200/80 flex items-center justify-between text-[11px] font-semibold text-stone-600">
+            <span class="flex items-center gap-1.5"><span>📚</span><span>In your Mealie cookbook</span></span>
+            <span id="sideMealieSearchStatus" class="text-[10px] font-medium text-stone-400"></span>
+          </div>
+          <div id="sideMealieSearchList" class="max-h-56 overflow-y-auto divide-y divide-stone-100" role="listbox" aria-label="Mealie side search results"></div>
+          <div id="sideMealieSearchFooter" class="px-3 py-1.5 bg-stone-50/70 border-t border-stone-100 text-[11px] text-stone-500">
+            Tap a Mealie recipe to link it, or keep typing for a custom side.
+          </div>
         </div>
 
         <!-- Side Recipe URL Live Preview Pill -->
@@ -764,16 +842,31 @@
     let activeFilterId = 'surprise';
     let currentOptions = [];
     let selectedRecipeId = null;
+    let selectedSearchedRecipe = null;
     let customNote = '';
 
     let currentSideOptions = [];
     let selectedSideId = null;
+    let selectedSearchedSide = null;
     let customSideNote = '';
     let sideSkipped = false;
 
     let isSubmitting = false;
     let urlDebounceTimeout = null;
     let sideUrlDebounceTimeout = null;
+
+    // Amalgamated Mealie search state
+    let mealieSearchResults = [];
+    let mealieSearchDebounce = null;
+    let mealieSearchSeq = 0;
+    let mealieSearchHighlightIdx = -1;
+    let lastMainSearchQuery = '';
+
+    let sideSearchResults = [];
+    let sideSearchDebounce = null;
+    let sideSearchSeq = 0;
+    let sideSearchHighlightIdx = -1;
+    let lastSideSearchQuery = '';
 
     // Elements
     const votingView = document.getElementById('votingView');
@@ -794,8 +887,18 @@
     const customCravingCard = document.getElementById('customCravingCard');
     const customCravingIconWrapper = document.getElementById('customCravingIconWrapper');
     const customActiveBadge = document.getElementById('customActiveBadge');
+    const customNoteInputWrapper = document.getElementById('customNoteInputWrapper');
     const customNoteInput = document.getElementById('customNoteInput');
     const clearCustomBtn = document.getElementById('clearCustomBtn');
+    const selectedSearchRecipeCard = document.getElementById('selectedSearchRecipeCard');
+    const selectedSearchRecipeImg = document.getElementById('selectedSearchRecipeImg');
+    const selectedSearchRecipeName = document.getElementById('selectedSearchRecipeName');
+    const selectedSearchRecipeMeta = document.getElementById('selectedSearchRecipeMeta');
+    const selectedSearchRecipeDetailsBtn = document.getElementById('selectedSearchRecipeDetailsBtn');
+    const mealieSearchResultsEl = document.getElementById('mealieSearchResults');
+    const mealieSearchStatusEl = document.getElementById('mealieSearchStatus');
+    const mealieSearchListEl = document.getElementById('mealieSearchList');
+    const mealieSearchFooterEl = document.getElementById('mealieSearchFooter');
     const urlPreviewContainer = document.getElementById('urlPreviewContainer');
     const urlPreviewTitle = document.getElementById('urlPreviewTitle');
     const urlPreviewDomain = document.getElementById('urlPreviewDomain');
@@ -803,8 +906,17 @@
     const customSideCard = document.getElementById('customSideCard');
     const customSideIconWrapper = document.getElementById('customSideIconWrapper');
     const customSideActiveBadge = document.getElementById('customSideActiveBadge');
+    const customSideInputWrapper = document.getElementById('customSideInputWrapper');
     const customSideInput = document.getElementById('customSideInput');
     const clearCustomSideBtn = document.getElementById('clearCustomSideBtn');
+    const selectedSearchSideCard = document.getElementById('selectedSearchSideCard');
+    const selectedSearchSideImg = document.getElementById('selectedSearchSideImg');
+    const selectedSearchSideName = document.getElementById('selectedSearchSideName');
+    const selectedSearchSideMeta = document.getElementById('selectedSearchSideMeta');
+    const sideMealieSearchResultsEl = document.getElementById('sideMealieSearchResults');
+    const sideMealieSearchStatusEl = document.getElementById('sideMealieSearchStatus');
+    const sideMealieSearchListEl = document.getElementById('sideMealieSearchList');
+    const sideMealieSearchFooterEl = document.getElementById('sideMealieSearchFooter');
     const sideUrlPreviewContainer = document.getElementById('sideUrlPreviewContainer');
     const sideUrlPreviewTitle = document.getElementById('sideUrlPreviewTitle');
     const sideUrlPreviewDomain = document.getElementById('sideUrlPreviewDomain');
@@ -1228,6 +1340,9 @@
       if (isSubmitting) return;
       activeFilterId = filterId;
       renderFilterPills();
+      if (selectedSearchedRecipe) {
+        clearCustomInput();
+      }
       selectedRecipeId = null;
       updateBottomBar();
       loadOptions();
@@ -1263,6 +1378,9 @@
 
     function refreshOptions() {
       const dismissedIds = (currentOptions || []).map(o => o.id).filter(Boolean);
+      if (selectedSearchedRecipe) {
+        clearCustomInput();
+      }
       selectedRecipeId = null;
       renderCards(currentOptions);
       updateBottomBar();
@@ -1483,7 +1601,13 @@
       const alreadySelected = selectedRecipeId === recipe.id;
       chooseBtn.textContent = alreadySelected ? '✓ Selected' : 'Choose this dinner';
       chooseBtn.onclick = () => {
-        if (!alreadySelected) selectRecipe(recipe.id);
+        if (!alreadySelected) {
+          if (currentOptions.some(o => o.id === recipe.id)) {
+            selectRecipe(recipe.id);
+          } else {
+            selectSearchedRecipe(recipe);
+          }
+        }
         closeRecipeDetails();
       };
 
@@ -1505,28 +1629,313 @@
       if (e.key === 'Escape') closeRecipeDetails();
     });
 
+    // Helper: Safely highlight matching tokens in recipe title (XSS-safe)
+    function highlightMatch(text, query) {
+      const raw = String(text || '');
+      const tokens = String(query || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .sort((a, b) => b.length - a.length);
+      if (tokens.length === 0) return escapeHtml(raw);
+
+      const escapedTokens = tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      const regex = new RegExp(`(${escapedTokens.join('|')})`, 'gi');
+      let out = '';
+      let lastIdx = 0;
+      let m;
+      while ((m = regex.exec(raw)) !== null) {
+        if (m.index > lastIdx) {
+          out += escapeHtml(raw.slice(lastIdx, m.index));
+        }
+        out += `<mark class="bg-amber-100 text-amber-950 rounded px-0.5 font-bold">${escapeHtml(m[0])}</mark>`;
+        lastIdx = regex.lastIndex;
+        if (m[0].length === 0) regex.lastIndex++;
+      }
+      if (lastIdx < raw.length) {
+        out += escapeHtml(raw.slice(lastIdx));
+      }
+      return out;
+    }
+
+    function renderPantryMiniBadge(pantry) {
+      if (!pantry) return '';
+      if (pantry.status === 'ready') {
+        return `<span class="text-emerald-700 font-semibold">🟢 Ready</span>`;
+      }
+      if (pantry.status === 'almost_ready') {
+        const missing = (pantry.missing_perishables || pantry.missing_items || []);
+        const label = missing.length ? `Need ${missing[0]}` : 'Almost ready';
+        return `<span class="text-amber-700 font-semibold truncate">🟡 ${escapeHtml(label)}</span>`;
+      }
+      if (pantry.missing_anchor) {
+        return `<span class="text-stone-500 truncate">⚪ Need ${escapeHtml(pantry.missing_anchor)}</span>`;
+      }
+      if (pantry.missing_count > 0) {
+        return `<span class="text-stone-500">⚪ Missing ${pantry.missing_count}</span>`;
+      }
+      return '';
+    }
+
+    function getSelectedMainRecipe() {
+      if (!selectedRecipeId) return null;
+      return currentOptions.find(opt => opt.id === selectedRecipeId)
+        || (selectedSearchedRecipe && selectedSearchedRecipe.id === selectedRecipeId ? selectedSearchedRecipe : null);
+    }
+
+    function resetMainSearchState() {
+      clearTimeout(mealieSearchDebounce);
+      mealieSearchSeq += 1;
+      selectedSearchedRecipe = null;
+      mealieSearchResults = [];
+      mealieSearchHighlightIdx = -1;
+      if (mealieSearchResultsEl) mealieSearchResultsEl.classList.add('hidden');
+      if (mealieSearchListEl) mealieSearchListEl.innerHTML = '';
+      if (selectedSearchRecipeCard) selectedSearchRecipeCard.classList.add('hidden');
+      if (customNoteInputWrapper) customNoteInputWrapper.classList.remove('hidden');
+    }
+
+    function hideMainSearchDropdown() {
+      if (mealieSearchResultsEl) mealieSearchResultsEl.classList.add('hidden');
+      mealieSearchHighlightIdx = -1;
+    }
+
     // Select a Recipe Card
     function selectRecipe(id) {
       if (isSubmitting) return;
 
       selectedRecipeId = id;
 
-      // Deselect and clear custom input
+      // Deselect and clear custom input & search state
+      resetMainSearchState();
       customNote = '';
       customNoteInput.value = '';
       clearCustomBtn.classList.add('hidden');
+      urlPreviewContainer.classList.add('hidden');
       customCravingCard.className = 'recipe-card relative bg-white border-2 border-dashed border-stone-300 hover:border-stone-400 rounded-2xl p-4 shadow-sm transition-all duration-200';
       customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-lg flex-shrink-0 text-amber-700 transition-colors';
+      customCravingIconWrapper.textContent = '🍜';
       customActiveBadge.classList.add('hidden');
 
       renderCards(currentOptions);
       updateBottomBar();
     }
 
-    // Handle typing in "Something Else" input
+    // Select a Mealie Recipe directly from amalgamated search results
+    function selectSearchedRecipe(recipe) {
+      if (isSubmitting || !recipe) return;
+
+      clearTimeout(mealieSearchDebounce);
+      clearTimeout(urlDebounceTimeout);
+      mealieSearchSeq += 1;
+
+      selectedRecipeId = recipe.id;
+      selectedSearchedRecipe = recipe;
+      customNote = '';
+
+      // Deselect any of the 3 shuffled cards above
+      renderCards(currentOptions);
+
+      // Hide input & dropdown, show rich selected Mealie recipe summary
+      customNoteInputWrapper.classList.add('hidden');
+      mealieSearchResultsEl.classList.add('hidden');
+      urlPreviewContainer.classList.add('hidden');
+
+      selectedSearchRecipeImg.src = recipe.imageUrl || '';
+      selectedSearchRecipeImg.alt = recipe.name || 'Selected recipe';
+      selectedSearchRecipeImg.onerror = function() {
+        this.onerror = null;
+        this.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23f5f5f4'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='32'>🥘</text></svg>";
+      };
+      selectedSearchRecipeName.textContent = recipe.name || 'Mealie Recipe';
+
+      const metaBits = [];
+      if (recipe.totalTime) metaBits.push(`<span>⏱️ ${escapeHtml(recipe.totalTime)}</span>`);
+      const pantryMini = renderPantryMiniBadge(recipe.pantry);
+      if (pantryMini) metaBits.push(pantryMini);
+      selectedSearchRecipeMeta.innerHTML = metaBits.join('<span class="text-stone-300">•</span>');
+
+      selectedSearchRecipeDetailsBtn.onclick = (e) => {
+        e.stopPropagation();
+        openRecipeDetails(recipe);
+      };
+      selectedSearchRecipeCard.classList.remove('hidden');
+
+      // Highlight outer card as linked Mealie Recipe
+      customCravingCard.className = 'recipe-card relative bg-emerald-50/40 border-2 border-emerald-500 ring-2 ring-emerald-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
+      customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
+      customCravingIconWrapper.textContent = '📚';
+      customActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded-full flex-shrink-0';
+      customActiveBadge.textContent = 'Mealie Recipe';
+      customActiveBadge.classList.remove('hidden');
+
+      updateBottomBar();
+    }
+
+    function changeSearchedRecipe() {
+      if (isSubmitting) return;
+      const priorQuery = lastMainSearchQuery || (selectedSearchedRecipe ? selectedSearchedRecipe.name : '');
+      selectedRecipeId = null;
+      resetMainSearchState();
+      customNoteInput.value = priorQuery;
+      handleCustomInput(priorQuery);
+      customNoteInput.focus();
+      customNoteInput.select();
+    }
+
+    function triggerMealieSearch(query) {
+      const trimmed = (query || '').trim();
+      clearTimeout(mealieSearchDebounce);
+      mealieSearchSeq += 1;
+      const seq = mealieSearchSeq;
+
+      if (trimmed.length < 2) {
+        mealieSearchResults = [];
+        hideMainSearchDropdown();
+        return;
+      }
+
+      lastMainSearchQuery = trimmed;
+      mealieSearchStatusEl.textContent = 'Searching...';
+
+      mealieSearchDebounce = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/recipes/search?q=${encodeURIComponent(trimmed)}&scope=main&limit=8`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (seq !== mealieSearchSeq || selectedSearchedRecipe) return;
+          // Ensure input didn't switch to URL or empty while in flight
+          if (!customNote.trim() || customNote.match(/https?:\/\/[^\s<>"]+/i)) return;
+
+          mealieSearchResults = data.results || [];
+          mealieSearchHighlightIdx = -1;
+          renderMealieSearchResults(mealieSearchResults, trimmed);
+        } catch (err) {
+          console.error('Mealie recipe search failed:', err);
+          if (seq === mealieSearchSeq) {
+            hideMainSearchDropdown();
+          }
+        }
+      }, 180);
+    }
+
+    function renderMealieSearchResults(results, query) {
+      mealieSearchListEl.innerHTML = '';
+
+      if (!results || results.length === 0) {
+        mealieSearchStatusEl.textContent = '0 matches';
+        mealieSearchFooterEl.textContent = 'No matches in Mealie — will be saved as a custom craving.';
+        mealieSearchResultsEl.classList.remove('hidden');
+        return;
+      }
+
+      mealieSearchStatusEl.textContent = `${results.length} ${results.length === 1 ? 'match' : 'matches'}`;
+      mealieSearchFooterEl.textContent = 'Tap a Mealie recipe to link it, or keep typing for a custom craving.';
+
+      results.forEach((recipe, idx) => {
+        const isHighlighted = (idx === mealieSearchHighlightIdx);
+        const row = document.createElement('div');
+        row.setAttribute('role', 'option');
+        row.setAttribute('aria-selected', isHighlighted ? 'true' : 'false');
+        row.dataset.index = String(idx);
+        row.className = `flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors ${
+          isHighlighted ? 'bg-amber-50' : 'hover:bg-amber-50/60 active:bg-amber-100/70'
+        }`;
+        row.onclick = () => selectSearchedRecipe(recipe);
+
+        const pantryMini = renderPantryMiniBadge(recipe.pantry);
+        const matchHint = recipe.match_field === 'ingredient'
+          ? '<span class="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/80 px-1.5 py-0.2 rounded">ingredient</span>'
+          : (recipe.match_field === 'tag'
+            ? '<span class="text-[10px] text-stone-600 bg-stone-100 border border-stone-200 px-1.5 py-0.2 rounded">tag</span>'
+            : '');
+
+        row.innerHTML = `
+          <img
+            src="${recipe.imageUrl}"
+            alt="${escapeHtml(recipe.name)}"
+            loading="lazy"
+            class="w-11 h-11 rounded-lg object-cover bg-stone-100 flex-shrink-0 border border-stone-200/70"
+            onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 100 100\\'><rect width=\\'100\\' height=\\'100\\' fill=\\'%23f5f5f4\\'/><text x=\\'50%\\' y=\\'50%\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' font-size=\\'28\\'>🥘</text></svg>';"
+          />
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-semibold text-stone-900 truncate">
+              ${highlightMatch(recipe.name, query)}
+            </div>
+            <div class="text-[11px] text-stone-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span>⏱️ ${escapeHtml(recipe.totalTime || '30 mins')}</span>
+              ${pantryMini}
+              ${matchHint}
+            </div>
+          </div>
+          <button
+            type="button"
+            class="search-detail-btn flex-shrink-0 px-2 py-1 rounded-lg text-[11px] font-semibold text-stone-500 hover:text-amber-700 hover:bg-amber-100/70 transition-colors"
+            title="View recipe details">
+            🧾
+          </button>
+        `;
+
+        const detailBtn = row.querySelector('.search-detail-btn');
+        if (detailBtn) {
+          detailBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openRecipeDetails(recipe);
+          });
+        }
+
+        mealieSearchListEl.appendChild(row);
+      });
+
+      mealieSearchResultsEl.classList.remove('hidden');
+    }
+
+    function updateMainSearchHighlight() {
+      const rows = mealieSearchListEl.querySelectorAll('[role="option"]');
+      rows.forEach((row, idx) => {
+        const active = (idx === mealieSearchHighlightIdx);
+        row.setAttribute('aria-selected', active ? 'true' : 'false');
+        row.classList.toggle('bg-amber-50', active);
+        if (active) {
+          row.scrollIntoView({ block: 'nearest' });
+        }
+      });
+    }
+
+    function handleCustomKeydown(e) {
+      if (mealieSearchResultsEl.classList.contains('hidden')) return;
+      if (e.key === 'ArrowDown') {
+        if (mealieSearchResults.length === 0) return;
+        e.preventDefault();
+        mealieSearchHighlightIdx = (mealieSearchHighlightIdx + 1) % mealieSearchResults.length;
+        updateMainSearchHighlight();
+      } else if (e.key === 'ArrowUp') {
+        if (mealieSearchResults.length === 0) return;
+        e.preventDefault();
+        mealieSearchHighlightIdx = mealieSearchHighlightIdx <= 0
+          ? mealieSearchResults.length - 1
+          : mealieSearchHighlightIdx - 1;
+        updateMainSearchHighlight();
+      } else if (e.key === 'Enter' && mealieSearchHighlightIdx >= 0 && mealieSearchResults[mealieSearchHighlightIdx]) {
+        e.preventDefault();
+        selectSearchedRecipe(mealieSearchResults[mealieSearchHighlightIdx]);
+      } else if (e.key === 'Escape') {
+        e.stopPropagation();
+        hideMainSearchDropdown();
+      }
+    }
+
+    // Handle typing in amalgamated Search / "Something Else" input
     function handleCustomInput(val) {
       customNote = val;
       const urlMatch = val.match(/https?:\/\/[^\s<>"]+/i);
+
+      if (selectedSearchedRecipe) {
+        selectedSearchedRecipe = null;
+        selectedRecipeId = null;
+        selectedSearchRecipeCard.classList.add('hidden');
+        customNoteInputWrapper.classList.remove('hidden');
+      }
 
       if (val.trim().length > 0) {
         if (selectedRecipeId !== null) {
@@ -1537,10 +1946,14 @@
         clearCustomBtn.classList.remove('hidden');
 
         if (urlMatch) {
+          clearTimeout(mealieSearchDebounce);
+          mealieSearchSeq += 1;
+          hideMainSearchDropdown();
+
           customCravingCard.className = 'recipe-card relative bg-sky-50/50 border-2 border-sky-500 ring-2 ring-sky-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
           customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
           customCravingIconWrapper.textContent = '🌐';
-          customActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-sky-600 text-white px-2 py-0.5 rounded-full';
+          customActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-sky-600 text-white px-2 py-0.5 rounded-full flex-shrink-0';
           customActiveBadge.textContent = 'Web Recipe';
           customActiveBadge.classList.remove('hidden');
 
@@ -1567,12 +1980,15 @@
           customCravingCard.className = 'recipe-card relative bg-amber-50/40 border-2 border-amber-500 ring-2 ring-amber-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
           customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
           customCravingIconWrapper.textContent = '🍜';
-          customActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full';
-          customActiveBadge.textContent = 'Active';
+          customActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full flex-shrink-0';
+          customActiveBadge.textContent = 'Custom';
           customActiveBadge.classList.remove('hidden');
           urlPreviewContainer.classList.add('hidden');
+
+          triggerMealieSearch(val);
         }
       } else {
+        resetMainSearchState();
         customCravingCard.className = 'recipe-card relative bg-white border-2 border-dashed border-stone-300 hover:border-stone-400 rounded-2xl p-4 shadow-sm transition-all duration-200';
         customCravingIconWrapper.className = 'w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-lg flex-shrink-0 text-amber-700 transition-colors';
         customCravingIconWrapper.textContent = '🍜';
@@ -1585,14 +2001,26 @@
     }
 
     function handleCustomFocus() {
-      if (customNote.trim().length > 0 && selectedRecipeId !== null) {
+      if (customNote.trim().length > 0 && selectedRecipeId !== null && !selectedSearchedRecipe) {
         selectedRecipeId = null;
         renderCards(currentOptions);
         updateBottomBar();
       }
+      if (!selectedSearchedRecipe && customNote.trim().length >= 2 && !customNote.match(/https?:\/\/[^\s<>"]+/i)) {
+        if (mealieSearchResults.length > 0) {
+          mealieSearchResultsEl.classList.remove('hidden');
+        } else {
+          triggerMealieSearch(customNote);
+        }
+      }
     }
 
     function clearCustomInput() {
+      if (selectedSearchedRecipe) {
+        selectedRecipeId = null;
+      }
+      resetMainSearchState();
+      lastMainSearchQuery = '';
       customNote = '';
       customNoteInput.value = '';
       handleCustomInput('');
@@ -1625,6 +2053,9 @@
 
     function refreshSideOptions() {
       const dismissedIds = (currentSideOptions || []).map(o => o.id).filter(Boolean);
+      if (selectedSearchedSide) {
+        clearCustomSideInput();
+      }
       selectedSideId = null;
       loadSideOptions(dismissedIds);
       updateBottomBar();
@@ -1711,13 +2142,31 @@
       });
     }
 
+    function resetSideSearchState() {
+      clearTimeout(sideSearchDebounce);
+      sideSearchSeq += 1;
+      selectedSearchedSide = null;
+      sideSearchResults = [];
+      sideSearchHighlightIdx = -1;
+      if (sideMealieSearchResultsEl) sideMealieSearchResultsEl.classList.add('hidden');
+      if (sideMealieSearchListEl) sideMealieSearchListEl.innerHTML = '';
+      if (selectedSearchSideCard) selectedSearchSideCard.classList.add('hidden');
+      if (customSideInputWrapper) customSideInputWrapper.classList.remove('hidden');
+    }
+
+    function hideSideSearchDropdown() {
+      if (sideMealieSearchResultsEl) sideMealieSearchResultsEl.classList.add('hidden');
+      sideSearchHighlightIdx = -1;
+    }
+
     function selectSide(id) {
       if (isSubmitting) return;
 
       selectedSideId = id;
       sideSkipped = false;
 
-      // Clear custom side text and staples
+      // Clear custom side text, search state, and staples
+      resetSideSearchState();
       customSideNote = '';
       customSideInput.value = '';
       clearCustomSideBtn.classList.add('hidden');
@@ -1726,6 +2175,195 @@
 
       renderSideCards(currentSideOptions);
       updateBottomBar();
+    }
+
+    function selectSearchedSide(recipe) {
+      if (isSubmitting || !recipe) return;
+
+      clearTimeout(sideSearchDebounce);
+      clearTimeout(sideUrlDebounceTimeout);
+      sideSearchSeq += 1;
+
+      selectedSideId = recipe.id;
+      selectedSearchedSide = recipe;
+      sideSkipped = false;
+      customSideNote = '';
+
+      renderSideCards(currentSideOptions);
+      resetPantryChips();
+
+      customSideInputWrapper.classList.add('hidden');
+      sideMealieSearchResultsEl.classList.add('hidden');
+      sideUrlPreviewContainer.classList.add('hidden');
+
+      selectedSearchSideImg.src = recipe.imageUrl || '';
+      selectedSearchSideImg.alt = recipe.name || 'Selected side';
+      selectedSearchSideImg.onerror = function() {
+        this.onerror = null;
+        this.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23ecfdf5'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='26'>🥗</text></svg>";
+      };
+      selectedSearchSideName.textContent = recipe.name || 'Mealie Side';
+
+      const metaBits = [];
+      if (recipe.totalTime) metaBits.push(`<span>⏱️ ${escapeHtml(recipe.totalTime)}</span>`);
+      const pantryMini = renderPantryMiniBadge(recipe.pantry);
+      if (pantryMini) metaBits.push(pantryMini);
+      selectedSearchSideMeta.innerHTML = metaBits.join('<span class="text-stone-300">•</span>');
+
+      selectedSearchSideCard.classList.remove('hidden');
+
+      customSideCard.className = 'recipe-card relative bg-emerald-50/40 border-2 border-emerald-500 ring-2 ring-emerald-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
+      customSideIconWrapper.className = 'w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
+      customSideIconWrapper.textContent = '📚';
+      customSideActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded-full flex-shrink-0';
+      customSideActiveBadge.textContent = 'Mealie Recipe';
+      customSideActiveBadge.classList.remove('hidden');
+
+      updateBottomBar();
+    }
+
+    function changeSearchedSide() {
+      if (isSubmitting) return;
+      const priorQuery = lastSideSearchQuery || (selectedSearchedSide ? selectedSearchedSide.name : '');
+      selectedSideId = null;
+      resetSideSearchState();
+      customSideInput.value = priorQuery;
+      handleCustomSideInput(priorQuery);
+      customSideInput.focus();
+      customSideInput.select();
+    }
+
+    function triggerSideMealieSearch(query) {
+      const trimmed = (query || '').trim();
+      clearTimeout(sideSearchDebounce);
+      sideSearchSeq += 1;
+      const seq = sideSearchSeq;
+
+      if (trimmed.length < 2) {
+        sideSearchResults = [];
+        hideSideSearchDropdown();
+        return;
+      }
+
+      lastSideSearchQuery = trimmed;
+      sideMealieSearchStatusEl.textContent = 'Searching...';
+
+      sideSearchDebounce = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/recipes/search?q=${encodeURIComponent(trimmed)}&scope=side&limit=6`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (seq !== sideSearchSeq || selectedSearchedSide) return;
+          if (!customSideNote.trim() || customSideNote.match(/https?:\/\/[^\s<>"]+/i)) return;
+
+          sideSearchResults = data.results || [];
+          sideSearchHighlightIdx = -1;
+          renderSideMealieSearchResults(sideSearchResults, trimmed);
+        } catch (err) {
+          console.error('Mealie side search failed:', err);
+          if (seq === sideSearchSeq) {
+            hideSideSearchDropdown();
+          }
+        }
+      }, 180);
+    }
+
+    function renderSideMealieSearchResults(results, query) {
+      sideMealieSearchListEl.innerHTML = '';
+
+      if (!results || results.length === 0) {
+        sideMealieSearchStatusEl.textContent = '0 matches';
+        sideMealieSearchFooterEl.textContent = 'No matches in Mealie — will be saved as a custom side.';
+        sideMealieSearchResultsEl.classList.remove('hidden');
+        return;
+      }
+
+      sideMealieSearchStatusEl.textContent = `${results.length} ${results.length === 1 ? 'match' : 'matches'}`;
+      sideMealieSearchFooterEl.textContent = 'Tap a Mealie recipe to link it, or keep typing for a custom side.';
+
+      results.forEach((recipe, idx) => {
+        const isHighlighted = (idx === sideSearchHighlightIdx);
+        const row = document.createElement('div');
+        row.setAttribute('role', 'option');
+        row.setAttribute('aria-selected', isHighlighted ? 'true' : 'false');
+        row.dataset.index = String(idx);
+        row.className = `flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors ${
+          isHighlighted ? 'bg-emerald-50' : 'hover:bg-emerald-50/60 active:bg-emerald-100/70'
+        }`;
+        row.onclick = () => selectSearchedSide(recipe);
+
+        const pantryMini = renderPantryMiniBadge(recipe.pantry);
+        row.innerHTML = `
+          <img
+            src="${recipe.imageUrl}"
+            alt="${escapeHtml(recipe.name)}"
+            loading="lazy"
+            class="w-10 h-10 rounded-lg object-cover bg-stone-100 flex-shrink-0 border border-stone-200/70"
+            onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 100 100\\'><rect width=\\'100\\' height=\\'100\\' fill=\\'%23ecfdf5\\'/><text x=\\'50%\\' y=\\'50%\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' font-size=\\'24\\'>🥗</text></svg>';"
+          />
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-semibold text-stone-900 truncate">
+              ${highlightMatch(recipe.name, query)}
+            </div>
+            <div class="text-[11px] text-stone-500 mt-0.5 flex flex-wrap items-center gap-x-2">
+              <span>⏱️ ${escapeHtml(recipe.totalTime || '20 mins')}</span>
+              ${pantryMini}
+            </div>
+          </div>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded flex-shrink-0">
+            Select
+          </span>
+        `;
+
+        sideMealieSearchListEl.appendChild(row);
+      });
+
+      sideMealieSearchResultsEl.classList.remove('hidden');
+    }
+
+    function updateSideSearchHighlight() {
+      const rows = sideMealieSearchListEl.querySelectorAll('[role="option"]');
+      rows.forEach((row, idx) => {
+        const active = (idx === sideSearchHighlightIdx);
+        row.setAttribute('aria-selected', active ? 'true' : 'false');
+        row.classList.toggle('bg-emerald-50', active);
+        if (active) {
+          row.scrollIntoView({ block: 'nearest' });
+        }
+      });
+    }
+
+    function handleCustomSideKeydown(e) {
+      if (sideMealieSearchResultsEl.classList.contains('hidden')) return;
+      if (e.key === 'ArrowDown') {
+        if (sideSearchResults.length === 0) return;
+        e.preventDefault();
+        sideSearchHighlightIdx = (sideSearchHighlightIdx + 1) % sideSearchResults.length;
+        updateSideSearchHighlight();
+      } else if (e.key === 'ArrowUp') {
+        if (sideSearchResults.length === 0) return;
+        e.preventDefault();
+        sideSearchHighlightIdx = sideSearchHighlightIdx <= 0
+          ? sideSearchResults.length - 1
+          : sideSearchHighlightIdx - 1;
+        updateSideSearchHighlight();
+      } else if (e.key === 'Enter' && sideSearchHighlightIdx >= 0 && sideSearchResults[sideSearchHighlightIdx]) {
+        e.preventDefault();
+        selectSearchedSide(sideSearchResults[sideSearchHighlightIdx]);
+      } else if (e.key === 'Escape') {
+        e.stopPropagation();
+        hideSideSearchDropdown();
+      }
+    }
+
+    function handleCustomSideFocus() {
+      if (!selectedSearchedSide && customSideNote.trim().length >= 2 && !customSideNote.match(/https?:\/\/[^\s<>"]+/i)) {
+        if (sideSearchResults.length > 0) {
+          sideMealieSearchResultsEl.classList.remove('hidden');
+        } else {
+          triggerSideMealieSearch(customSideNote);
+        }
+      }
     }
 
     function resetCustomSideCard() {
@@ -1746,6 +2384,7 @@
 
     function selectPantryStaple(name, emoji) {
       if (isSubmitting) return;
+      resetSideSearchState();
       selectedSideId = null;
       sideSkipped = false;
       renderSideCards(currentSideOptions);
@@ -1758,7 +2397,7 @@
       customSideCard.className = 'recipe-card relative bg-emerald-50/40 border-2 border-emerald-500 ring-2 ring-emerald-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
       customSideIconWrapper.className = 'w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
       customSideIconWrapper.textContent = emoji || '🥗';
-      customSideActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded-full';
+      customSideActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded-full flex-shrink-0';
       customSideActiveBadge.textContent = 'Quick Staple';
       customSideActiveBadge.classList.remove('hidden');
       sideUrlPreviewContainer.classList.add('hidden');
@@ -1782,6 +2421,13 @@
       sideSkipped = false;
       const urlMatch = val.match(/https?:\/\/[^\s<>"]+/i);
 
+      if (selectedSearchedSide) {
+        selectedSearchedSide = null;
+        selectedSideId = null;
+        selectedSearchSideCard.classList.add('hidden');
+        customSideInputWrapper.classList.remove('hidden');
+      }
+
       if (val.trim().length > 0) {
         if (selectedSideId !== null) {
           selectedSideId = null;
@@ -1790,10 +2436,14 @@
         clearCustomSideBtn.classList.remove('hidden');
 
         if (urlMatch) {
+          clearTimeout(sideSearchDebounce);
+          sideSearchSeq += 1;
+          hideSideSearchDropdown();
+
           customSideCard.className = 'recipe-card relative bg-sky-50/50 border-2 border-sky-500 ring-2 ring-sky-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
           customSideIconWrapper.className = 'w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
           customSideIconWrapper.textContent = '🌐';
-          customSideActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-sky-600 text-white px-2 py-0.5 rounded-full';
+          customSideActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-sky-600 text-white px-2 py-0.5 rounded-full flex-shrink-0';
           customSideActiveBadge.textContent = 'Side Recipe URL';
           customSideActiveBadge.classList.remove('hidden');
 
@@ -1819,12 +2469,15 @@
           customSideCard.className = 'recipe-card relative bg-emerald-50/40 border-2 border-emerald-500 ring-2 ring-emerald-400/40 rounded-2xl p-4 shadow-md transition-all duration-200';
           customSideIconWrapper.className = 'w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm transition-colors';
           customSideIconWrapper.textContent = '🥗';
-          customSideActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded-full';
+          customSideActiveBadge.className = 'text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded-full flex-shrink-0';
           customSideActiveBadge.textContent = 'Active Side';
           customSideActiveBadge.classList.remove('hidden');
           sideUrlPreviewContainer.classList.add('hidden');
+
+          triggerSideMealieSearch(val);
         }
       } else {
+        resetSideSearchState();
         resetCustomSideCard();
         resetPantryChips();
       }
@@ -1833,12 +2486,27 @@
     }
 
     function clearCustomSideInput() {
+      if (selectedSearchedSide) {
+        selectedSideId = null;
+      }
+      resetSideSearchState();
+      lastSideSearchQuery = '';
       customSideNote = '';
       customSideInput.value = '';
       resetCustomSideCard();
       resetPantryChips();
       updateBottomBar();
     }
+
+    // Dismiss search dropdowns when clicking outside their respective cards
+    document.addEventListener('click', (e) => {
+      if (customCravingCard && !customCravingCard.contains(e.target)) {
+        hideMainSearchDropdown();
+      }
+      if (customSideCard && !customSideCard.contains(e.target)) {
+        hideSideSearchDropdown();
+      }
+    });
 
     // Step Navigation
     function goToStep2() {
@@ -1850,7 +2518,7 @@
 
       // Update Main Course reminder banner in Step 2
       if (selectedRecipeId) {
-        const r = currentOptions.find(opt => opt.id === selectedRecipeId);
+        const r = getSelectedMainRecipe();
         sideStepMainTitle.textContent = r ? r.name : 'Selected Recipe';
         sideStepMainEmoji.textContent = (r && r.emoji) ? r.emoji : '🥘';
       } else {
@@ -1924,6 +2592,7 @@
       if (currentStep === 1) {
         sideSkipped = true;
         selectedSideId = null;
+        selectedSearchedSide = null;
         customSideNote = '';
         submitDinnerChoice();
       } else if (currentStep === 2) {
@@ -1935,6 +2604,7 @@
       if (isSubmitting) return;
       sideSkipped = true;
       selectedSideId = null;
+      selectedSearchedSide = null;
       customSideNote = '';
       submitDinnerChoice();
     }
@@ -1949,7 +2619,7 @@
 
       if (selectedRecipeId) {
         payload.recipe_id = selectedRecipeId;
-        const recipe = currentOptions.find(r => r.id === selectedRecipeId);
+        const recipe = getSelectedMainRecipe();
         chosenName = recipe ? recipe.name : 'Selected Recipe';
         emoji = (recipe && recipe.emoji) ? recipe.emoji : '🥘';
       } else if (customNote.trim()) {

@@ -315,6 +315,38 @@ async def get_dinner_options(
         raise HTTPException(status_code=500, detail="Failed to fetch dinner options")
 
 
+@app.get("/api/recipes/search")
+async def search_mealie_recipes(
+    q: str = "",
+    limit: int = 8,
+    scope: Optional[str] = "all",
+):
+    """Search across all Mealie cookbook recipes for the amalgamated free-form search field."""
+    try:
+        query = (q or "").strip()
+        if not query:
+            return {
+                "results": [],
+                "count": 0,
+                "query": "",
+                "is_mock": mealie_client.mock_mode,
+            }
+        results = await mealie_client.search_recipes(
+            query=query,
+            limit=limit,
+            scope=scope or "all",
+        )
+        return {
+            "results": results,
+            "count": len(results),
+            "query": query,
+            "is_mock": mealie_client.mock_mode or any(r.get("is_mock") for r in results),
+        }
+    except Exception as e:
+        logger.error(f"Error searching recipes for '{q}': {e}")
+        raise HTTPException(status_code=500, detail="Failed to search recipes")
+
+
 @app.get("/api/pantry")
 async def get_pantry(
     category: Optional[str] = None,

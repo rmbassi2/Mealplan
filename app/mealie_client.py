@@ -17,6 +17,7 @@ from app.taxonomy import (
     _pick_weighted_without_replacement,
     extract_recipe_taxonomy,
     is_dinner_recipe,
+    is_side_recipe,
     select_balanced_recipes,
     select_side_recipes,
 )
@@ -1014,6 +1015,211 @@ class MealieClient:
             for m in sample_sides
         ]
 
+    def _find_cached_recipe(self, recipe_id: str) -> Optional[Dict[str, Any]]:
+        """Look up a recipe by ID or slug in in-memory caches."""
+        if not recipe_id:
+            return None
+        cached = self._recipe_cache.get(recipe_id)
+        if cached:
+            return cached
+        if self._cached_all_recipes:
+            for r in self._cached_all_recipes:
+                if r.get("id") == recipe_id or r.get("slug") == recipe_id:
+                    return r
+        return None
+
+    async def search_recipes(
+        self,
+        query: str,
+        limit: int = 8,
+        scope: str = "all",
+    ) -> List[Dict[str, Any]]:
+        """Search cookbook recipes by name, tags, categories, tools, ingredients, or description.
+
+        Searches across all cookbook recipes so users can find any Mealie recipe by name,
+        while using `scope` ("main", "side", or "all") as a ranking boost rather than a hard filter.
+        """
+        q = (query or "").strip()
+        if not q:
+            return []
+
+        limit = max(1, min(int(limit or 8), 25))
+        scope_norm = (scope or "all").strip().lower()
+
+        all_recipes = await self.get_all_cookbook_recipes()
+        if not all_recipes:
+            return []
+
+        if pantry_manager.get_stats()["total"] == 0:
+            pantry_manager.seed_from_recipes(all_recipes)
+        in_stock_set = pantry_manager.get_in_stock_set()
+
+        q_lower = q.lower()
+        tokens = [t for t in re.split(r"\s+", q_lower) if t]
+        if not tokens:
+            return []
+
+        seen_keys = set()
+        scored: List[Tuple[float, str, Dict[str, Any], Dict[str, Any], Dict[str, Any], bool, str]] = []
+
+        for r in all_recipes:
+            recipe_id = r.get("id") or r.get("slug")
+            if not recipe_id or recipe_id in seen_keys:
+                continue
+            seen_keys.add(recipe_id)
+
+            name_raw = str(r.get("name") or "")
+            name_lower = name_raw.lower()
+            name_words = re.findall(r"[a-z0-9]+", name_lower)
+
+            tax = r.get("_taxonomy") or extract_recipe_taxonomy(r)
+
+            meta_parts: List[str] = []
+            for field in ("recipeCategory", "categories", "tags", "tools"):
+                raw_val = r.get(field) or []
+                if isinstance(raw_val, list):
+                    for item in raw_val:
+                        if isinstance(item, dict):
+                            if item.get("name"):
+                                meta_parts.append(str(item["name"]))
+                            if item.get("slug"):
+                                meta_parts.append(str(item["slug"]))
+                        elif item:
+                            meta_parts.append(str(item))
+                elif raw_val:
+                    meta_parts.append(str(raw_val))
+            if r.get("category"):
+                meta_parts.append(str(r["category"]))
+            for t_name in tax.get("tags", set()):
+                meta_parts.append(str(t_name))
+            for tool_name in tax.get("tools", set()):
+                meta_parts.append(str(tool_name))
+            meta_lower = " ".join(meta_parts).lower()
+
+            ing_parts: List[str] = []
+            for ing in (r.get("recipeIngredient") or r.get("ingredients") or []):
+                if isinstance(ing, dict):
+                    food = ing.get("food")
+                    if isinstance(food, dict) and food.get("name"):
+                        ing_parts.append(str(food["name"]))
+                    elif isinstance(food, str):
+                        ing_parts.append(food)
+                    if ing.get("display"):
+                        ing_parts.append(str(ing["display"]))
+                    elif ing.get("note"):
+                        ing_parts.append(str(ing["note"]))
+                elif isinstance(ing, str):
+                    ing_parts.append(ing)
+            ing_lower = " ".join(ing_parts).lower()
+
+            desc_lower = str(r.get("description") or "").lower()
+            combined = f"{name_lower} {meta_lower} {ing_lower} {desc_lower}"
+
+            # Every query token must match somewhere in the recipe
+            if not all(tok in combined for tok in tokens):
+                continue
+
+            score = 0.0
+            name_token_hits = sum(1 for tok in tokens if tok in name_lower)
+            if name_lower == q_lower:
+                score += 120.0
+            elif name_lower.startswith(q_lower):
+                score += 95.0
+            elif any(w.startswith(q_lower) for w in name_words):
+                score += 80.0
+            elif q_lower in name_lower:
+                score += 70.0
+            elif name_token_hits == len(tokens):
+                score += 55.0
+            elif name_token_hits > 0:
+                score += 25.0 * (name_token_hits / len(tokens))
+
+            if q_lower in meta_lower:
+                score += 32.0
+            elif all(tok in meta_lower for tok in tokens):
+                score += 22.0
+            elif any(tok in meta_lower for tok in tokens):
+                score += 8.0
+
+            if q_lower in ing_lower:
+                score += 24.0
+            elif all(tok in ing_lower for tok in tokens):
+                score += 18.0
+            elif any(tok in ing_lower for tok in tokens):
+                score += 6.0
+
+            if q_lower in desc_lower:
+                score += 12.0
+            elif all(tok in desc_lower for tok in tokens):
+                score += 8.0
+
+            if name_token_hits == len(tokens) or q_lower in name_lower:
+                match_field = "name"
+            elif name_token_hits > 0:
+                match_field = "name"
+            elif any(tok in ing_lower for tok in tokens) and not all(tok in meta_lower for tok in tokens):
+                match_field = "ingredient"
+            elif any(tok in meta_lower for tok in tokens):
+                match_field = "tag"
+            else:
+                match_field = "description"
+
+            side_flag = is_side_recipe(tax, r)
+            dinner_flag = is_dinner_recipe(tax)
+            if scope_norm == "side" and side_flag:
+                score += 15.0
+            elif scope_norm == "main" and dinner_flag:
+                score += 8.0
+
+            pantry_eval = pantry_manager.evaluate_recipe(r, in_stock_set)
+            if pantry_eval.get("status") == "ready":
+                score += 2.0
+            elif pantry_eval.get("status") == "almost_ready":
+                score += 1.0
+
+            scored.append((score, name_lower, r, tax, pantry_eval, side_flag, match_field))
+
+        scored.sort(key=lambda item: (-item[0], item[1]))
+
+        results: List[Dict[str, Any]] = []
+        for _, _, r, tax, pantry_eval, side_flag, match_field in scored[:limit]:
+            recipe_id = r.get("id") or r.get("slug")
+            cat_label = "Side Dish" if side_flag else "Dinner"
+            raw_cats = r.get("recipeCategory") or r.get("categories") or []
+            if raw_cats and isinstance(raw_cats, list):
+                first_c = raw_cats[0]
+                cat_label = first_c.get("name") if isinstance(first_c, dict) else str(first_c)
+            elif r.get("category"):
+                cat_label = str(r["category"])
+
+            is_mock = self.mock_mode
+            results.append(
+                {
+                    "id": recipe_id,
+                    "name": r.get("name", "Untitled Recipe"),
+                    "slug": r.get("slug", ""),
+                    "description": r.get("description") or "",
+                    "totalTime": format_recipe_time(r),
+                    "imageUrl": f"/api/recipe-image/{recipe_id}",
+                    "category": cat_label,
+                    "badges": list(tax.get("badges", []))[:3],
+                    "tags": list(tax.get("tags", set())),
+                    "tools": list(tax.get("tools", set())),
+                    "servings": str(r.get("recipeYield") or r.get("recipeServings") or "").strip(),
+                    "mealieUrl": (
+                        f"{self.base_url}/g/{settings.mealie_group_slug or 'home'}/r/{r.get('slug')}"
+                        if not is_mock and self.base_url and r.get("slug")
+                        else None
+                    ),
+                    "emoji": r.get("emoji") or ("🥗" if side_flag else "🥘"),
+                    "pantry": pantry_eval,
+                    "is_side": side_flag,
+                    "match_field": match_field,
+                    "is_mock": is_mock,
+                }
+            )
+        return results
+
     async def get_recipe_image(self, recipe_id: str) -> Tuple[bytes, str]:
         """Proxy recipe image from Mealie, or serve generated SVG if unavailable or mock."""
         # Check if recipe is in mock collection
@@ -1069,26 +1275,32 @@ class MealieClient:
         source_domain = None
 
         if recipe_id:
-            # Check mock recipes first
-            mock_recipe = next((m for m in MOCK_RECIPES if m["id"] == recipe_id), None)
+            # Check mock recipes first (both mains and sides in case a side was picked via search)
+            mock_recipe = next((m for m in MOCK_RECIPES + MOCK_SIDES if m["id"] == recipe_id), None)
             if mock_recipe:
                 dish_name = mock_recipe["name"]
                 total_time = mock_recipe.get("totalTime")
                 recipe_slug = mock_recipe.get("slug")
             elif not self.mock_mode:
-                try:
-                    async with httpx.AsyncClient(timeout=4.0) as client:
-                        r_resp = await client.get(
-                            f"{self.base_url}/api/recipes/{recipe_id}",
-                            headers=self.headers,
-                        )
-                        if r_resp.status_code == 200:
-                            r_data = r_resp.json()
-                            dish_name = r_data.get("name", "Selected Recipe")
-                            total_time = format_recipe_time(r_data)
-                            recipe_slug = r_data.get("slug")
-                except Exception as e:
-                    logger.debug(f"Could not retrieve recipe metadata for {recipe_id}: {e}")
+                cached_r = self._find_cached_recipe(recipe_id)
+                if cached_r:
+                    dish_name = cached_r.get("name", "Selected Recipe")
+                    total_time = format_recipe_time(cached_r)
+                    recipe_slug = cached_r.get("slug")
+                else:
+                    try:
+                        async with httpx.AsyncClient(timeout=4.0) as client:
+                            r_resp = await client.get(
+                                f"{self.base_url}/api/recipes/{recipe_id}",
+                                headers=self.headers,
+                            )
+                            if r_resp.status_code == 200:
+                                r_data = r_resp.json()
+                                dish_name = r_data.get("name", "Selected Recipe")
+                                total_time = format_recipe_time(r_data)
+                                recipe_slug = r_data.get("slug")
+                    except Exception as e:
+                        logger.debug(f"Could not retrieve recipe metadata for {recipe_id}: {e}")
 
             payload: Dict[str, Any] = {
                 "date": today_str,
@@ -1146,7 +1358,7 @@ class MealieClient:
         side_payload = None
 
         if side_recipe_id:
-            mock_side = next((m for m in MOCK_SIDES if m["id"] == side_recipe_id), None)
+            mock_side = next((m for m in MOCK_SIDES + MOCK_RECIPES if m["id"] == side_recipe_id), None)
             if mock_side:
                 side_name = mock_side["name"]
                 side_time = mock_side.get("totalTime")
@@ -1160,20 +1372,27 @@ class MealieClient:
                     "recipeId": None,
                 }
             elif not self.mock_mode:
-                try:
-                    async with httpx.AsyncClient(timeout=4.0) as client:
-                        s_resp = await client.get(
-                            f"{self.base_url}/api/recipes/{side_recipe_id}",
-                            headers=self.headers,
-                        )
-                        if s_resp.status_code == 200:
-                            s_data = s_resp.json()
-                            side_name = s_data.get("name", "Selected Side")
-                            side_time = format_recipe_time(s_data)
-                            side_slug = s_data.get("slug")
-                            side_emoji = "🥗"
-                except Exception as e:
-                    logger.debug(f"Could not retrieve side metadata for {side_recipe_id}: {e}")
+                cached_s = self._find_cached_recipe(side_recipe_id)
+                if cached_s:
+                    side_name = cached_s.get("name", "Selected Side")
+                    side_time = format_recipe_time(cached_s)
+                    side_slug = cached_s.get("slug")
+                    side_emoji = "🥗"
+                else:
+                    try:
+                        async with httpx.AsyncClient(timeout=4.0) as client:
+                            s_resp = await client.get(
+                                f"{self.base_url}/api/recipes/{side_recipe_id}",
+                                headers=self.headers,
+                            )
+                            if s_resp.status_code == 200:
+                                s_data = s_resp.json()
+                                side_name = s_data.get("name", "Selected Side")
+                                side_time = format_recipe_time(s_data)
+                                side_slug = s_data.get("slug")
+                                side_emoji = "🥗"
+                    except Exception as e:
+                        logger.debug(f"Could not retrieve side metadata for {side_recipe_id}: {e}")
 
                 side_payload = {
                     "date": today_str,
