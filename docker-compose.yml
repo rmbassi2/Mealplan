@@ -21,6 +21,7 @@ services:
       - NTFY_TOKEN=${NTFY_TOKEN:-}
       - MOCK_MODE=${MOCK_MODE:-false}
       - PANTRY_DB_PATH=${PANTRY_DB_PATH:-/app/data/pantry.db}
+      - SHUFFLE_COOLDOWN_MINUTES=${SHUFFLE_COOLDOWN_MINUTES:-30}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]

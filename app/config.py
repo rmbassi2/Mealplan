@@ -20,6 +20,9 @@ class Settings(BaseModel):
     # Pantry Inventory Database Path
     pantry_db_path: str = os.getenv("PANTRY_DB_PATH", "data/pantry.db")
 
+    # Shuffle Cooldown (minutes a shuffled-away recipe is penalized)
+    shuffle_cooldown_minutes: int = int(os.getenv("SHUFFLE_COOLDOWN_MINUTES", "30"))
+
     @property
     def is_configured(self) -> bool:
         return bool(self.mealie_base_url and self.mealie_api_token)

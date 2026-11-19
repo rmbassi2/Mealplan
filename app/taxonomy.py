@@ -389,11 +389,56 @@ def classify_side_bucket(recipe: Dict[str, Any], tax: Dict[str, Any]) -> str:
     return "veggie"
 
 
+def _recipe_key(recipe: Dict[str, Any]) -> str:
+    """Return canonical identifier for a recipe matching what the API exposes."""
+    return str(recipe.get("id") or recipe.get("slug") or "")
+
+
+def _cooldown_fallback_weights(
+    candidates: List[Dict[str, Any]],
+    penalized_recipes: Dict[str, float],
+) -> List[float]:
+    """Compute fallback weights for penalized recipes favoring the oldest-shuffled ones."""
+    if not candidates:
+        return []
+    rems = [float(penalized_recipes.get(_recipe_key(r), 0.0)) for r in candidates]
+    min_rem = min(rems)
+    max_rem = max(rems)
+    if max_rem > min_rem:
+        span = max_rem - min_rem
+        return [(((max_rem - rem) / span) ** 2) + 0.005 for rem in rems]
+    return [1.0 for _ in candidates]
+
+
+def _pick_weighted_without_replacement(
+    candidates: List[Dict[str, Any]],
+    weights: List[float],
+    k: int,
+) -> List[Dict[str, Any]]:
+    """Sample up to k distinct items from candidates using weights without replacement."""
+    if k <= 0 or not candidates:
+        return []
+    avail = list(range(len(candidates)))
+    chosen: List[Dict[str, Any]] = []
+    while len(chosen) < k and avail:
+        curr_weights = [weights[i] for i in avail]
+        idx = random.choices(avail, weights=curr_weights, k=1)[0]
+        chosen.append(candidates[idx])
+        avail.remove(idx)
+    return chosen
+
+
 def select_side_recipes(
     recipes: List[Dict[str, Any]],
     count: int = 3,
+    penalized_recipes: Optional[Dict[str, float]] = None,
 ) -> List[Dict[str, Any]]:
-    """Select 'count' diverse side dish recipes, ideally 1 salad, 1 starch, 1 veggie."""
+    """Select 'count' diverse side dish recipes, ideally 1 salad, 1 starch, 1 veggie.
+
+    Recipes present in ``penalized_recipes`` (recently shuffled away) are avoided
+    unless fewer than ``count`` fresh side candidates remain, in which case
+    oldest-shuffled sides are preferred first.
+    """
     if not recipes:
         return []
 
@@ -410,35 +455,68 @@ def select_side_recipes(
     if len(side_candidates) <= count:
         return side_candidates
 
-    # Partition candidates into 3 distinct culinary buckets:
-    # 1. Fresh Salads & Slaws
-    # 2. Potatoes, Grains & Starches
-    # 3. Warm Roasted & Sautéed Veggies
-    buckets: Dict[str, List[Dict[str, Any]]] = {
-        "salad": [],
-        "starch": [],
-        "veggie": [],
-    }
-    for r in side_candidates:
-        b = classify_side_bucket(r, r["_taxonomy"])
-        buckets[b].append(r)
-
-    for b in buckets:
-        random.shuffle(buckets[b])
+    penalties = penalized_recipes or {}
+    if penalties:
+        fresh_candidates = [r for r in side_candidates if _recipe_key(r) not in penalties]
+        cooldown_candidates = [r for r in side_candidates if _recipe_key(r) in penalties]
+    else:
+        fresh_candidates = side_candidates
+        cooldown_candidates = []
 
     selected: List[Dict[str, Any]] = []
+    used_buckets: Set[str] = set()
 
-    # Pick 1 from each bucket if available
-    for b in ("salad", "starch", "veggie"):
-        if buckets[b] and len(selected) < count:
-            selected.append(buckets[b].pop(0))
+    # Phase 1: Select from fresh (unpenalized) side candidates across 3 culinary buckets
+    if fresh_candidates:
+        buckets: Dict[str, List[Dict[str, Any]]] = {
+            "salad": [],
+            "starch": [],
+            "veggie": [],
+        }
+        for r in fresh_candidates:
+            b = classify_side_bucket(r, r["_taxonomy"])
+            buckets[b].append(r)
 
-    # If we still need more to satisfy count (e.g. one bucket was empty), fill from remaining pool
-    if len(selected) < count:
-        remaining = [r for r in side_candidates if r not in selected]
-        random.shuffle(remaining)
-        needed = count - len(selected)
-        selected.extend(remaining[:needed])
+        for b in buckets:
+            random.shuffle(buckets[b])
+
+        for b in ("salad", "starch", "veggie"):
+            if buckets[b] and len(selected) < count:
+                selected.append(buckets[b].pop(0))
+                used_buckets.add(b)
+
+        if len(selected) < count:
+            remaining_fresh = [r for r in fresh_candidates if r not in selected]
+            random.shuffle(remaining_fresh)
+            needed = count - len(selected)
+            for r in remaining_fresh[:needed]:
+                selected.append(r)
+                used_buckets.add(classify_side_bucket(r, r["_taxonomy"]))
+
+    # Phase 2: Graceful fallback to penalized sides if fewer than `count` fresh sides exist
+    if len(selected) < count and cooldown_candidates:
+        cbuckets: Dict[str, List[Dict[str, Any]]] = {
+            "salad": [],
+            "starch": [],
+            "veggie": [],
+        }
+        for r in cooldown_candidates:
+            cbuckets[classify_side_bucket(r, r["_taxonomy"])].append(r)
+
+        # Prefer buckets not yet represented, weighting oldest-shuffled sides highest
+        for b in ("salad", "starch", "veggie"):
+            if b not in used_buckets and cbuckets[b] and len(selected) < count:
+                b_weights = _cooldown_fallback_weights(cbuckets[b], penalties)
+                picked = _pick_weighted_without_replacement(cbuckets[b], b_weights, 1)
+                if picked:
+                    selected.append(picked[0])
+                    used_buckets.add(b)
+
+        if len(selected) < count:
+            remaining_cooldown = [r for r in cooldown_candidates if r not in selected]
+            rem_weights = _cooldown_fallback_weights(remaining_cooldown, penalties)
+            needed = count - len(selected)
+            selected.extend(_pick_weighted_without_replacement(remaining_cooldown, rem_weights, needed))
 
     random.shuffle(selected)
     return selected
@@ -551,6 +629,75 @@ def matches_filter(
     return True
 
 
+def _select_from_tier(
+    candidates: List[Dict[str, Any]],
+    needed: int,
+    is_weeknight: bool,
+    selected_proteins: Set[str],
+    selected_cuisines: Set[str],
+    penalized_recipes: Optional[Dict[str, float]] = None,
+) -> List[Dict[str, Any]]:
+    """Run anti-monotony weighted sampling for up to ``needed`` recipes from ``candidates``."""
+    if needed <= 0 or not candidates:
+        return []
+
+    cooldown_factors = (
+        _cooldown_fallback_weights(candidates, penalized_recipes)
+        if penalized_recipes
+        else None
+    )
+
+    base_weights = []
+    for idx, r in enumerate(candidates):
+        tags = r["_taxonomy"]["tags"]
+        is_quick = "quick-weeknight" in tags or "low-effort" in tags
+        w = 1.8 if (is_weeknight and is_quick) else 1.0
+
+        p_info = r.get("_pantry")
+        if p_info:
+            if p_info.get("status") == "ready":
+                w *= 1.6
+            elif p_info.get("status") == "almost_ready":
+                w *= 1.2
+            elif not p_info.get("is_ready", True):
+                w *= 0.2
+
+        if cooldown_factors is not None:
+            w *= cooldown_factors[idx]
+
+        base_weights.append(w)
+
+    picked: List[Dict[str, Any]] = []
+    available_indices = list(range(len(candidates)))
+
+    while len(picked) < needed and available_indices:
+        current_weights = []
+        for idx in available_indices:
+            r = candidates[idx]
+            prot = r["_taxonomy"]["primary_protein"]
+            cuisines = r["_taxonomy"]["dimensions"].get("cuisine", [])
+            w = base_weights[idx]
+
+            # Anti-monotony penalty for duplicate protein family
+            if prot in selected_proteins:
+                w *= 0.15
+            # Soft penalty for duplicate cuisine
+            if any(c in selected_cuisines for c in cuisines):
+                w *= 0.5
+            current_weights.append(w)
+
+        chosen_idx = random.choices(available_indices, weights=current_weights, k=1)[0]
+        chosen = candidates[chosen_idx]
+        picked.append(chosen)
+
+        selected_proteins.add(chosen["_taxonomy"]["primary_protein"])
+        for c in chosen["_taxonomy"]["dimensions"].get("cuisine", []):
+            selected_cuisines.add(c)
+        available_indices.remove(chosen_idx)
+
+    return picked
+
+
 def select_balanced_recipes(
     recipes: List[Dict[str, Any]],
     count: int = 3,
@@ -558,8 +705,14 @@ def select_balanced_recipes(
     protein: Optional[str] = None,
     tool: Optional[str] = None,
     cuisine: Optional[str] = None,
+    penalized_recipes: Optional[Dict[str, float]] = None,
 ) -> List[Dict[str, Any]]:
-    """Select 'count' recipes with maximum protein and cuisine diversity."""
+    """Select 'count' recipes with maximum protein and cuisine diversity.
+
+    Recipes present in ``penalized_recipes`` (recently shuffled away) are held
+    out of selection while at least ``count`` fresh recipes remain; if the fresh
+    pool is exhausted, remaining slots fall back to the oldest-shuffled recipes.
+    """
     if not recipes:
         return []
 
@@ -592,57 +745,42 @@ def select_balanced_recipes(
     weekday = date.today().weekday()  # 0=Monday, 6=Sunday
     is_weeknight = weekday in (0, 1, 2, 3)
 
-    # Base sampling weights: on weeknights, gently favor quick/low-effort recipes (1.8x boost)
-    # instead of a deterministic sort that starves variety or locks in a single recipe
-    base_weights = []
-    for r in pool:
-        tags = r["_taxonomy"]["tags"]
-        is_quick = "quick-weeknight" in tags or "low-effort" in tags
-        w = 1.8 if (is_weeknight and is_quick) else 1.0
-
-        p_info = r.get("_pantry")
-        if p_info:
-            if p_info.get("status") == "ready":
-                w *= 1.6
-            elif p_info.get("status") == "almost_ready":
-                w *= 1.2
-            elif not p_info.get("is_ready", True):
-                w *= 0.2
-
-        base_weights.append(w)
+    penalties = penalized_recipes or {}
+    if penalties:
+        fresh_pool = [r for r in pool if _recipe_key(r) not in penalties]
+        cooldown_pool = [r for r in pool if _recipe_key(r) in penalties]
+    else:
+        fresh_pool = pool
+        cooldown_pool = []
 
     selected: List[Dict[str, Any]] = []
     selected_proteins: Set[str] = set()
     selected_cuisines: Set[str] = set()
-    available_indices = list(range(len(pool)))
 
-    # Iteratively choose recipes, dynamically discounting already-represented proteins and cuisines
-    while len(selected) < count and available_indices:
-        current_weights = []
-        for idx in available_indices:
-            r = pool[idx]
-            prot = r["_taxonomy"]["primary_protein"]
-            cuisines = r["_taxonomy"]["dimensions"].get("cuisine", [])
-            w = base_weights[idx]
+    # Phase 1: Pick from unpenalized (fresh) recipes first
+    if fresh_pool:
+        selected.extend(
+            _select_from_tier(
+                fresh_pool,
+                needed=count,
+                is_weeknight=is_weeknight,
+                selected_proteins=selected_proteins,
+                selected_cuisines=selected_cuisines,
+            )
+        )
 
-            # Anti-monotony penalty for duplicate protein family
-            if prot in selected_proteins:
-                w *= 0.15
-            # Soft penalty for duplicate cuisine
-            if any(c in selected_cuisines for c in cuisines):
-                w *= 0.5
-            current_weights.append(w)
-
-        # Weighted probabilistic choice
-        chosen_idx = random.choices(available_indices, weights=current_weights, k=1)[0]
-        chosen = pool[chosen_idx]
-        selected.append(chosen)
-
-        # Track selected dimensions
-        selected_proteins.add(chosen["_taxonomy"]["primary_protein"])
-        for c in chosen["_taxonomy"]["dimensions"].get("cuisine", []):
-            selected_cuisines.add(c)
-        available_indices.remove(chosen_idx)
+    # Phase 2: Gracefully fill any remaining slots from cooldown pool (oldest-shuffled first)
+    if len(selected) < count and cooldown_pool:
+        selected.extend(
+            _select_from_tier(
+                cooldown_pool,
+                needed=count - len(selected),
+                is_weeknight=is_weeknight,
+                selected_proteins=selected_proteins,
+                selected_cuisines=selected_cuisines,
+                penalized_recipes=penalties,
+            )
+        )
 
     random.shuffle(selected)
     return selected
