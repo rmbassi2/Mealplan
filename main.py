@@ -271,6 +271,13 @@ async def get_taxonomy_filters():
     }
 
 
+def _parse_csv_ids(raw: Optional[str]) -> List[str]:
+    """Parse a comma-separated query parameter of recipe IDs into a clean list."""
+    if not raw:
+        return []
+    return [rid.strip() for rid in raw.split(",") if rid.strip()]
+
+
 @app.get("/api/options")
 async def get_dinner_options(
     mood: Optional[str] = None,
@@ -278,6 +285,7 @@ async def get_dinner_options(
     tool: Optional[str] = None,
     cuisine: Optional[str] = None,
     pantry_only: Optional[bool] = False,
+    penalize: Optional[str] = None,
 ):
     """Fetch 3 balanced dinner recipe options from Mealie, with optional mood, protein, tool, cuisine, or pantry filtering."""
     try:
@@ -288,6 +296,7 @@ async def get_dinner_options(
             tool=tool,
             cuisine=cuisine,
             pantry_only=bool(pantry_only or (mood in ("pantry", "pantry-ready"))),
+            penalize_ids=_parse_csv_ids(penalize),
         )
         return {
             "options": options,
@@ -475,10 +484,13 @@ async def add_missing_item_to_shopping_list(req: ShoppingListAddRequest):
 
 
 @app.get("/api/side-options")
-async def get_side_options():
+async def get_side_options(penalize: Optional[str] = None):
     """Fetch 3 curated side dish options from Mealie or smart fallbacks."""
     try:
-        options = await mealie_client.get_side_options(count=3)
+        options = await mealie_client.get_side_options(
+            count=3,
+            penalize_ids=_parse_csv_ids(penalize),
+        )
         return {
             "options": options,
             "count": len(options),
